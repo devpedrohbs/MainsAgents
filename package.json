@@ -1,0 +1,58 @@
+{
+  "name": "mains-agents",
+  "description": "Desktop workspace for specialized AI agents powered by Codex.",
+  "author": "devpedrohbs",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node dev.mjs",
+    "dev:web": "vite --open app.html",
+    "codex:bridge": "node codex-bridge.mjs",
+    "build": "tsc -b && vite build",
+    "desktop": "npm run build && electron .",
+    "desktop:dist": "npm run build && electron-builder --win nsis",
+    "preview": "vite preview --open app.html",
+    "typecheck": "tsc -b --pretty false"
+  },
+  "main": "desktop-main.mjs",
+  "dependencies": {
+    "@xyflow/react": "12.11.6",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.1",
+    "typescript": "7.0.2",
+    "electron": "41.0.2",
+    "electron-builder": "26.0.12",
+    "vite": "8.3.0"
+  },
+  "build": {
+    "appId": "com.mainsagents.desktop",
+    "productName": "MainsAgents",
+    "asar": true,
+    "files": [
+      "dist/**/*",
+      "desktop-main.mjs",
+      "codex-bridge.mjs",
+      "package.json"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "target": "nsis",
+      "artifactName": "MainsAgents-Setup-${version}.${ext}",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  }
+}

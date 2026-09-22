@@ -1,0 +1,8 @@
+import type { Agent, AgentTool } from '../features/agents/model/Agent';
+import { agentStatusLabels, agentToolDetails, getAgentInitials } from '../features/agents/model/Agent';
+
+const availableTools = Object.keys(agentToolDetails) as AgentTool[];
+
+export function AgentSettings({agent,onBack,onEdit}:{agent:Agent;onBack:()=>void;onEdit:()=>void}) {
+  return <div className="page"><div className="page-head"><div><p className="eyebrow">Agent settings</p><h1>{agent.name}</h1><p>Define the role, tools, and default working behavior.</p></div><button className="soft-button" onClick={onBack}>Back to agents</button></div><div className="agent-settings-hero"><span className="agent-monogram">{getAgentInitials(agent)}</span><div><b>{agent.name}</b><span>{agent.role} · {agentStatusLabels[agent.status]}</span></div><button className="primary-button" onClick={onEdit}>Edit agent</button></div><section className="settings-panel agent-settings-panel"><label className="field"><span>Name</span><input value={agent.name} readOnly/></label><label className="field"><span>Role</span><input value={agent.role} readOnly/></label><label className="field full"><span>Description</span><input value={agent.description} readOnly/></label><label className="field full"><span>Instructions</span><textarea rows={5} value={agent.instructions} readOnly/></label>{availableTools.map((tool)=>{const detail=agentToolDetails[tool];const enabled=agent.tools.includes(tool);return <div className="setting-row" key={tool}><div className="setting-copy"><b>{detail.label}</b><p>{detail.description}</p></div><button className={`toggle ${enabled?'on':''}`} aria-label={detail.label} aria-pressed={enabled} disabled/></div>})}</section></div>;
+}
