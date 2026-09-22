@@ -5,6 +5,7 @@ import type { CanvasFlowNode, CanvasNodeData, CanvasNodeKind } from './canvasTyp
 import { ContentIdeaNode, HookNode, ImageNode, NoteNode, ResearchNode, ScriptNode } from './nodes/CanvasNodes';
 import { useCanvas } from './CanvasProvider';
 import { useWorkspaces } from '../../app/WorkspaceProvider';
+import { useLanguage } from '../../app/LanguageProvider';
 
 const nodeTypes = { note:NoteNode, research:ResearchNode, image:ImageNode, contentIdea:ContentIdeaNode, hook:HookNode, script:ScriptNode } satisfies NodeTypes;
 const nodeLabels:Record<CanvasNodeKind,string>={note:'Note',research:'Research',image:'Image',contentIdea:'Content idea',hook:'Hook',script:'Script'};
@@ -23,6 +24,7 @@ interface CanvasProps { onToast:(message:string)=>void; onAskAgent:(nodeIds:stri
 
 export function Canvas({onToast,onAskAgent,onSendToAgent}:CanvasProps) {
   const {currentWorkspace}=useWorkspaces();
+  const {t}=useLanguage();
   const {nodes,edges,setNodes,setEdges,onNodesChange,onEdgesChange,view,updateView,groupNodes}=useCanvas();
   const [addMenuOpen,setAddMenuOpen]=useState(false);
   const [contextMenu,setContextMenu]=useState<ContextMenuState|null>(null);
@@ -48,7 +50,7 @@ export function Canvas({onToast,onAskAgent,onSendToAgent}:CanvasProps) {
   const groupSelected=()=>{const ids=selectedNodes.map((node)=>node.id);if(ids.length<2)return;groupNodes(ids);onToast(`${ids.length} nodes grouped`)};
 
   return <section className="canvas-layout" ref={layoutRef}>
-    <div className="canvas-toolbar"><div className="canvas-title"><Icon name="canvas"/><strong>{currentWorkspace.name} canvas</strong><span>· {nodes.length} objects</span></div><div className="canvas-tools"><button className="soft-button" onClick={()=>addNode('note')}><Icon name="note"/>Note</button><div className="canvas-add-wrap"><button className="soft-button" aria-expanded={addMenuOpen} onClick={()=>setAddMenuOpen((open)=>!open)}><Icon name="plus"/>Add</button>{addMenuOpen&&<div className="canvas-add-menu">{(Object.keys(nodeLabels) as CanvasNodeKind[]).map((kind)=><button key={kind} onClick={()=>addNode(kind)}><i/>{nodeLabels[kind]}</button>)}</div>}</div></div></div>
+    <div className="canvas-toolbar"><div className="canvas-title"><Icon name="canvas"/><strong>{currentWorkspace.name} canvas</strong><span>· {nodes.length} objects</span></div><div className="canvas-tools"><button className="soft-button" onClick={()=>addNode('note')}><Icon name="note"/>{t('Note')}</button><div className="canvas-add-wrap"><button className="soft-button" aria-expanded={addMenuOpen} onClick={()=>setAddMenuOpen((open)=>!open)}><Icon name="plus"/>{t('Add')}</button>{addMenuOpen&&<div className="canvas-add-menu">{(Object.keys(nodeLabels) as CanvasNodeKind[]).map((kind)=><button key={kind} onClick={()=>addNode(kind)}><i/>{t(nodeLabels[kind])}</button>)}</div>}</div></div></div>
     <ReactFlow<CanvasFlowNode,Edge>
       nodes={nodes}
       edges={edges}
@@ -79,14 +81,14 @@ export function Canvas({onToast,onAskAgent,onSendToAgent}:CanvasProps) {
     </ReactFlow>
     {connectFromId&&<div className="connect-hint"><Icon name="link"/>Select a destination node <button onClick={()=>setConnectFromId(null)}>Cancel</button></div>}
     {contextMenu&&<div className="context-menu canvas-context-menu" role="menu" aria-label="Node actions" style={{left:contextMenu.x,top:contextMenu.y}} onContextMenu={(event)=>event.preventDefault()}>
-      <button role="menuitem" onClick={askAgent}><Icon name="message"/>Ask Agent</button>
-      <button role="menuitem" onClick={sendToAgent}><Icon name="users"/>Send to Agent</button>
+      <button role="menuitem" onClick={askAgent}><Icon name="message"/>{t('Ask Agent')}</button>
+      <button role="menuitem" onClick={sendToAgent}><Icon name="users"/>{t('Send to Agent')}</button>
       <div className="context-separator"/>
-      <button role="menuitem" onClick={()=>duplicateNode(contextMenu.nodeId)}><Icon name="copy"/>Duplicate</button>
-      <button role="menuitem" onClick={()=>beginConnection(contextMenu.nodeId)}><Icon name="link"/>Connect</button>
+      <button role="menuitem" onClick={()=>duplicateNode(contextMenu.nodeId)}><Icon name="copy"/>{t('Duplicate')}</button>
+      <button role="menuitem" onClick={()=>beginConnection(contextMenu.nodeId)}><Icon name="link"/>{t('Connect')}</button>
       <div className="context-separator"/>
-      <button role="menuitem" className="danger" onClick={()=>deleteNodes(new Set([contextMenu.nodeId]))}><Icon name="trash"/>Delete</button>
+      <button role="menuitem" className="danger" onClick={()=>deleteNodes(new Set([contextMenu.nodeId]))}><Icon name="trash"/>{t('Delete')}</button>
     </div>}
-    {selectedNodes.length>0&&<div className="selection-bar show"><span className="selection-label">{selectedNodes.length} selected</span><button className="soft-button" onClick={()=>onAskAgent(selectedNodes.map((node)=>node.id))}><Icon name="message"/>Ask Agent</button><button className="soft-button" onClick={()=>onSendToAgent(selectedNodes.map((node)=>node.id))}><Icon name="users"/>Send to Agent</button><button className="soft-button" disabled={selectedNodes.length<2} onClick={groupSelected}><Icon name="folder"/>Group</button></div>}
+    {selectedNodes.length>0&&<div className="selection-bar show"><span className="selection-label">{selectedNodes.length} {t('selected')}</span><button className="soft-button" onClick={()=>onAskAgent(selectedNodes.map((node)=>node.id))}><Icon name="message"/>{t('Ask Agent')}</button><button className="soft-button" onClick={()=>onSendToAgent(selectedNodes.map((node)=>node.id))}><Icon name="users"/>{t('Send to Agent')}</button><button className="soft-button" disabled={selectedNodes.length<2} onClick={groupSelected}><Icon name="folder"/>{t('Group')}</button></div>}
   </section>;
 }

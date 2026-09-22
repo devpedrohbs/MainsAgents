@@ -139,7 +139,10 @@ export async function startCodexBridge({ port = 8787, cwd = process.cwd() } = {}
       if (request.method === 'POST' && url.pathname === '/api/codex/sessions') {
         const input = await body(request);
         const config = input.config ?? {};
-        const params = { cwd, model: process.env.MAINSAGENTS_CODEX_MODEL ?? 'gpt-5.6-terra', approvalPolicy: 'never', sandbox: 'read-only', developerInstructions: config.instructions ? `You are ${config.agentName ?? 'a MainsAgents specialist'}. ${config.instructions}` : undefined, serviceName: 'mainsagents' };
+        const skillsContext = config.skillsDirectory
+          ? `\n\nThis agent has skills available in: ${config.skillsDirectory}. Installed skills: ${(config.skills ?? []).join(', ') || 'scan the directory for SKILL.md files'}. Read and follow the relevant SKILL.md before using a skill.`
+          : '';
+        const params = { cwd, model: process.env.MAINSAGENTS_CODEX_MODEL ?? 'gpt-5.6-terra', approvalPolicy: 'never', sandbox: 'read-only', developerInstructions: `You are ${config.agentName ?? 'a MainsAgents specialist'}. ${config.instructions ?? ''}${skillsContext}`.trim(), serviceName: 'mainsagents' };
         const result = input.threadId ? await client.request('thread/resume', { threadId: input.threadId, ...params }) : await client.request('thread/start', params);
         return json(response, 200, { threadId: result.thread.id });
       }

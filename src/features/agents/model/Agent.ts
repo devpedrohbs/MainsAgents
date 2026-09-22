@@ -11,6 +11,8 @@ export interface Agent {
   status: AgentStatusValue;
   workspaceId: string;
   tools: AgentTool[];
+  skillsDirectory?: string;
+  skills?: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -28,7 +30,7 @@ export const agentToolDetails: Record<AgentTool, { label: string; description: s
   subagents: { label: 'Subagents', description: 'Delegate focused work to other agents.' },
 };
 
-export type AgentEditorValues = Pick<Agent, 'name' | 'role' | 'description' | 'instructions' | 'workspaceId' | 'tools'>;
+export type AgentEditorValues = Pick<Agent, 'name' | 'role' | 'description' | 'instructions' | 'workspaceId' | 'tools' | 'skillsDirectory' | 'skills'>;
 
 export function getAgentInitials(agent: Pick<Agent, 'name'>): string {
   return agent.name

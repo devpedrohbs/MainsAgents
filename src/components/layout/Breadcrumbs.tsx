@@ -1,6 +1,7 @@
 import type { PageId } from '../../app/types';
 import { routes } from '../../app/routes';
 import { useWorkspaces } from '../../app/WorkspaceProvider';
+import { useLanguage } from '../../app/LanguageProvider';
 
 interface BreadcrumbsProps {
   page: PageId;
@@ -9,6 +10,7 @@ interface BreadcrumbsProps {
 
 export function Breadcrumbs({ page, onNavigate }: BreadcrumbsProps) {
   const { currentWorkspace } = useWorkspaces();
+  const {t}=useLanguage();
   const items = [currentWorkspace.name, ...routes[page].breadcrumbs.slice(1)];
 
   return (
@@ -21,9 +23,9 @@ export function Breadcrumbs({ page, onNavigate }: BreadcrumbsProps) {
           <span className="breadcrumb-part" key={`${item}-${index}`}>
             {index > 0 && <span className="breadcrumb-separator" aria-hidden="true">/</span>}
             {isLast || !destination ? (
-              <strong aria-current={isLast ? 'page' : undefined}>{item}</strong>
+              <strong aria-current={isLast ? 'page' : undefined}>{t(item)}</strong>
             ) : (
-              <a href={`#${destination}`} onClick={(event) => { event.preventDefault(); onNavigate(destination); }}>{item}</a>
+              <a href={`#${destination}`} onClick={(event) => { event.preventDefault(); onNavigate(destination); }}>{t(item)}</a>
             )}
           </span>
         );

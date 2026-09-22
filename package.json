@@ -3,7 +3,7 @@
   "description": "Desktop workspace for specialized AI agents powered by Codex.",
   "author": "devpedrohbs",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "scripts": {
     "dev": "node dev.mjs",
@@ -37,6 +37,7 @@
     "files": [
       "dist/**/*",
       "desktop-main.mjs",
+      "desktop-preload.cjs",
       "codex-bridge.mjs",
       "package.json"
     ],

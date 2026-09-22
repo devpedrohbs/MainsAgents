@@ -9,6 +9,8 @@ export interface CodexSessionConfig {
   workspaceId: string;
   instructions: string;
   tools: readonly AgentTool[];
+  skillsDirectory?: string;
+  skills?: readonly string[];
   metadata?: Record<string, string>;
 }
 

@@ -19,7 +19,7 @@ interface ChatContextValue {
 
 const ChatContext = createContext<ChatContextValue | null>(null);
 const makeId = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-const makeSession = (agentId: AgentId, title = 'New session'): AgentSession => { const now=new Date().toISOString();return {id:makeId('session'),agentId,title,messages:[],createdAt:now,updatedAt:now} };
+const makeSession = (agentId: AgentId, title?: string): AgentSession => { const now=new Date().toISOString();return {id:makeId('session'),agentId,title:title??(document.documentElement.lang==='pt-BR'?'Nova sessão':'New session'),messages:[],createdAt:now,updatedAt:now} };
 const titleFromMessage = (message: string) => message.length > 42 ? `${message.slice(0, 42).trim()}…` : message;
 
 export function ChatProvider({ children, codexService }: PropsWithChildren<{codexService:CodexService}>) {
@@ -61,11 +61,11 @@ export function ChatProvider({ children, codexService }: PropsWithChildren<{code
     if(!session){session=makeSession(agent.id);setSessions((current)=>[session!,...current]);setActiveSessionIds((current)=>({...current,[agent.id]:session!.id}))}
     const sessionId=session.id;
     setRunStates((current)=>({...current,[sessionId]:'thinking'}));
-    updateSession(sessionId,(current)=>({...current,title:current.title==='New session'?titleFromMessage(clean):current.title,updatedAt:new Date().toISOString(),messages:[...current.messages,{id:makeId('message'),type:'message',role:'user',content:clean,createdAt:new Date().toISOString(),contextNodes:contextNodes.length?[...contextNodes]:undefined}]}));
+    updateSession(sessionId,(current)=>({...current,title:['New session','Nova sessão'].includes(current.title)?titleFromMessage(clean):current.title,updatedAt:new Date().toISOString(),messages:[...current.messages,{id:makeId('message'),type:'message',role:'user',content:clean,createdAt:new Date().toISOString(),contextNodes:contextNodes.length?[...contextNodes]:undefined}]}));
     const controller=new AbortController();abortControllers.current[sessionId]=controller;
     void (async()=>{
       try{
-        const thread=session!.codexThreadId?await codexService.resumeSession({threadId:session!.codexThreadId}):await codexService.createSession({agentId:agent.id,agentName:agent.name,workspaceId:agent.workspaceId,instructions:agent.instructions,tools:agent.tools});
+        const thread=session!.codexThreadId?await codexService.resumeSession({threadId:session!.codexThreadId}):await codexService.createSession({agentId:agent.id,agentName:agent.name,workspaceId:agent.workspaceId,instructions:agent.instructions,tools:agent.tools,skillsDirectory:agent.skillsDirectory,skills:agent.skills});
         if(!session!.codexThreadId)updateSession(sessionId,(current)=>({...current,codexThreadId:thread.threadId,updatedAt:new Date().toISOString()}));
         const execution=await codexService.sendMessage({threadId:thread.threadId,content:clean,context:contextNodes.map((node)=>({id:node.nodeId,kind:node.kind,label:node.label}))});
         executions.current[sessionId]=execution.executionId;

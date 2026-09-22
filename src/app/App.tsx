@@ -17,9 +17,11 @@ import { useCanvas } from '../components/canvas/CanvasProvider';
 import { useWorkspaces } from './WorkspaceProvider';
 import { useChat } from '../features/chat/ChatProvider';
 import { usePersistentState } from '../data/localPersistence';
+import { useLanguage } from './LanguageProvider';
 
 export function App() {
   const { page, navigate } = useHashRouter();
+  const {locale}=useLanguage();
   const {agents:allAgents,getAgentById,createAgent,updateAgent,deleteAgent}=useAgents();
   const {currentWorkspaceId,workspaces,setCurrentWorkspaceId}=useWorkspaces();
   const {sessions,createSession,openSession}=useChat();
@@ -41,8 +43,8 @@ export function App() {
   const removeAgent=()=>{if(!editorAgentId||editorAgentId==='new')return;const remaining=agents.filter((agent)=>agent.id!==editorAgentId);const removed=getAgentById(editorAgentId);deleteAgent(editorAgentId);if(activeAgentId===editorAgentId)setActiveAgentId(remaining[0]?.id??'');setEditorAgentId(null);notify(`${removed?.name??'Agent'} deleted`)};
   const openTask=(task:Task)=>{selectAgent(task.agentId);notify(`${task.title} opened`)};
   const moveTask=(taskId:string,status:TaskStatus)=>{const task=allTasks.find((item)=>item.id===taskId);setAllTasks((current)=>current.map((item)=>item.id===taskId?{...item,status}:item));if(task)notify(`${task.title} moved to ${status}`)};
-  const newTask=()=>{if(!activeAgent){setEditorAgentId('new');notify('Create an agent before adding a task');return}const task:Task={id:`task-${Date.now().toString(36)}`,title:'Untitled task',description:'New workspace task.',agentId:activeAgent.id,workspaceId:currentWorkspaceId,status:'research',metadata:'New',createdAt:new Date().toISOString()};setAllTasks((current)=>[task,...current]);navigate('board');notify('New task added')};
-  const newSession=()=>{if(!activeAgent){setEditorAgentId('new');notify('Create an agent before starting a session');return}const session=createSession(activeAgent.id);setPanelOpen(true);notify(`${session.title} created`)};
+  const newTask=()=>{if(!activeAgent){setEditorAgentId('new');notify(locale==='pt-BR'?'Crie um agente antes de adicionar uma tarefa':'Create an agent before adding a task');return}const task:Task={id:`task-${Date.now().toString(36)}`,title:locale==='pt-BR'?'Tarefa sem título':'Untitled task',description:locale==='pt-BR'?'Nova tarefa do workspace.':'New workspace task.',agentId:activeAgent.id,workspaceId:currentWorkspaceId,status:'research',metadata:locale==='pt-BR'?'Nova':'New',createdAt:new Date().toISOString()};setAllTasks((current)=>[task,...current]);navigate('board');notify(locale==='pt-BR'?'Nova tarefa adicionada':'New task added')};
+  const newSession=()=>{if(!activeAgent){setEditorAgentId('new');notify(locale==='pt-BR'?'Crie um agente antes de iniciar uma sessão':'Create an agent before starting a session');return}const session=createSession(activeAgent.id);setPanelOpen(true);notify(locale==='pt-BR'?`${session.title} criada`:`${session.title} created`)};
   const addCanvasNode=(kind:Parameters<typeof addNode>[0])=>{addNode(kind);navigate('canvas');notify(`${kind==='note'?'Note':'Image'} added to Canvas`)};
   const workspaceSessions=sessions.filter((session)=>agents.some((agent)=>agent.id===session.agentId));
   useEffect(()=>{if(!agents.some((agent)=>agent.id===activeAgentId))setActiveAgentId(agents[0]?.id??'');setEditorAgentId(null)},[currentWorkspaceId,allAgents]);

@@ -4,6 +4,7 @@ import { Icon, type IconName } from '../common/Icon';
 import { AgentList } from '../agents/AgentList';
 import { routes } from '../../app/routes';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher';
+import { useLanguage } from '../../app/LanguageProvider';
 
 interface SidebarProps { currentPage:PageId; agents:readonly Agent[]; onNavigate:(page:PageId)=>void; onSelectAgent:(agentId:string)=>void }
 const primary:[PageId,IconName,string][]=[['home','home','Home'],['board','board','Board'],['canvas','canvas','Canvas']];
@@ -15,14 +16,15 @@ function NavButton({page,icon,label,currentPage,onNavigate,badge}:{page:PageId;i
 }
 
 export function Sidebar({currentPage,agents,onNavigate,onSelectAgent}:SidebarProps) {
+  const {t}=useLanguage();
   return <aside className="sidebar">
     <div className="brand"><span className="brand-mark"/><span>MainsAgents</span></div>
     <WorkspaceSwitcher/>
     <div className="sidebar-scroll">
-      <nav className="nav-group">{primary.map(([page,icon,label])=><NavButton key={page} {...{page,icon,label,currentPage,onNavigate}}/>)}</nav>
-      <div className="nav-group"><p className="nav-label">Workspace</p>{workspace.map(([page,icon,label])=><NavButton key={page} {...{page,icon,label,currentPage,onNavigate}} badge={page==='agents'?String(agents.length):undefined}/>)}</div>
-      <div className="nav-group"><p className="nav-label">Agents</p><AgentList agents={agents} compact onSelect={onSelectAgent}/></div>
+      <nav className="nav-group">{primary.map(([page,icon,label])=><NavButton key={page} {...{page,icon,label:t(label),currentPage,onNavigate}}/>)}</nav>
+      <div className="nav-group"><p className="nav-label">{t('Workspace')}</p>{workspace.map(([page,icon,label])=><NavButton key={page} {...{page,icon,label:t(label),currentPage,onNavigate}} badge={page==='agents'?String(agents.length):undefined}/>)}</div>
+      <div className="nav-group"><p className="nav-label">{t('Agents')}</p><AgentList agents={agents} compact onSelect={onSelectAgent}/></div>
     </div>
-    <div className="sidebar-footer"><NavButton page="settings" icon="settings" label="Settings" currentPage={currentPage} onNavigate={onNavigate}/><div className="connection"><i/><span>Codex connected</span></div></div>
+    <div className="sidebar-footer"><NavButton page="settings" icon="settings" label={t('Settings')} currentPage={currentPage} onNavigate={onNavigate}/><div className="connection"><i/><span>{t('Codex connected')}</span></div></div>
   </aside>;
 }

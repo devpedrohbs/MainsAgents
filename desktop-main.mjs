@@ -1,7 +1,9 @@
-import { app, BrowserWindow, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
+import { spawn } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { createServer, request as httpRequest } from 'node:http';
-import { appendFileSync, createReadStream, existsSync, mkdirSync, statSync } from 'node:fs';
-import { extname, join, normalize } from 'node:path';
+import { appendFileSync, createReadStream, existsSync, mkdirSync, readdirSync, statSync } from 'node:fs';
+import { dirname, extname, join, normalize } from 'node:path';
 import { startCodexBridge } from './codex-bridge.mjs';
 
 const mimeTypes = {
@@ -27,6 +29,57 @@ function logStartup(message) {
     appendFileSync(join(app.getPath('userData'), 'startup.log'), `${new Date().toISOString()} ${message}\n`);
   } catch {}
 }
+
+function findSkills(directory, depth = 0) {
+  if (!directory || !existsSync(directory) || depth > 4) return [];
+  try {
+    const entries = readdirSync(directory, { withFileTypes: true });
+    if (entries.some((entry) => entry.isFile() && entry.name.toLowerCase() === 'skill.md')) return [{ name: directory.split(/[\\/]/).filter(Boolean).at(-1) ?? 'skill', path: directory }];
+    return entries.filter((entry) => entry.isDirectory() && !entry.name.startsWith('.git')).flatMap((entry) => findSkills(join(directory, entry.name), depth + 1));
+  } catch { return []; }
+}
+
+function installSkill(source, cwd) {
+  let executable = 'npx';
+  let args = ['--yes', 'skills', 'add', source, '--agent', 'codex', '--yes'];
+  if (process.platform === 'win32') {
+    const npxCommand = execFileSync('where.exe', ['npx.cmd'], { encoding: 'utf8', windowsHide: true }).split(/\r?\n/).find(Boolean);
+    if (!npxCommand) throw new Error('npx was not found. Install Node.js before installing skills.');
+    const nodeDirectory = dirname(npxCommand.trim());
+    executable = join(nodeDirectory, 'node.exe');
+    args = [join(nodeDirectory, 'node_modules', 'npm', 'bin', 'npx-cli.js'), '--yes', 'skills', 'add', source, '--agent', 'codex', '--yes'];
+  }
+  return new Promise((resolve, reject) => {
+    const child = spawn(executable, args, { cwd, windowsHide: true, shell: false });
+    let output = '';
+    const timer = setTimeout(() => { child.kill(); reject(new Error('Skill installation timed out.')); }, 120000);
+    child.stdout.on('data', (chunk) => { output += chunk.toString(); });
+    child.stderr.on('data', (chunk) => { output += chunk.toString(); });
+    child.on('error', (error) => { clearTimeout(timer); reject(error); });
+    child.on('exit', (code) => {
+      clearTimeout(timer);
+      code === 0 ? resolve(output) : reject(new Error(output.trim() || `Skill installer exited with code ${code}`));
+    });
+  });
+}
+
+ipcMain.handle('skills:select-directory', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, { title: 'Select skills folder', properties: ['openDirectory'] });
+  if (result.canceled || !result.filePaths[0]) return null;
+  const directory = result.filePaths[0];
+  return { directory, skills: findSkills(directory) };
+});
+
+ipcMain.handle('skills:install', async (_event, value) => {
+  const source = String(value ?? '').trim();
+  if (!/^(https?:\/\/[^\s]+|[\w.-]+\/[\w./-]+(?:@[\w.-]+)?)$/.test(source)) throw new Error('Use a GitHub URL or owner/repository identifier.');
+  const projectDirectory = join(app.getPath('documents'), 'MainsAgents Skills');
+  mkdirSync(projectDirectory, { recursive: true });
+  await installSkill(source, projectDirectory);
+  const candidates = [join(projectDirectory, '.agents', 'skills'), join(projectDirectory, '.codex', 'skills'), projectDirectory];
+  const directory = candidates.find((candidate) => findSkills(candidate).length > 0) ?? projectDirectory;
+  return { directory, skills: findSkills(directory) };
+});
 
 function proxyToCodex(clientRequest, clientResponse, port) {
   const proxy = httpRequest({
@@ -96,6 +149,7 @@ async function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      preload: join(app.getAppPath(), 'desktop-preload.cjs'),
     },
   });
 

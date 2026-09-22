@@ -15,6 +15,8 @@ O projeto foi pensado para pesquisa, notícias, criação de conteúdo, tendênc
 - Contexto bidirecional entre Chat e Canvas.
 - Command Palette com `Ctrl + K`.
 - Persistência local de todo o histórico.
+- Interface alternável entre Português (Brasil) e English (US).
+- Skills por agente, com instalação via GitHub ou seleção de uma pasta local.
 - Aplicativo desktop para Windows com instalador NSIS.
 
 ## Stack
@@ -46,7 +48,7 @@ O MainsAgents inicia o `codex app-server` localmente. Nenhuma chave de API é ar
 
 ## Instalação para usuário
 
-Baixe ou gere `MainsAgents-Setup-0.1.0.exe`, execute o instalador e escolha o diretório de instalação. O instalador cria atalhos na área de trabalho e no menu Iniciar.
+Baixe ou gere `MainsAgents-Setup-0.2.0.exe`, execute o instalador e escolha o diretório de instalação. O instalador cria atalhos na área de trabalho e no menu Iniciar.
 
 Na primeira abertura, a aplicação cria um workspace vazio. O fluxo inicial é:
 
@@ -56,6 +58,15 @@ Na primeira abertura, a aplicação cria um workspace vazio. O fluxo inicial é:
 4. Envie uma mensagem; a resposta será transmitida pelo Codex em tempo real.
 5. Envie respostas para o Canvas ou use nodes do Canvas como contexto.
 6. Organize o trabalho no Board.
+
+O idioma pode ser alterado em **Settings → Interface language**. A escolha é salva localmente.
+
+Para associar skills a um agente, abra a configuração do agente e use a seção **Skills**. Você pode:
+
+- escolher uma pasta existente que contenha um ou mais arquivos `SKILL.md`;
+- informar um repositório como `dickwu/apple-design-skill` e clicar em **Install skill**.
+
+Skills instaladas pelo aplicativo ficam em `%USERPROFILE%\Documents\MainsAgents Skills`. A pasta e a lista detectada são salvas na configuração do agente e enviadas como contexto quando uma nova thread Codex é criada.
 
 ## Desenvolvimento
 
@@ -104,7 +115,7 @@ Os artefatos são criados em `release/`:
 
 ```text
 release/
-  MainsAgents-Setup-0.1.0.exe
+  MainsAgents-Setup-0.2.0.exe
   win-unpacked/
 ```
 

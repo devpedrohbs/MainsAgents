@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { PageId } from './types';
 import { pageFromLocation, routes } from './routes';
+import { useLanguage } from './LanguageProvider';
 
 export function useHashRouter() {
+  const {t}=useLanguage();
   const [page, setPage] = useState<PageId>(pageFromLocation);
 
   const navigate = useCallback((nextPage: PageId) => {
@@ -27,8 +29,8 @@ export function useHashRouter() {
   }, []);
 
   useEffect(() => {
-    document.title = `${routes[page].title} · MainsAgents`;
-  }, [page]);
+    document.title = `${t(routes[page].title)} · MainsAgents`;
+  }, [page,t]);
 
   return { page, navigate };
 }

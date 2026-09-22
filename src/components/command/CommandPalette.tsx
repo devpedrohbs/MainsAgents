@@ -5,6 +5,7 @@ import type { Agent } from '../../features/agents/model/Agent';
 import type { AgentSession } from '../../features/chat/model/Chat';
 import type { CanvasNodeKind } from '../canvas/canvasTypes';
 import { Icon, type IconName } from '../common/Icon';
+import { useLanguage } from '../../app/LanguageProvider';
 
 type ItemGroup = 'Actions' | 'Agents' | 'Tasks' | 'Sessions' | 'Workspaces';
 interface PaletteItem { id:string; label:string; detail?:string; icon:IconName; shortcut?:string; group:ItemGroup; keywords?:string; run:()=>void }
@@ -31,6 +32,7 @@ const groupOrder:ItemGroup[]=['Actions','Agents','Tasks','Sessions','Workspaces'
 const normalize=(value:string)=>value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 
 export function CommandPalette(props:CommandPaletteProps) {
+  const {locale,t}=useLanguage();
   const {agents,tasks,sessions,workspaces,currentWorkspaceId,open,onClose,onNavigate,onNewAgent,onNewTask,onNewSession,onAddNode,onOpenAgent,onOpenTask,onOpenSession,onSwitchWorkspace}=props;
   const [query,setQuery]=useState('');
   const [scope,setScope]=useState<'all'|'workspaces'>('all');
@@ -76,9 +78,9 @@ export function CommandPalette(props:CommandPaletteProps) {
   };
   let renderedIndex=0;
 
-  return <div className="command-backdrop" onMouseDown={(event)=>event.target===event.currentTarget&&onClose()}><section className="command" role="dialog" aria-modal="true" aria-label="Command palette">
-    <div className="command-search"><Icon name="search"/>{scope==='workspaces'&&<button className="command-scope" onClick={()=>setScope('all')}>Workspaces ×</button>}<input ref={inputRef} value={query} onChange={(event)=>setQuery(event.target.value)} onKeyDown={onKeyDown} placeholder={scope==='workspaces'?'Choose a workspace…':'Search commands, agents, tasks and sessions…'}/><span className="kbd">ESC</span></div>
-    <div className="command-list">{filtered.length===0?<div className="command-empty"><Icon name="search"/><b>No results</b><span>Try another name or command.</span></div>:groupOrder.map((group)=>{const groupItems=filtered.filter((item)=>item.group===group);if(!groupItems.length)return null;return <div className="command-group" key={group}><p className="command-group-label">{group}</p>{groupItems.map((item)=>{const index=renderedIndex++;return <button ref={(node)=>{itemRefs.current[index]=node}} key={item.id} className={`command-item ${index===selected?'active':''}`} onMouseEnter={()=>setSelected(index)} onClick={()=>choose(item)}><span className="command-icon"><Icon name={item.icon}/></span><span className="command-copy"><b>{item.label}</b>{item.detail&&<small>{item.detail}</small>}</span>{item.shortcut&&<span className="kbd">{item.shortcut}</span>}</button>})}</div>})}</div>
-    <footer className="command-footer"><span><i>↑↓</i> Navigate</span><span><i>↵</i> Open</span><span><i>esc</i> Close</span></footer>
+  return <div className="command-backdrop" onMouseDown={(event)=>event.target===event.currentTarget&&onClose()}><section className="command" role="dialog" aria-modal="true" aria-label={t('Command palette')}>
+    <div className="command-search"><Icon name="search"/>{scope==='workspaces'&&<button className="command-scope" onClick={()=>setScope('all')}>{t('Workspaces')} ×</button>}<input ref={inputRef} value={query} onChange={(event)=>setQuery(event.target.value)} onKeyDown={onKeyDown} placeholder={scope==='workspaces'?(locale==='pt-BR'?'Escolha um workspace…':'Choose a workspace…'):(locale==='pt-BR'?'Busque comandos, agentes, tarefas e sessões…':'Search commands, agents, tasks and sessions…')}/><span className="kbd">ESC</span></div>
+    <div className="command-list">{filtered.length===0?<div className="command-empty"><Icon name="search"/><b>{t('No results')}</b><span>{t('Try another name or command.')}</span></div>:groupOrder.map((group)=>{const groupItems=filtered.filter((item)=>item.group===group);if(!groupItems.length)return null;return <div className="command-group" key={group}><p className="command-group-label">{t(group)}</p>{groupItems.map((item)=>{const index=renderedIndex++;return <button ref={(node)=>{itemRefs.current[index]=node}} key={item.id} className={`command-item ${index===selected?'active':''}`} onMouseEnter={()=>setSelected(index)} onClick={()=>choose(item)}><span className="command-icon"><Icon name={item.icon}/></span><span className="command-copy"><b>{t(item.label)}</b>{item.detail&&<small>{item.detail}</small>}</span>{item.shortcut&&<span className="kbd">{item.shortcut}</span>}</button>})}</div>})}</div>
+    <footer className="command-footer"><span><i>↑↓</i> {t('Navigate')}</span><span><i>↵</i> {t('Open')}</span><span><i>esc</i> {t('Close')}</span></footer>
   </section></div>;
 }
