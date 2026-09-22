@@ -26,7 +26,7 @@ interface AgentEditorDrawerProps {
 
 export function AgentEditorDrawer({ agent, onClose, onSave, onDelete }: AgentEditorDrawerProps) {
   const { workspaces, currentWorkspaceId } = useWorkspaces();
-  const {t}=useLanguage();
+  const {locale,t}=useLanguage();
   const [values, setValues] = useState<AgentEditorValues>(agent ? pickValues(agent) : { ...emptyValues, workspaceId: currentWorkspaceId });
   const [error, setError] = useState('');
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -97,20 +97,20 @@ export function AgentEditorDrawer({ agent, onClose, onSave, onDelete }: AgentEdi
           <div className="drawer-scroll">
             <section className="drawer-section">
               <div className="drawer-section-title"><b>{t('Identity')}</b><span>{t('How this agent appears across the workspace.')}</span></div>
-              <label className="field"><span>{t('Name')}</span><input ref={nameRef} value={values.name} onChange={(event) => setField('name', event.target.value)} placeholder="e.g. Research Editor" /></label>
-              <label className="field"><span>{t('Role')}</span><input value={values.role} onChange={(event) => setField('role', event.target.value)} placeholder="e.g. Editorial researcher" /></label>
-              <label className="field"><span>{t('Description')}</span><textarea rows={3} value={values.description} onChange={(event) => setField('description', event.target.value)} placeholder="A concise explanation of what this agent does." /></label>
+              <label className="field"><span>{t('Name')}</span><input ref={nameRef} value={values.name} onChange={(event) => setField('name', event.target.value)} placeholder={locale==='pt-BR'?'ex.: Editor de Pesquisa':'e.g. Research Editor'} /></label>
+              <label className="field"><span>{t('Role')}</span><input value={values.role} onChange={(event) => setField('role', event.target.value)} placeholder={locale==='pt-BR'?'ex.: Pesquisador editorial':'e.g. Editorial researcher'} /></label>
+              <label className="field"><span>{t('Description')}</span><textarea rows={3} value={values.description} onChange={(event) => setField('description', event.target.value)} placeholder={locale==='pt-BR'?'Uma explicação breve do que este agente faz.':'A concise explanation of what this agent does.'} /></label>
             </section>
 
             <section className="drawer-section">
               <div className="drawer-section-title"><b>{t('Behavior')}</b><span>{t('Set the permanent context this agent should follow.')}</span></div>
-              <label className="field"><span>{t('Instructions')}</span><textarea className="instructions-input" rows={7} value={values.instructions} onChange={(event) => setField('instructions', event.target.value)} placeholder="Describe goals, process, constraints, and expected output." /></label>
+              <label className="field"><span>{t('Instructions')}</span><textarea className="instructions-input" rows={7} value={values.instructions} onChange={(event) => setField('instructions', event.target.value)} placeholder={locale==='pt-BR'?'Descreva objetivos, processo, restrições e resultado esperado.':'Describe goals, process, constraints, and expected output.'} /></label>
               <label className="field"><span>{t('Workspace')}</span><select value={values.workspaceId} onChange={(event) => setField('workspaceId', event.target.value)}>{workspaces.map((workspace)=><option value={workspace.id} key={workspace.id}>{workspace.name}</option>)}</select></label>
             </section>
 
             <section className="drawer-section">
               <div className="drawer-section-title"><b>{t('Tools')}</b><span>{t('Choose what this agent can access in the prototype.')}</span></div>
-              <div className="tool-grid">{tools.map((tool) => { const detail = agentToolDetails[tool]; const selected = values.tools.includes(tool); return <button className={`tool-option ${selected ? 'selected' : ''}`} type="button" aria-pressed={selected} key={tool} onClick={() => toggleTool(tool)}><span className="tool-check">{selected ? '✓' : ''}</span><span><b>{detail.label}</b><small>{detail.description}</small></span></button>; })}</div>
+              <div className="tool-grid">{tools.map((tool) => { const detail = agentToolDetails[tool]; const selected = values.tools.includes(tool); return <button className={`tool-option ${selected ? 'selected' : ''}`} type="button" aria-pressed={selected} key={tool} onClick={() => toggleTool(tool)}><span className="tool-check">{selected ? '✓' : ''}</span><span><b>{t(detail.label)}</b><small>{t(detail.description)}</small></span></button>; })}</div>
             </section>
 
             <section className="drawer-section">
