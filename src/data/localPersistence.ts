@@ -22,6 +22,8 @@ export function usePersistentState<T>(key: string, initialValue: T | (() => T)):
   useEffect(() => {
     const version = ++loadVersion.current;
     alive.current = true;
+    hydratedRef.current = false;
+    setHydrated(false);
     indexedDbStateStore.read<T>(key)
       .then((saved) => {
         if (!alive.current || version !== loadVersion.current) return;
@@ -29,15 +31,20 @@ export function usePersistentState<T>(key: string, initialValue: T | (() => T)):
         for (const update of pendingUpdates.current) restored = typeof update === 'function' ? (update as (current: T) => T)(restored) : update;
         pendingUpdates.current = [];
         setValue(restored);
+        hydratedRef.current = true;
+        setHydrated(true);
       })
-      .catch((error) => console.warn(`[MainsAgents] Failed to restore ${key}`, error))
-      .finally(() => { if (alive.current && version === loadVersion.current) { hydratedRef.current = true; setHydrated(true); } });
+      .catch((error) => {
+        if (!alive.current || version !== loadVersion.current) return;
+        console.warn(`[MainsAgents] Failed to restore ${key}`, error);
+        window.dispatchEvent(new CustomEvent('mainsagents:persistence-error',{detail:`Could not restore ${key}. Your saved data has been kept. Restart the app to try again.`}));
+      });
     return () => { alive.current = false; };
   }, [key]);
 
   useEffect(() => {
-    if (!hydrated) return;
-    indexedDbStateStore.write(key, value).catch((error) => console.warn(`[MainsAgents] Failed to persist ${key}`, error));
+    if (!hydrated || !hydratedRef.current) return;
+    indexedDbStateStore.write(key, value).catch((error) => {console.warn(`[MainsAgents] Failed to persist ${key}`, error);window.dispatchEvent(new CustomEvent('mainsagents:persistence-error',{detail:`Could not save ${key}. Check available disk space.`}))});
   }, [hydrated, key, value]);
 
   return [value, setPersistentValue, hydrated];

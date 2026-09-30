@@ -1,6 +1,7 @@
 export type AgentId = string;
 export type AgentStatusValue = 'working' | 'review' | 'idle';
 export type AgentTool = 'web-search' | 'files' | 'canvas-context' | 'subagents';
+export type AgentProviderId = 'codex' | 'claude' | 'gemini';
 
 export interface Agent {
   id: AgentId;
@@ -11,8 +12,14 @@ export interface Agent {
   status: AgentStatusValue;
   workspaceId: string;
   tools: AgentTool[];
+  providerId?: AgentProviderId;
+  modelId?: string;
+  avatarImage?: string;
   skillsDirectory?: string;
   skills?: string[];
+  skillFiles?: Record<string, string>;
+  disabledSkills?: string[];
+  skillsInstallKey?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -30,7 +37,7 @@ export const agentToolDetails: Record<AgentTool, { label: string; description: s
   subagents: { label: 'Subagents', description: 'Delegate focused work to other agents.' },
 };
 
-export type AgentEditorValues = Pick<Agent, 'name' | 'role' | 'description' | 'instructions' | 'workspaceId' | 'tools' | 'skillsDirectory' | 'skills'>;
+export type AgentEditorValues = Pick<Agent, 'name' | 'role' | 'description' | 'instructions' | 'workspaceId' | 'tools' | 'skillsDirectory' | 'skills' | 'skillFiles' | 'disabledSkills' | 'skillsInstallKey' | 'providerId' | 'modelId' | 'avatarImage'>;
 
 export function getAgentInitials(agent: Pick<Agent, 'name'>): string {
   return agent.name

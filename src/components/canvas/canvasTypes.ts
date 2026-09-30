@@ -1,7 +1,7 @@
 import type { Node } from '@xyflow/react';
 import type { AgentId } from '../../features/agents/model/Agent';
 
-export type CanvasNodeKind = 'note' | 'research' | 'image' | 'contentIdea' | 'hook' | 'script';
+export type CanvasNodeKind = 'note' | 'research' | 'image' | 'contentIdea' | 'hook' | 'script' | 'terminal' | 'browser' | 'chat';
 
 export interface CanvasNodeData extends Record<string, unknown> {
   label: string;
@@ -23,6 +23,19 @@ export interface CanvasNodeData extends Record<string, unknown> {
   groupLabel?: string;
   agentId?: AgentId;
   agentLabel?: string;
+  workspaceId?: string;
+  command?: string;
+  terminalOutput?: string;
+  terminalCwd?: string;
+  terminalShell?: string;
+  terminalHistory?: string[];
+  terminalExitCode?: number | null;
+  terminalEventCursor?: number;
+  terminalExecutionId?: string;
+  terminalStatus?: 'idle' | 'running' | 'finished' | 'error' | 'cancelled';
+  browserUrl?: string;
+  chatAgentId?: AgentId;
+  chatSessionId?: string;
 }
 
 export type CanvasFlowNode = Node<CanvasNodeData, CanvasNodeKind>;

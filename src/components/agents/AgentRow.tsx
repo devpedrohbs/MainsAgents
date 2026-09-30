@@ -1,12 +1,25 @@
 import type { Agent } from '../../features/agents/model/Agent';
-import { getAgentInitials } from '../../features/agents/model/Agent';
+import { AgentAvatar } from './AgentAvatar';
 import { AgentStatus } from './AgentStatus';
 import { useLanguage } from '../../app/LanguageProvider';
+import { Icon } from '../common/Icon';
+import { agentToolDetails } from '../../features/agents/model/Agent';
 
-interface AgentRowProps { agent:Agent; compact?:boolean; onSelect:(agentId:string)=>void }
+interface AgentRowProps { agent:Agent; compact?:boolean; selected?:boolean; onSelect:(agentId:string)=>void; onChat?:(agentId:string)=>void; onConfigure?:(agentId:string)=>void }
 
-export function AgentRow({agent,compact=false,onSelect}:AgentRowProps) {
-  const {t}=useLanguage();
-  if(compact) return <button className="nav-item agent-nav" onClick={()=>onSelect(agent.id)}><i className={`agent-dot ${agent.status==='idle'?'idle':agent.status==='review'?'review':''}`}/><span>{agent.name}</span></button>;
-  return <button className="agent-row-large" onClick={()=>onSelect(agent.id)}><span className="agent-monogram">{getAgentInitials(agent)}</span><span className="agent-main"><b>{agent.name}</b><span>{agent.role}</span></span><span className="agent-purpose">{agent.description}</span><AgentStatus status={agent.status}/><span className="time">{agent.tools.length} {t('tools')}</span></button>;
+export function AgentRow({agent,compact=false,selected=false,onSelect,onConfigure}:AgentRowProps) {
+  const {t,locale}=useLanguage();
+  if(compact) return <button className="nav-item agent-nav" title={agent.name} aria-label={agent.name} onClick={()=>onSelect(agent.id)}><AgentAvatar name={agent.name} image={agent.avatarImage}/><span>{agent.name}</span></button>;
+  const pt=locale==='pt-BR';
+  const provider=agent.providerId==='claude'?'Claude Code CLI':agent.providerId==='gemini'?'Gemini API':'Codex CLI';
+  return <article className={`specialist-tile ${selected?'selected':''}`} data-od-id={'agent-row-'+agent.id}>
+    <button className="specialist-open" onClick={()=>onSelect(agent.id)} aria-expanded={selected} aria-label={`${pt?'Ver detalhes de':'View details for'} ${agent.name}`}>
+      <AgentAvatar name={agent.name} image={agent.avatarImage}/>
+      <h2>{agent.name}</h2><span className="specialist-role">{agent.role}</span>
+      <p>{agent.description || (pt?'Um especialista para seu próximo projeto.':'A specialist for your next project.')}</p>
+      <span className="specialist-chips">{agent.tools.slice(0,2).map(tool=><span key={tool}>{t(agentToolDetails[tool].label)}</span>)}{(agent.skills?.length??0)>0&&<span>{agent.skills!.length} skills</span>}</span>
+      <span className="specialist-footer"><AgentStatus status={agent.status}/><small>{provider}</small></span>
+    </button>
+    <button className="icon-button specialist-configure" onClick={()=> (onConfigure??onSelect)(agent.id)} aria-label={`${pt?'Configurar':'Configure'} ${agent.name}`} title={pt?'Configurar agente':'Configure agent'}><Icon name="more"/></button>
+  </article>;
 }

@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MainsAgents — Kit de logo</title>
+  <style>
+    :root { font-family: Inter, "Segoe UI", Arial, sans-serif; color: #171a20; background: #f5f6f8; }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    main { max-width: 1220px; margin: 0 auto; padding: 56px 28px 90px; }
+    h1 { margin: 0; font-size: clamp(32px, 5vw, 56px); letter-spacing: -.05em; }
+    h2 { font-size: 22px; letter-spacing: -.03em; margin: 0 0 20px; }
+    p { line-height: 1.55; color: #657080; }
+    .intro { max-width: 680px; margin: 14px 0 44px; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+    .panel { background: white; border: 1px solid #e5e7eb; border-radius: 22px; overflow: hidden; }
+    .panel small { display: block; color: #667180; font-size: 13px; padding: 15px 18px; border-top: 1px solid #e5e7eb; }
+    .icon-frame { display: grid; place-items: center; aspect-ratio: 1.32; padding: 28px; }
+    .icon-frame img { width: min(240px, 72%); height: auto; border-radius: 22%; box-shadow: 0 18px 32px #11182722; }
+    section { margin-top: 48px; }
+    .light-stage { background: #f6f7f9; }
+    .dark-stage { background: #171a20; }
+    .cobalt-stage { background: #2f6feb; }
+    .lockup-stage { height: 205px; display: grid; place-items: center; padding: 18px 30px; }
+    .lockup-stage img { width: min(640px, 100%); max-height: 100%; }
+    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    .mockup { min-height: 420px; display: flex; background: #fff; }
+    .sidebar { width: 220px; background: #f9fafb; border-right: 1px solid #e5e7eb; padding: 18px; }
+    .brand-row { display: flex; align-items: center; gap: 10px; font-weight: 680; letter-spacing: -.03em; }
+    .brand-row img { width: 42px; height: 42px; border-radius: 12px; }
+    .nav { margin-top: 38px; display: grid; gap: 10px; color: #717b88; font-size: 14px; }
+    .nav span { display: block; padding: 11px 12px; border-radius: 9px; }
+    .nav span:first-child { background: #eaf1ff; color: #2f6feb; font-weight: 650; }
+    .content { flex: 1; padding: 30px; }
+    .content h3 { font-size: 22px; margin: 0 0 24px; }
+    .agent-card { display: flex; gap: 16px; align-items: center; border: 1px solid #e5e7eb; border-radius: 16px; padding: 18px; max-width: 360px; }
+    .agent-card img { width: 64px; height: 64px; border-radius: 16px; background: #718095; }
+    .agent-card strong { display: block; }
+    .agent-card span { font-size: 13px; color: #748091; }
+    .splash { min-height: 420px; background: radial-gradient(circle at 50% 25%, #343e4c, #171a20 70%); display: grid; place-items: center; text-align: center; padding: 35px; }
+    .splash img { width: min(570px, 100%); }
+    .splash p { margin: 12px 0 0; color: #aab5c3; }
+    .files { display: flex; flex-wrap: wrap; gap: 10px; }
+    .files a { display: inline-block; color: #29364a; text-decoration: none; background: #fff; border: 1px solid #dfe3e9; padding: 10px 13px; border-radius: 9px; font-size: 14px; }
+    .files a:hover { border-color: #2f6feb; }
+    @media (max-width: 760px) { .grid, .two { grid-template-columns: 1fr; } .sidebar { width: 155px; } .content { padding: 20px; } .mockup { min-height: 340px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>MainsAgents</h1>
+    <p class="intro">O mesmo avatar maestro, com fraque de vidro e batuta, aplicado em fundos e tamanhos diferentes. Os arquivos abaixo estão prontos para uso no projeto.</p>
+
+    <section>
+      <h2>Ícone do aplicativo</h2>
+      <div class="grid">
+        <div class="panel"><div class="icon-frame light-stage"><img src="mainsagents-appicon-black.png" alt="Logo em fundo preto" /></div><small>Preto · ícone do app desktop</small></div>
+        <div class="panel"><div class="icon-frame light-stage"><img src="mainsagents-appicon-slate.png" alt="Logo em fundo cinza azulado" /></div><small>Slate · neutro suave</small></div>
+        <div class="panel"><div class="icon-frame light-stage"><img src="mainsagents-appicon-cobalt.png" alt="Logo em fundo azul" /></div><small>Cobalto · cor de destaque do projeto</small></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Logo com nome</h2>
+      <div class="two">
+        <div class="panel"><div class="lockup-stage light-stage"><img src="mainsagents-lockup-on-light.svg" alt="MainsAgents para superfícies claras" /></div><small>Para superfícies claras</small></div>
+        <div class="panel"><div class="lockup-stage dark-stage"><img src="mainsagents-lockup-on-dark.svg" alt="MainsAgents para superfícies escuras" /></div><small>Para superfícies escuras</small></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Exemplos de uso</h2>
+      <div class="two">
+        <div class="panel mockup">
+          <aside class="sidebar"><div class="brand-row"><img src="mainsagents-appicon-black.png" alt="" /> MainsAgents</div><div class="nav"><span>Visão geral</span><span>Agentes</span><span>Tarefas</span><span>Configurações</span></div></aside>
+          <div class="content"><h3>Seus agentes</h3><div class="agent-card"><img src="mainsagents-logo-128.png" alt="" /><div><strong>Orquestrador</strong><span>Coordena tarefas e agentes</span></div></div></div>
+        </div>
+        <div class="panel splash"><div><img src="mainsagents-lockup-on-dark.svg" alt="MainsAgents" /><p>Um lugar para seus agentes trabalharem juntos.</p></div></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Arquivos</h2>
+      <div class="files">
+        <a href="mainsagents-logo-glass.png" download>PNG transparente original</a>
+        <a href="mainsagents-logo-512.png" download>PNG 512</a>
+        <a href="mainsagents-logo-256.png" download>PNG 256</a>
+        <a href="mainsagents-logo-128.png" download>PNG 128</a>
+        <a href="mainsagents-logo-64.png" download>PNG 64</a>
+        <a href="mainsagents-logo-32.png" download>PNG 32</a>
+        <a href="mainsagents-appicon-black.png" download>Ícone preto</a>
+        <a href="mainsagents-appicon-graphite.png" download>Ícone grafite</a>
+        <a href="mainsagents-appicon-slate.png" download>Ícone slate</a>
+        <a href="mainsagents-appicon-cobalt.png" download>Ícone cobalto</a>
+        <a href="mainsagents-icon-black.ico" download>ICO Windows · preto</a>
+        <a href="mainsagents-lockup-on-light.svg" download>Logo com nome · claro</a>
+        <a href="mainsagents-lockup-on-dark.svg" download>Logo com nome · escuro</a>
+        <a href="mainsagents-mockups.png" download>Prancha de mockups</a>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

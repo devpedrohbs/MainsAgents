@@ -16,6 +16,13 @@ export const routes: Record<PageId, RouteDefinition> = {
     sidebarPage: 'home',
     breadcrumbs: ['Content', 'Home'],
   },
+  content: {
+    id: 'content',
+    label: 'Content Studio',
+    title: 'Content Studio',
+    sidebarPage: 'content',
+    breadcrumbs: ['Content', 'Content Studio'],
+  },
   board: {
     id: 'board',
     label: 'Board',
@@ -30,6 +37,7 @@ export const routes: Record<PageId, RouteDefinition> = {
     sidebarPage: 'canvas',
     breadcrumbs: ['Content', 'Canvas'],
   },
+  flow: { id: 'flow', label: 'Flow', title: 'Flow', sidebarPage: 'canvas', breadcrumbs: ['Content', 'Flow'] },
   agents: {
     id: 'agents',
     label: 'Agents',

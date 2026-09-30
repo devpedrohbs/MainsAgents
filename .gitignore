@@ -1,8 +1,13 @@
 node_modules/
 dist/
 release/
+release-*/
 .vite/
-.agents/
+.mainsagents-workspaces/
+.agents/*
+!.agents/skills/
+.agents/skills/*
+!.agents/skills/frontend-design/
 skills-lock.json
 *.tsbuildinfo
 *.local

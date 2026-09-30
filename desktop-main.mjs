@@ -1,10 +1,21 @@
-import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
+import { setDesktopDiagnosticWriter } from './desktop-diagnostics.mjs';
+import { app, BrowserWindow, dialog, ipcMain, safeStorage, session, shell } from 'electron';
+import { attachCanvasBrowserPolicy } from './canvas-browser-security.mjs';
+import { createDesktopStateStore } from './desktop-state-store.mjs';
+import { findSkills } from './skill-discovery.mjs';
+import { parseSkillInstallCommand, skillInstallArgs } from './skill-install-command.mjs';
+import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { execFileSync } from 'node:child_process';
 import { createServer, request as httpRequest } from 'node:http';
-import { appendFileSync, createReadStream, existsSync, mkdirSync, readdirSync, statSync } from 'node:fs';
-import { dirname, extname, join, normalize } from 'node:path';
+import { appendFileSync, createReadStream, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { dirname, extname, join, normalize, isAbsolute } from 'node:path';
 import { startCodexBridge } from './codex-bridge.mjs';
+import { createExternalProviderBridge } from './external-providers.mjs';
+import { createClaudeCodeBridge } from './claude-code-bridge.mjs';
+import { createCanvasRuntimeBridge } from './canvas-runtime-bridge.mjs';
+import { createAccountServer } from './cloud-server.mjs';
+import { createContentWorkflowBridge } from './content-workflow-bridge.mjs';
 
 const mimeTypes = {
   '.css': 'text/css; charset=utf-8',
@@ -21,7 +32,11 @@ const mimeTypes = {
 let mainWindow;
 let webServer;
 let codexBridge;
+let accountServer;
+let contentWorkflowBridge;
 let shuttingDown = false;
+const appToken=randomBytes(32).toString('hex');
+function authorized(request){const supplied=String(request.headers['x-mainsagents-app-token']??'');return supplied.length===appToken.length&&timingSafeEqual(Buffer.from(supplied),Buffer.from(appToken));}
 
 function logStartup(message) {
   try {
@@ -29,25 +44,108 @@ function logStartup(message) {
     appendFileSync(join(app.getPath('userData'), 'startup.log'), `${new Date().toISOString()} ${message}\n`);
   } catch {}
 }
+setDesktopDiagnosticWriter(logStartup);
 
-function findSkills(directory, depth = 0) {
-  if (!directory || !existsSync(directory) || depth > 4) return [];
-  try {
-    const entries = readdirSync(directory, { withFileTypes: true });
-    if (entries.some((entry) => entry.isFile() && entry.name.toLowerCase() === 'skill.md')) return [{ name: directory.split(/[\\/]/).filter(Boolean).at(-1) ?? 'skill', path: directory }];
-    return entries.filter((entry) => entry.isDirectory() && !entry.name.startsWith('.git')).flatMap((entry) => findSkills(join(directory, entry.name), depth + 1));
-  } catch { return []; }
+function openExternalLink(url) {
+  if (!/^https:\/\//i.test(url)) return;
+  void shell.openExternal(url).catch((error) => {
+    logStartup(`Could not open external browser: ${error instanceof Error ? error.message : String(error)}`);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      void dialog.showMessageBox(mainWindow, {
+        type: 'warning',
+        title: 'MainsAgents',
+        message: 'Não foi possível abrir o navegador externo. / Could not open the external browser.',
+        detail: 'Verifique o navegador padrão do Windows e tente novamente. / Check your default Windows browser and try again.',
+      }).catch((dialogError) => logStartup(`Browser error dialog failed: ${String(dialogError)}`));
+    }
+  });
 }
 
-function installSkill(source, cwd) {
+const accountConfigPath=()=>join(app.getPath('userData'),'account.json');
+function googleClientId(){if(process.env.MAINSAGENTS_GOOGLE_CLIENT_ID)return process.env.MAINSAGENTS_GOOGLE_CLIENT_ID;try{return String(JSON.parse(readFileSync(join(app.getAppPath(),'desktop-config.json'),'utf8')).googleClientId??'')}catch{return ''}}
+function readAccountConfig(){try{return JSON.parse(readFileSync(accountConfigPath(),'utf8'))}catch{return {serverUrl:'',encryptedToken:'',email:'',userId:''}}}
+function writeAccountConfig(config){mkdirSync(app.getPath('userData'),{recursive:true});writeFileSync(accountConfigPath(),JSON.stringify(config),{mode:0o600})}
+function accountToken(config){if(!config.encryptedToken)return '';if(!safeStorage.isEncryptionAvailable())throw new Error('Secure credential storage is unavailable');return safeStorage.decryptString(Buffer.from(config.encryptedToken,'base64'))}
+const providerKeysPath=()=>join(app.getPath('userData'),'provider-keys.json');
+function readProviderKeys(){try{return JSON.parse(readFileSync(providerKeysPath(),'utf8'))}catch{return {}}}
+function writeProviderKeys(keys){mkdirSync(app.getPath('userData'),{recursive:true});writeFileSync(providerKeysPath(),JSON.stringify(keys),{mode:0o600})}
+function getProviderKey(provider){const encrypted=readProviderKeys()[provider];if(!encrypted)return '';if(!safeStorage.isEncryptionAvailable())throw new Error('Secure credential storage is unavailable');return safeStorage.decryptString(Buffer.from(encrypted,'base64'))}
+const externalProviders=createExternalProviderBridge({getKey:getProviderKey});
+const claudeCodeBridge=createClaudeCodeBridge({cwdRoot:join(app.getPath('documents'),'MainsAgents Workspace','Claude')});
+const canvasRuntimeBridge=createCanvasRuntimeBridge({cwdRoot:join(app.getPath('documents'),'MainsAgents Workspace','Canvas')});
+ipcMain.handle('provider:save-key',(event,provider,key)=>{assertTrustedSender(event);if(provider!=='gemini'||typeof key!=='string'||key.length<12||key.length>512)throw new Error('Invalid provider key');if(!safeStorage.isEncryptionAvailable())throw new Error('Secure credential storage is unavailable');writeProviderKeys({...readProviderKeys(),[provider]:safeStorage.encryptString(key).toString('base64')});return {saved:true}});
+ipcMain.handle('provider:remove-key',(event,provider)=>{assertTrustedSender(event);if(provider!=='gemini')throw new Error('Unknown provider');const keys=readProviderKeys();delete keys[provider];writeProviderKeys(keys);return {saved:false}});
+function saveAccountToken(config,rawToken,email,userId){if(!safeStorage.isEncryptionAvailable())throw new Error('Secure credential storage is unavailable');writeAccountConfig({...config,encryptedToken:safeStorage.encryptString(rawToken).toString('base64'),email,userId});desktopStateStore?.selectProfile(userId)}
+async function accountRequest(path,method='GET',data,authenticated=true){const config=readAccountConfig();if(!config.serverUrl)throw new Error('Configure the account service first');const raw=authenticated?accountToken(config):'';if(authenticated&&!raw)throw new Error('Sign in to MainsAgents first');const response=await fetch(`${config.serverUrl}${path}`,{method,redirect:'error',headers:{'content-type':'application/json',...(raw?{authorization:`Bearer ${raw}`}:{})},body:data===undefined?undefined:JSON.stringify(data),signal:AbortSignal.timeout(30000)});const result=await response.json().catch(()=>({error:'Invalid account service response'}));if(!response.ok)throw new Error(result.error??`Account service returned ${response.status}`);return result}
+
+async function signInWithGoogle(){
+  const clientId=googleClientId();
+  if(!clientId)throw new Error('Google sign-in needs to be configured by the app developer.');
+  const verifier=randomBytes(48).toString('base64url');
+  const challenge=createHash('sha256').update(verifier).digest('base64url');
+  const state=randomBytes(24).toString('base64url');
+  const nonce=randomBytes(24).toString('base64url');
+  let callbackServer;
+  let redirectUri;
+  let timeout;
+  try{
+    const authResult=await new Promise((resolve,reject)=>{
+      callbackServer=createServer((request,response)=>{
+        const callbackUrl=new URL(request.url??'/', 'http://127.0.0.1');
+        if(callbackUrl.pathname!=='/oauth2/callback'){response.writeHead(404);response.end();return}
+        if(callbackUrl.searchParams.get('state')!==state){response.writeHead(400,{'content-type':'text/plain; charset=utf-8'});response.end('Sign-in request did not match. Return to MainsAgents and try again.');reject(new Error('Google sign-in state validation failed'));return}
+        const oauthError=callbackUrl.searchParams.get('error');
+        const code=callbackUrl.searchParams.get('code');
+        response.writeHead(oauthError?400:200,{'content-type':'text/html; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'});
+        response.end(`<html><meta charset="utf-8"><title>MainsAgents</title><body style="font:16px system-ui;max-width:520px;margin:15vh auto;padding:24px;color:#181818"><h1>${oauthError?'Sign-in cancelled':'You can return to MainsAgents'}</h1><p>${oauthError?'Google sign-in was cancelled.':'Your Google account was verified. This browser window can be closed.'}</p></body></html>`);
+        if(oauthError)reject(new Error('Google sign-in was cancelled.'));
+        else if(code)resolve({code,redirectUri});
+        else reject(new Error('Google did not return an authorization code.'));
+      });
+      callbackServer.once('error',reject);
+      callbackServer.listen(0,'127.0.0.1',()=>{
+        const address=callbackServer.address();
+        if(!address||typeof address==='string'){reject(new Error('Could not open the Google sign-in callback.'));return}
+        redirectUri=`http://127.0.0.1:${address.port}/oauth2/callback`;
+        const authorization=new URL('https://accounts.google.com/o/oauth2/v2/auth');
+        authorization.searchParams.set('client_id',clientId);authorization.searchParams.set('redirect_uri',redirectUri);authorization.searchParams.set('response_type','code');authorization.searchParams.set('scope','openid email profile');authorization.searchParams.set('state',state);authorization.searchParams.set('nonce',nonce);authorization.searchParams.set('code_challenge',challenge);authorization.searchParams.set('code_challenge_method','S256');authorization.searchParams.set('prompt','select_account');
+        timeout=setTimeout(()=>reject(new Error('Google sign-in timed out. Please try again.')),5*60_000);
+        void shell.openExternal(authorization.toString()).catch(reject);
+      });
+    });
+    const tokenResponse=await fetch('https://oauth2.googleapis.com/token',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:new URLSearchParams({client_id:clientId,code:authResult.code,code_verifier:verifier,grant_type:'authorization_code',redirect_uri:authResult.redirectUri}),signal:AbortSignal.timeout(15000)});
+    const tokenData=await tokenResponse.json();
+    if(!tokenResponse.ok||typeof tokenData.id_token!=='string')throw new Error('Google could not complete sign-in. Please try again.');
+    const result=await accountRequest('/api/auth/google','POST',{idToken:tokenData.id_token,nonce},false);
+    saveAccountToken(readAccountConfig(),result.token,result.email,result.userId);
+    return {email:result.email,userId:result.userId,recoveryCode:result.recoveryCode};
+  }catch(error){
+    if(error instanceof Error)throw error;
+    throw new Error(String(error));
+  } finally {
+    if(timeout)clearTimeout(timeout);
+    if(callbackServer?.listening)callbackServer.close();
+  }
+}
+
+ipcMain.handle('account:status',async(event)=>{assertTrustedSender(event);const config=readAccountConfig();if(!config.serverUrl)return {configured:false,signedIn:false};if(!config.encryptedToken)return {configured:true,signedIn:false,serverUrl:config.serverUrl};try{const account=await accountRequest('/api/auth/me');return {configured:true,signedIn:true,serverUrl:config.serverUrl,email:account.email,userId:account.userId}}catch(error){return {configured:true,signedIn:false,serverUrl:config.serverUrl,error:error.message}}});
+ipcMain.handle('account:google-configured',(event)=>{assertTrustedSender(event);return Boolean(googleClientId())});
+ipcMain.handle('account:google-sign-in',async(event)=>{assertTrustedSender(event);return signInWithGoogle()});
+ipcMain.handle('account:register',async(event,email,password)=>{assertTrustedSender(event);const result=await accountRequest('/api/auth/register','POST',{email,password},false);saveAccountToken(readAccountConfig(),result.token,result.email,result.userId);return {email:result.email,userId:result.userId,recoveryCode:result.recoveryCode}});
+ipcMain.handle('account:login',async(event,email,password)=>{assertTrustedSender(event);const result=await accountRequest('/api/auth/login','POST',{email,password},false);saveAccountToken(readAccountConfig(),result.token,result.email,result.userId);return {email:result.email,userId:result.userId}});
+ipcMain.handle('account:recover',async(event,email,recoveryCode,newPassword)=>{assertTrustedSender(event);const result=await accountRequest('/api/auth/recover','POST',{email,recoveryCode,newPassword},false);saveAccountToken(readAccountConfig(),result.token,result.email,result.userId);return {email:result.email,userId:result.userId,recoveryCode:result.recoveryCode}});
+ipcMain.handle('account:logout',async(event)=>{assertTrustedSender(event);try{await accountRequest('/api/auth/logout','POST')}finally{writeAccountConfig({...readAccountConfig(),encryptedToken:'',email:'',userId:''});desktopStateStore?.selectProfile('default')}return {signedIn:false}});
+ipcMain.handle('account:delete-account',async(event,password)=>{assertTrustedSender(event);const result=await accountRequest('/api/auth/account','DELETE',{password});writeAccountConfig({...readAccountConfig(),encryptedToken:'',email:'',userId:''});desktopStateStore?.selectProfile('default');return result});
+
+function installSkill(selection, cwd) {
   let executable = 'npx';
-  let args = ['--yes', 'skills', 'add', source, '--agent', 'codex', '--yes'];
+  let args = skillInstallArgs(selection);
   if (process.platform === 'win32') {
     const npxCommand = execFileSync('where.exe', ['npx.cmd'], { encoding: 'utf8', windowsHide: true }).split(/\r?\n/).find(Boolean);
     if (!npxCommand) throw new Error('npx was not found. Install Node.js before installing skills.');
     const nodeDirectory = dirname(npxCommand.trim());
     executable = join(nodeDirectory, 'node.exe');
-    args = [join(nodeDirectory, 'node_modules', 'npm', 'bin', 'npx-cli.js'), '--yes', 'skills', 'add', source, '--agent', 'codex', '--yes'];
+    args = [join(nodeDirectory, 'node_modules', 'npm', 'bin', 'npx-cli.js'), ...skillInstallArgs(selection)];
   }
   return new Promise((resolve, reject) => {
     const child = spawn(executable, args, { cwd, windowsHide: true, shell: false });
@@ -63,31 +161,42 @@ function installSkill(source, cwd) {
   });
 }
 
-ipcMain.handle('skills:select-directory', async () => {
+function assertTrustedSender(event){if(event.sender!==mainWindow?.webContents)throw new Error('Untrusted application window');}
+
+ipcMain.handle('skills:select-directory', async (event) => {
+  assertTrustedSender(event);
   const result = await dialog.showOpenDialog(mainWindow, { title: 'Select skills folder', properties: ['openDirectory'] });
   if (result.canceled || !result.filePaths[0]) return null;
   const directory = result.filePaths[0];
   return { directory, skills: findSkills(directory) };
 });
 
-ipcMain.handle('skills:install', async (_event, value) => {
-  const source = String(value ?? '').trim();
-  if (!/^(https?:\/\/[^\s]+|[\w.-]+\/[\w./-]+(?:@[\w.-]+)?)$/.test(source)) throw new Error('Use a GitHub URL or owner/repository identifier.');
-  const projectDirectory = join(app.getPath('documents'), 'MainsAgents Skills');
+ipcMain.handle('skills:refresh-directory', (event, directory) => {
+  assertTrustedSender(event);
+  if(typeof directory!=='string'||!isAbsolute(directory)||!existsSync(directory)||!statSync(directory).isDirectory())throw new Error('The skills folder is unavailable. Choose an existing folder.');
+  return {directory,skills:findSkills(directory)};
+});
+
+ipcMain.handle('skills:install', async (event, value, agentKey, selectedDirectory) => {
+  assertTrustedSender(event);
+  const selection=parseSkillInstallCommand(value);
+  const rawAgentKey=String(agentKey??'agent');
+  const agentDirectory=rawAgentKey.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9-]+/g,'-').replace(/^-+|-+$/g,'').slice(0,80)||'agent';
+  if(selectedDirectory && (typeof selectedDirectory!=='string'||!isAbsolute(selectedDirectory)||!existsSync(selectedDirectory)||!statSync(selectedDirectory).isDirectory()))throw new Error('The skills folder is unavailable. Choose an existing folder.');
+  const projectDirectory = selectedDirectory || join(app.getPath('documents'), 'MainsAgents Skills',agentDirectory);
   mkdirSync(projectDirectory, { recursive: true });
-  await installSkill(source, projectDirectory);
-  const candidates = [join(projectDirectory, '.agents', 'skills'), join(projectDirectory, '.codex', 'skills'), projectDirectory];
-  const directory = candidates.find((candidate) => findSkills(candidate).length > 0) ?? projectDirectory;
+  await installSkill(selection, projectDirectory);
+  const directory = projectDirectory;
   return { directory, skills: findSkills(directory) };
 });
 
-function proxyToCodex(clientRequest, clientResponse, port) {
+function proxyToCodex(clientRequest, clientResponse, bridge) {
   const proxy = httpRequest({
     hostname: '127.0.0.1',
-    port,
+    port:bridge.port,
     path: clientRequest.url,
     method: clientRequest.method,
-    headers: clientRequest.headers,
+    headers: { ...clientRequest.headers, 'x-mainsagents-bridge-token':bridge.token },
   }, (response) => {
     clientResponse.writeHead(response.statusCode ?? 502, response.headers);
     response.pipe(clientResponse);
@@ -99,10 +208,37 @@ function proxyToCodex(clientRequest, clientResponse, port) {
   clientRequest.pipe(proxy);
 }
 
-function startWebServer(rootDirectory, bridgePort, port = 47831) {
+function startWebServer(rootDirectory, port = 47831) {
   const server = createServer((request, response) => {
     const url = new URL(request.url ?? '/', 'http://127.0.0.1');
-    if (url.pathname.startsWith('/api/codex/')) return proxyToCodex(request, response, bridgePort);
+    if(url.pathname.startsWith('/api/')&&!authorized(request)){response.writeHead(403,{'content-type':'application/json','cache-control':'no-store'});return response.end(JSON.stringify({error:'Local application access denied'}));}
+    if (url.pathname === '/api/app/version') {response.writeHead(200,{'content-type':'application/json; charset=utf-8','cache-control':'no-store'});return response.end(JSON.stringify({version:app.getVersion()}));}
+    if (url.pathname.startsWith('/api/content/')) {
+      const address=webServer?.address();
+      const expected=address&&typeof address==='object'?`http://127.0.0.1:${address.port}`:'';
+      const origin=String(request.headers.origin??'');
+      if(request.method!=='GET'&&origin!==expected){response.writeHead(403,{'content-type':'application/json'});return response.end(JSON.stringify({error:'Editorial changes must come from MainsAgents.'}));}
+      return void contentWorkflowBridge.handle(request,response,url);
+    }
+    if (url.pathname === '/api/codex/reconnect' && request.method === 'POST') {
+      if (codexBridge?.isAlive()) {response.writeHead(200,{'content-type':'application/json'});return response.end(JSON.stringify({ready:true}));}
+      const workspaceDirectory=join(app.getPath('documents'),'MainsAgents Workspace');
+      void (async()=>{if(codexBridge){await codexBridge.close();codexBridge=null}return startCodexBridge({port:0,cwd:workspaceDirectory})})().then((bridge)=>{codexBridge=bridge;response.writeHead(200,{'content-type':'application/json'});response.end(JSON.stringify({ready:true}))}).catch((error)=>{response.writeHead(503,{'content-type':'application/json'});response.end(JSON.stringify({ready:false,error:error instanceof Error?error.message:String(error)}))});return;
+    }
+    if (url.pathname.startsWith('/api/codex/')) {
+      if (codexBridge) return proxyToCodex(request,response,codexBridge);
+      response.writeHead(503,{'content-type':'application/json; charset=utf-8','cache-control':'no-store'});
+      return response.end(JSON.stringify({ready:false,status:'not-installed',error:'Codex is unavailable. Install and sign in to Codex, then reconnect.'}));
+    }
+    if(url.pathname.startsWith('/api/canvas/')){
+      const address=webServer?.address();
+      const appOrigin=address&&typeof address==='object'?`http://127.0.0.1:${address.port}`:'';
+      const requestOrigin=String(request.headers.origin??'');
+      if((request.method==='POST'&&!requestOrigin)||(requestOrigin&&requestOrigin!==appOrigin)){response.writeHead(403,{'content-type':'application/json','cache-control':'no-store'});return response.end(JSON.stringify({error:'Canvas terminal requests must come from MainsAgents.'}));}
+      return void canvasRuntimeBridge.handle(request,response,url);
+    }
+    if(url.pathname.startsWith('/api/providers/claude/'))return void claudeCodeBridge.handle(request,response,url);
+    if(url.pathname.startsWith('/api/providers/'))return void externalProviders.handle(request,response,url);
 
     const requestedPath = url.pathname === '/' ? '/app.html' : decodeURIComponent(url.pathname);
     const normalizedPath = normalize(requestedPath).replace(/^([/\\])+/, '');
@@ -126,13 +262,31 @@ function startWebServer(rootDirectory, bridgePort, port = 47831) {
   });
 }
 
+let desktopStateStore;
+ipcMain.on('state:profile', event => {
+  event.returnValue=event.sender===mainWindow?.webContents ? desktopStateStore?.currentProfile() : undefined;
+});
+for (const operation of ['hasProfile','initialize','read','write','readAll','replaceAll']) {
+  ipcMain.handle(`state:${operation}`, (event, ...args) => {
+    assertTrustedSender(event);
+    if (!desktopStateStore) throw new Error('Local storage is not ready');
+    return desktopStateStore[operation](...args);
+  });
+}
+
 async function createWindow() {
   logStartup('Starting desktop services');
+  desktopStateStore=createDesktopStateStore(app.getPath('userData'),app.getVersion());
+  contentWorkflowBridge=createContentWorkflowBridge({dbPath:join(app.getPath('userData'),'editorial.sqlite')});
+  accountServer=createAccountServer({dbPath:join(app.getPath('userData'),'accounts.sqlite'),host:'127.0.0.1',port:0,googleClientId:googleClientId()});
+  const accountAddress=await accountServer.listen();
+  writeAccountConfig({...readAccountConfig(),serverUrl:`http://127.0.0.1:${accountAddress.port}`});
+  logStartup('Local account service ready');
   const workspaceDirectory = join(app.getPath('documents'), 'MainsAgents Workspace');
   mkdirSync(workspaceDirectory, { recursive: true });
-  codexBridge = await startCodexBridge({ port: 0, cwd: workspaceDirectory });
-  logStartup(`Codex bridge ready on ${codexBridge.port}`);
-  const web = await startWebServer(join(app.getAppPath(), 'dist'), codexBridge.port);
+  try {codexBridge = await startCodexBridge({ port: 0, cwd: workspaceDirectory });logStartup(`Codex bridge ready on ${codexBridge.port}`);}
+  catch(error){logStartup(`Codex unavailable: ${error instanceof Error?error.message:String(error)}`);}
+  const web = await startWebServer(join(app.getAppPath(), 'dist'));
   webServer = web.server;
   logStartup(`Web application ready on ${web.port}`);
 
@@ -142,6 +296,7 @@ async function createWindow() {
     minWidth: 1080,
     minHeight: 700,
     backgroundColor: '#0a0a0a',
+    icon: join(app.getAppPath(), 'dist', 'images', 'brand', 'mainsagents-icon-black.ico'),
     show: false,
     title: 'MainsAgents',
     autoHideMenuBar: true,
@@ -149,12 +304,20 @@ async function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      webviewTag: true,
       preload: join(app.getAppPath(), 'desktop-preload.cjs'),
     },
   });
+  session.defaultSession.webRequest.onBeforeSendHeaders({urls:[`http://127.0.0.1:${web.port}/*`]},(details,callback)=>{
+    if(details.webContentsId===mainWindow?.webContents.id)details.requestHeaders['x-mainsagents-app-token']=appToken;
+    callback({requestHeaders:details.requestHeaders});
+  });
 
+  const appOrigin=`http://127.0.0.1:${web.port}`;
+  attachCanvasBrowserPolicy(mainWindow.webContents, appOrigin, openExternalLink);
+  mainWindow.webContents.on('will-navigate',(event,url)=>{if(new URL(url).origin!==appOrigin){event.preventDefault();openExternalLink(url)}});
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (/^https?:/i.test(url)) void shell.openExternal(url);
+    openExternalLink(url);
     return { action: 'deny' };
   });
   mainWindow.once('ready-to-show', () => mainWindow?.show());
@@ -167,6 +330,9 @@ async function closeServices() {
   shuttingDown = true;
   if (webServer) await new Promise((resolve) => webServer.close(resolve));
   if (codexBridge) await codexBridge.close();
+  if (accountServer) await accountServer.close();
+  if (contentWorkflowBridge) contentWorkflowBridge.close();
+  if (desktopStateStore) desktopStateStore.close();
 }
 
 const lock = app.requestSingleInstanceLock();

@@ -2,6 +2,14 @@ import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import { createInterface } from 'node:readline';
 import { join } from 'node:path';
+import { randomBytes, timingSafeEqual } from 'node:crypto';
+import { existsSync } from 'node:fs';
+
+export function codexLaunch({platform=process.platform,cliPath=process.env.CODEX_CLI_PATH,nodePath=process.execPath,appData=process.env.APPDATA??''}={}) {
+  const cli=cliPath??(platform==='win32'?join(appData,'npm','node_modules','@openai','codex','bin','codex.js'):'codex');
+  const javascript=/\.(?:mjs|cjs|js)$/i.test(cli);
+  return {command:javascript?nodePath:cli,args:[...(javascript?[cli]:[]),'app-server','--stdio'],cli,javascript};
+}
 
 class AppServerClient {
   constructor(cwd) {
@@ -9,18 +17,21 @@ class AppServerClient {
     this.nextId = 1;
     this.pending = new Map();
     this.listeners = new Set();
-    const windowsCli = join(process.env.APPDATA ?? '', 'npm', 'node_modules', '@openai', 'codex', 'bin', 'codex.js');
-    const command = process.platform === 'win32' ? (process.versions.electron ? 'node' : process.execPath) : 'codex';
-    const args = process.platform === 'win32' ? [windowsCli, 'app-server', '--stdio'] : ['app-server', '--stdio'];
-    this.process = spawn(command, args, { cwd, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
+    this.closed=false;
+    const {command,args,cli,javascript}=codexLaunch();
+    if(process.platform==='win32'&&!existsSync(cli))throw new Error('Codex CLI not found. Install @openai/codex or set CODEX_CLI_PATH.');
+    const env=process.versions.electron&&javascript?{...process.env,ELECTRON_RUN_AS_NODE:'1'}:process.env;
+    this.process=spawn(command,args,{cwd,stdio:['pipe','pipe','pipe'],windowsHide:true,env});
     createInterface({ input: this.process.stdout }).on('line', (line) => this.handleLine(line));
     this.process.stderr.on('data', (chunk) => process.stderr.write(`[codex] ${chunk}`));
     this.process.on('exit', (code) => {
+      this.closed=true;
       const error = new Error(`Codex app-server stopped with exit code ${code ?? 'unknown'}`);
       for (const { reject } of this.pending.values()) reject(error);
       this.pending.clear();
       for (const listener of this.listeners) listener({ method: 'bridge/error', params: { message: error.message } });
     });
+    this.process.on('error',(error)=>{this.closed=true;for(const pending of this.pending.values())pending.reject(error);this.pending.clear()});
     this.ready = this.initialize();
   }
 
@@ -43,9 +54,11 @@ class AppServerClient {
   }
 
   request(method, params) {
+    if(this.closed)return Promise.reject(new Error('Codex app-server is not running'));
     const id = this.nextId++;
     return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject });
+      const timer=setTimeout(()=>{this.pending.delete(id);reject(new Error(`Codex ${method} timed out`))},30000);
+      this.pending.set(id, { resolve:(value)=>{clearTimeout(timer);resolve(value)}, reject:(error)=>{clearTimeout(timer);reject(error)} });
       this.process.stdin.write(`${JSON.stringify({ method, id, params })}\n`);
     });
   }
@@ -57,6 +70,18 @@ class AppServerClient {
 
 const executions = new Map();
 const pendingEvents = new Map();
+const activeThreadWriters = new Map();
+const activeWriterMessage = 'This session already has a Codex response in progress. Wait for it to finish before sending another message.';
+
+async function waitForExternalWriter(client, threadId, timeoutMs = 20_000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const stored = await client.request('thread/read', { threadId, includeTurns: false });
+    if (stored.thread?.status?.type !== 'active') return true;
+    await new Promise((resolve) => setTimeout(resolve, 800));
+  }
+  return false;
+}
 
 function recordFor(executionId, threadId = '') {
   let record = executions.get(executionId);
@@ -78,7 +103,10 @@ function publish(executionId, event) {
   if (record.done && terminal) return;
   record.events.push(event);
   for (const listener of record.listeners) listener(event);
-  if (terminal) record.done = true;
+  if (terminal) {
+    record.done = true;
+    if (record.threadId && activeThreadWriters.get(record.threadId) === executionId) activeThreadWriters.delete(record.threadId);
+  }
 }
 
 function itemLabel(item) {
@@ -129,31 +157,85 @@ async function body(request) {
 }
 
 export async function startCodexBridge({ port = 8787, cwd = process.cwd() } = {}) {
+  const token=randomBytes(32).toString('hex');
   const client = new AppServerClient(cwd);
   connectNotifications(client);
-  await client.ready;
+  try{await client.ready}catch(error){client.close();throw error}
   const server = createServer(async (request, response) => {
     const url = new URL(request.url ?? '/', `http://${request.headers.host ?? '127.0.0.1'}`);
+    const supplied=String(request.headers['x-mainsagents-bridge-token']??'');
+    if(supplied.length!==token.length||!timingSafeEqual(Buffer.from(supplied),Buffer.from(token)))return json(response,403,{error:'Local bridge access denied'});
     try {
-      if (request.method === 'GET' && url.pathname === '/api/codex/health') return json(response, 200, { ready: true });
+      if (request.method === 'GET' && url.pathname === '/api/codex/health') {
+        const result = await client.request('account/read', { refreshToken: false });
+        const ready = Boolean(result.account) || result.requiresOpenaiAuth === false;
+        return json(response, ready ? 200 : 401, { ready, status: ready ? 'connected' : 'login-required', accountType: result.account?.type ?? null });
+      }
+      if (request.method === 'GET' && url.pathname === '/api/codex/usage') {
+        const result = await client.request('account/rateLimits/read', {});
+        return json(response, 200, { rateLimits: result.rateLimits ?? null, rateLimitsByLimitId: result.rateLimitsByLimitId ?? null, fetchedAt: new Date().toISOString() });
+      }
+      if (request.method === 'POST' && url.pathname === '/api/codex/login') {
+        const result = await client.request('account/login/start', { type: 'chatgpt', useHostedLoginSuccessPage: true, appBrand: 'chatgpt' });
+        return json(response, 200, { authUrl: result.authUrl, loginId: result.loginId });
+      }
+      if (request.method === 'GET' && url.pathname === '/api/codex/models') {
+        const result = await client.request('model/list', { limit: 100, includeHidden: false });
+        return json(response, 200, { models: (result.data ?? []).map((item) => ({ id: item.model ?? item.id, name: item.displayName ?? item.model ?? item.id, isDefault: Boolean(item.isDefault) })) });
+      }
       if (request.method === 'POST' && url.pathname === '/api/codex/sessions') {
         const input = await body(request);
         const config = input.config ?? {};
-        const skillsContext = config.skillsDirectory
-          ? `\n\nThis agent has skills available in: ${config.skillsDirectory}. Installed skills: ${(config.skills ?? []).join(', ') || 'scan the directory for SKILL.md files'}. Read and follow the relevant SKILL.md before using a skill.`
+        const skillsContext = config.skillsDirectory && Array.isArray(config.skills) && config.skills.length
+          ? `\n\nThis agent may use only these associated skills from ${config.skillsDirectory}: ${config.skills.join(', ')}. Read the relevant skill Markdown file before using a selected skill (a standalone .md or SKILL.md). Do not use other skills from that directory.`
           : '';
-        const params = { cwd, model: process.env.MAINSAGENTS_CODEX_MODEL ?? 'gpt-5.6-terra', approvalPolicy: 'never', sandbox: 'read-only', developerInstructions: `You are ${config.agentName ?? 'a MainsAgents specialist'}. ${config.instructions ?? ''}${skillsContext}`.trim(), serviceName: 'mainsagents' };
-        const result = input.threadId ? await client.request('thread/resume', { threadId: input.threadId, ...params }) : await client.request('thread/start', params);
+        const params = { cwd, ...(config.modelId||process.env.MAINSAGENTS_CODEX_MODEL?{model:config.modelId||process.env.MAINSAGENTS_CODEX_MODEL}:{}), approvalPolicy: 'never', sandbox: 'read-only', developerInstructions: `You are ${config.agentName ?? 'a MainsAgents specialist'}. ${config.instructions ?? ''}${skillsContext}`.trim(), serviceName: 'mainsagents' };
+        if (input.threadId) {
+          if (activeThreadWriters.has(input.threadId)) return json(response, 409, { error: activeWriterMessage });
+          const stored = await client.request('thread/read', { threadId: input.threadId, includeTurns: false });
+          if (stored.thread?.status?.type === 'active') return json(response, 409, { error: activeWriterMessage });
+        }
+        const result = input.threadId ? await client.request('thread/resume', { threadId: input.threadId }) : await client.request('thread/start', params);
         return json(response, 200, { threadId: result.thread.id });
       }
       if (request.method === 'POST' && url.pathname === '/api/codex/executions') {
         const input = await body(request);
+        const threadId = input.threadId;
+        if (!threadId) return json(response, 400, { error: 'A Codex thread is required to send a message.' });
+        if (activeThreadWriters.has(threadId)) return json(response, 409, { error: activeWriterMessage });
         const context = (input.context ?? []).map((item) => `[${item.kind}] ${item.label}${item.content ? `\n${item.content}` : ''}`).join('\n\n');
         const text = context ? `${input.content}\n\nWorkspace context:\n${context}` : input.content;
-        const result = await client.request('turn/start', { threadId: input.threadId, input: [{ type: 'text', text }], approvalPolicy: 'never', sandboxPolicy: { type: 'readOnly' } });
-        const executionId = result.turn.id;
-        recordFor(executionId, input.threadId);
-        return json(response, 200, { executionId, threadId: input.threadId });
+        const lockToken = `pending-${randomBytes(12).toString('hex')}`;
+        activeThreadWriters.set(threadId, lockToken);
+        try {
+          const stored = await client.request('thread/read', { threadId, includeTurns: false });
+          if (stored.thread?.status?.type === 'active') {
+            const becameIdle = await waitForExternalWriter(client, threadId);
+            if (!becameIdle) {
+              activeThreadWriters.delete(threadId);
+              return json(response, 409, { error: 'Another Codex window is still finishing a response in this session. Wait for it to finish, then send again.' });
+            }
+          }
+          const turnConfig = { threadId, input: [{ type: 'text', text }], approvalPolicy: 'never', sandboxPolicy: { type: 'readOnly' }, ...(typeof input.modelId === 'string' && input.modelId ? { model: input.modelId } : {}), ...(['low','medium','high','xhigh'].includes(input.reasoningEffort) ? { effort: input.reasoningEffort } : {}) };
+          let result;
+          try {
+            result = await client.request('turn/start', turnConfig);
+          } catch (error) {
+            if (!/already has an active writer/i.test(error instanceof Error ? error.message : String(error))) throw error;
+            const becameIdle = await waitForExternalWriter(client, threadId);
+            if (!becameIdle) throw new Error('Another Codex window is still finishing a response in this session. Wait for it to finish, then send again.');
+            result = await client.request('turn/start', turnConfig);
+          }
+          const executionId = result.turn.id;
+          const record = recordFor(executionId, threadId);
+          activeThreadWriters.set(threadId, executionId);
+          if (record.done && activeThreadWriters.get(threadId) === executionId) activeThreadWriters.delete(threadId);
+          return json(response, 200, { executionId, threadId });
+        } catch (error) {
+          if (activeThreadWriters.get(threadId) === lockToken) activeThreadWriters.delete(threadId);
+          if (/already has an active writer/i.test(error instanceof Error ? error.message : String(error))) return json(response, 409, { error: activeWriterMessage });
+          throw error;
+        }
       }
       const eventMatch = url.pathname.match(/^\/api\/codex\/executions\/([^/]+)\/events$/);
       if (request.method === 'GET' && eventMatch) {
@@ -178,14 +260,16 @@ export async function startCodexBridge({ port = 8787, cwd = process.cwd() } = {}
       }
       json(response, 404, { error: 'Not found' });
     } catch (error) {
-      json(response, 500, { error: error instanceof Error ? error.message : String(error) });
+      const message = error instanceof Error ? error.message : String(error);
+      const writerConflict = /already has an active writer|another Codex window is still finishing/i.test(message);
+      json(response, writerConflict ? 409 : 500, { error: /another Codex window is still finishing/i.test(message) ? message : writerConflict ? activeWriterMessage : message });
     }
   });
   await new Promise((resolve,reject) => {server.once('error',reject);server.listen(port,'127.0.0.1',()=>{server.off('error',reject);resolve()})});
   const address = server.address();
   const activePort = typeof address === 'object' && address ? address.port : port;
   console.log(`[MainsAgents] Codex bridge ready on http://127.0.0.1:${activePort}`);
-  return { port: activePort, close: async () => { await new Promise((resolve) => server.close(resolve)); client.close(); } };
+  return { port: activePort, token, isAlive:()=>!client.closed, close: async () => { await new Promise((resolve) => server.close(resolve)); client.close(); } };
 }
 
 if (process.argv[1] && import.meta.url === new URL(`file:///${process.argv[1].replaceAll('\\','/')}`).href) startCodexBridge().catch((error) => { console.error(error); process.exitCode = 1; });

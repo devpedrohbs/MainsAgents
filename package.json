@@ -3,17 +3,19 @@
   "description": "Desktop workspace for specialized AI agents powered by Codex.",
   "author": "devpedrohbs",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.20",
   "type": "module",
   "scripts": {
     "dev": "node dev.mjs",
     "dev:web": "vite --open app.html",
     "codex:bridge": "node codex-bridge.mjs",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && node scripts/build-preview.mjs",
     "desktop": "npm run build && electron .",
     "desktop:dist": "npm run build && electron-builder --win nsis",
     "preview": "vite preview --open app.html",
-    "typecheck": "tsc -b --pretty false"
+    "typecheck": "tsc -b --pretty false",
+    "test": "node --experimental-strip-types --test tests/*.test.mjs",
+    "account:server": "node cloud-server.mjs"
   },
   "main": "desktop-main.mjs",
   "dependencies": {
@@ -25,9 +27,10 @@
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.1.1",
-    "typescript": "7.0.2",
     "electron": "41.0.2",
     "electron-builder": "26.0.12",
+    "shadcn": "^4.21.0",
+    "typescript": "7.0.2",
     "vite": "8.3.0"
   },
   "build": {
@@ -37,17 +40,29 @@
     "files": [
       "dist/**/*",
       "desktop-main.mjs",
+      "canvas-browser-security.mjs",
+      "desktop-state-store.mjs",
+      "skill-discovery.mjs",
+      "skill-install-command.mjs",
+      "desktop-diagnostics.mjs",
       "desktop-preload.cjs",
       "codex-bridge.mjs",
+      "canvas-runtime-bridge.mjs",
+      "claude-code-bridge.mjs",
+      "external-providers.mjs",
+      "cloud-server.mjs",
+      "content-workflow-bridge.mjs",
+      "desktop-config.json",
       "package.json"
     ],
     "directories": {
       "output": "release"
     },
     "win": {
+      "icon": "public/images/brand/mainsagents-icon-black.ico",
       "target": "nsis",
       "artifactName": "MainsAgents-Setup-${version}.${ext}",
-      "signAndEditExecutable": false
+      "signAndEditExecutable": "true"
     },
     "nsis": {
       "oneClick": false,

@@ -1,4 +1,5 @@
 import type { AgentTool } from '../agents/model/Agent';
+import type { ReasoningEffort } from './model/Chat';
 
 export type CodexThreadId = string;
 export type CodexExecutionId = string;
@@ -8,6 +9,7 @@ export interface CodexSessionConfig {
   agentName?: string;
   workspaceId: string;
   instructions: string;
+  modelId?: string;
   tools: readonly AgentTool[];
   skillsDirectory?: string;
   skills?: readonly string[];
@@ -27,6 +29,8 @@ export interface ResumeCodexSessionInput {
 export interface SendCodexMessageInput {
   threadId: CodexThreadId;
   content: string;
+  modelId?: string;
+  reasoningEffort?: ReasoningEffort;
   context?: readonly CodexContextItem[];
   clientMessageId?: string;
 }
