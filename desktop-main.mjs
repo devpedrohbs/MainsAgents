@@ -18,6 +18,7 @@ import { createCanvasRuntimeBridge } from './canvas-runtime-bridge.mjs';
 import { createAccountServer } from './cloud-server.mjs';
 import { openDesktopEditorialBridge } from './desktop-editorial-storage.mjs';
 import { createNotionEditorialConnector } from './notion-editorial-connector.mjs';
+import {createPublicationConnector} from './publication-connector.mjs';
 import {inspectBackupFileLinks} from './backup-file-links.mjs';
 import {registerEditorialFilesIpc} from './editorial-files-ipc.mjs';
 
@@ -326,6 +327,7 @@ async function createWindow() {
     getSessions:profile=>desktopStateStore.read(profile,'sessions')??[],
     getCurrentProfile:()=>desktopStateStore.currentProfile(),
     getConnector:()=>codexBridge?.isAlive()?createNotionEditorialConnector(()=>codexBridge.notionMcp):null,
+    getPublicationConnector:()=>codexBridge?.isAlive()?createPublicationConnector(()=>codexBridge.publicationMcp):null,
     suggestConnection:(profile,workspaceId)=>{
       const agents=desktopStateStore.read(profile,'agents')??[];
       for(const agent of agents.filter(item=>item.workspaceId===workspaceId)){

@@ -40,6 +40,8 @@ interface ContentContextValue {
   reviewScript:(artifact:EditorialArtifact,decision:'rejected'|'revision-requested',notes:string)=>Promise<void>;
   reviewFiles:(artifact:EditorialArtifact,decision:'approved'|'rejected'|'revision-requested',notes:string)=>Promise<void>;
   publicationCommand:(input:Record<string,unknown>)=>Promise<void>;
+  publicationAccounts:()=>Promise<{accounts:Array<{id:string;name:string}>}>;
+  publicationTransport:(action:'prepare'|'execute'|'reconcile'|'cancel',input:Record<string,unknown>)=>Promise<void>;
   mediaJobs:MediaJob[];
   mediaCapabilities:()=>Promise<{available:boolean;ffmpeg:boolean;ffprobe:boolean;error:string}>;
   inspectVideo:(contentId:string,assetId:string)=>Promise<{metadata:VideoMetadata;versionId:string;sha256:string}>;
@@ -169,6 +171,8 @@ export function ContentWorkflowProvider({children}:PropsWithChildren){
   const reviewScript=useCallback((artifact:EditorialArtifact,decision:'rejected'|'revision-requested',notes:string)=>storage.command(`/api/content/review?profile=${encodeURIComponent(profile())}`,{artifactId:artifact.id,expectedArtifact:artifact,decision,notes}),[storage]);
   const reviewFiles=useCallback((artifact:EditorialArtifact,decision:'approved'|'rejected'|'revision-requested',notes:string)=>storage.command(`/api/content/file-review?profile=${encodeURIComponent(profile())}`,{artifactId:artifact.id,expectedArtifact:artifact,decision,notes}),[storage]);
   const publicationCommand=useCallback((input:Record<string,unknown>)=>storage.command(`/api/content/publications?profile=${encodeURIComponent(profile())}`,input),[storage]);
+  const publicationAccounts=useCallback(()=>request('publishing/accounts',{method:'POST'}),[request]);
+  const publicationTransport=useCallback((action:'prepare'|'execute'|'reconcile'|'cancel',input:Record<string,unknown>)=>storage.command(`/api/content/publishing/${action}?profile=${encodeURIComponent(profile())}`,input),[storage]);
   const mediaCapabilities=useCallback(()=>request('media/capabilities'),[request]);
   const inspectVideo=useCallback((contentId:string,assetId:string)=>request('media/inspect',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({contentId,assetId})}),[request]);
   const exportVideo=useCallback((input:Record<string,unknown>)=>storage.command(`/api/content/media?profile=${encodeURIComponent(profile())}`,input),[storage]);
@@ -200,6 +204,6 @@ export function ContentWorkflowProvider({children}:PropsWithChildren){
   const changeFile=useCallback((assetId:string,role:AssetRole,sourceAssetId?:string)=>commit(current=>changeAssetMetadata(current,assetId,role,sourceAssetId)),[commit]);
   const removeFile=useCallback((assetId:string)=>commit(current=>removeAsset(current,assetId)),[commit]);
   const transferWork=useCallback((contentId:string,sourceAgentId:string,targetAgentId:string,instructions:string,assetIds:string[],newSession:boolean,expectedArtifactId?:string)=>enqueueWork('handoff',contentId,targetAgentId,{sourceAgentId,instructions,assetIds,newSession,expectedArtifactId}),[enqueueWork]);
-  return <Context.Provider value={{state,ready,storageError,jobs,jobsError,workJobs,workError,mediaJobs,mediaCapabilities,inspectVideo,exportVideo,mediaAction,transferWork,retryWork,cancelWork,workDetail,getNotionConnection,configureNotion,retryJob,setProductionStage,createTopic,runResearch,reviseTopic,decideTopic,runScript,approveScript,reviewScript,reviewFiles,publicationCommand,captureChatDelivery,attachFiles,reviseFile,verifyFiles,changeFile,removeFile}}>{children}</Context.Provider>;
+  return <Context.Provider value={{state,ready,storageError,jobs,jobsError,workJobs,workError,mediaJobs,mediaCapabilities,inspectVideo,exportVideo,mediaAction,transferWork,retryWork,cancelWork,workDetail,getNotionConnection,configureNotion,retryJob,setProductionStage,createTopic,runResearch,reviseTopic,decideTopic,runScript,approveScript,reviewScript,reviewFiles,publicationCommand,publicationAccounts,publicationTransport,captureChatDelivery,attachFiles,reviseFile,verifyFiles,changeFile,removeFile}}>{children}</Context.Provider>;
 }
 export function useContentWorkflow(){const context=useContext(Context);if(!context)throw new Error('useContentWorkflow requires ContentWorkflowProvider');return context}

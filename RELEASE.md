@@ -1,6 +1,6 @@
 # Publicação e recuperação do MainsAgents (Windows)
 
-Versão desta rodada: 0.3.38. O instalador NSIS mantém o mesmo `appId`. O estado principal e editorial do desktop ficam no SQLite permanente em `%USERPROFILE%\.mainsagents\storage`, fora da instalação. O perfil Electron em `%APPDATA%\mains-agents` mantém cookies e dados auxiliares; históricos antigos foram migrados sem substituir dados atuais.
+Versão desta rodada: 0.3.39. O instalador NSIS mantém o mesmo `appId`. O estado principal e editorial do desktop ficam no SQLite permanente em `%USERPROFILE%\.mainsagents\storage`, fora da instalação. O perfil Electron em `%APPDATA%\mains-agents` mantém cookies e dados auxiliares; históricos antigos foram migrados sem substituir dados atuais.
 
 ## Antes da publicação
 
@@ -47,3 +47,11 @@ O workflow Windows produz um artefato de build, sem publicar automaticamente uma
 - app.asar SHA-256: `c4e11310a467af87bbf49917ac9ef830f7bfc82aa5af3c7acd9d720268b8f820`.
 - Assinatura do instalador baixado: NotSigned. Este é um build independente do build local acima; seus hashes são distintos.
 - Nenhuma release pública foi criada. O build usa `--publish never`; publicar uma release é uma etapa explícita separada.
+
+## Build local 0.3.39 validado
+
+- LinkedIn texto via Publora MCP: rascunho/agendamento, autorização separada, reconciliação sem recriar e cancelamento para rascunho. Contrato e limites em [publicação integrada](docs/publication-connector-increment.md).
+- 182 testes automatizados e teste Electron de publicação com provedor simulado passaram. O teste de persistência passou usando o app.asar 0.3.39 e estado sintético da versão anterior. Nenhuma postagem em contas pessoais foi realizada.
+- Instalador SHA-256: `758fec064d589d7ce8b7befdf52a73a7d0a69bf1b41ce697512c9cfda25a31c4`.
+- app.asar SHA-256: `2e52b378c68e0f3ebe64e5a4e09ac07ae6fba6cdcaa2db6496c91cf4d47a6b4c`.
+- 43 módulos nativos verificados; assinatura NotSigned. A instalação pessoal do desktop não foi substituída nesta rodada.

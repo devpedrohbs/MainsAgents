@@ -2,6 +2,12 @@
 
 Data: 02/10/2026. Base: [auditoria](C:/Users/pacas/Documents/ChatGPT/MainsAgents/docs/analysis/mainsagents-audit-2026-10-02.md). A execução começou na versão 0.3.31; o estado abaixo distingue o que foi entregue das partes ainda pendentes.
 
+## Publicação integrada — 0.3.39
+
+- **AUTO-15 parcial entregue:** LinkedIn texto via Publora MCP, seleção explícita da conta, rascunho externo ou agendamento, prévia da versão exata, autorização separada, intenção SQLite de uso único, idempotência, consulta verificável e cancelamento autorizado para rascunho. Falhas, perda de identificador e mudanças externas bloqueiam reenvio automático. [Fluxo e limites](../publication-connector-increment.md).
+- **Prioridade seguinte:** completar mídia e o conector Zernio (Instagram/TikTok), além de edição/reagendamento nativos. Só então iniciar AUTO-16 (rotinas), seguido de AUTO-17/18 (memória/projetos). AUTO-19/20 continuam pendentes.
+- AUTO-21: a publicação de uma release pública e a assinatura opcional continuam pendentes. A validação Windows da 0.3.38 está registrada abaixo.
+
 ## Fechamento local — 0.3.38
 
 A prioridade desta rodada foi concluir recortes iniciados antes de abrir AUTO-15–20. Detalhes e limites: [fechamento das pendências locais](../completion-increment.md).

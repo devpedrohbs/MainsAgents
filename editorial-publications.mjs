@@ -25,7 +25,7 @@ export function createEditorialPublications(db){
         state.publications.push(delivery);
       }else if(!delivery||artifactHash(delivery)!==artifactHash(input.expectedDelivery))throw new Error('The reviewed delivery changed. Reopen it before deciding.');
       if(!['create','edit','submit','approve','reject','revise'].includes(input.action))throw new Error('Use the publishing connector to confirm scheduling or publication.');
-      if(['sending','scheduled','published'].includes(delivery.status))throw new Error('Reconcile or cancel the external delivery before changing it.');
+      if(['sending','scheduled','published'].includes(delivery.status)||delivery.operation&&delivery.operation.phase!=='preview')throw new Error('Reconcile or cancel the external delivery before changing it.');
       if(['create','edit'].includes(input.action)){
         const draft=input.draft??{};
         if(!text(draft.text)||!validTimeZone(draft.timeZone)||draft.plannedAt!==undefined&&draft.plannedAt!==''&&!date(draft.plannedAt)||!Array.isArray(draft.assetIds)||draft.assetIds.length>30)throw new Error('Enter text, valid time zone and linked files.');
@@ -39,7 +39,7 @@ export function createEditorialPublications(db){
         const changed=artifactHash(publicationPayload(delivery))!==artifactHash(publicationPayload(next));
         if(input.action==='edit'&&changed)delivery.version++;
         Object.assign(delivery,publicationPayload(next));
-        if(changed){delivery.status='draft';delete delivery.receipt;}
+        if(changed){delivery.status='draft';delete delivery.receipt;delete delivery.operation;}
       }else{
         if(!text(input.notes??'',5000))throw new Error('Keep review notes under 5000 characters.');
         if(input.action==='approve'&&delivery.status!=='in-review')throw new Error('Submit this version for review before approving.');

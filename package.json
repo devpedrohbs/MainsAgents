@@ -4,7 +4,7 @@
   "author": "devpedrohbs",
   "license": "MIT",
   "private": true,
-  "version": "0.3.38",
+  "version": "0.3.39",
   "type": "module",
   "scripts": {
     "dev": "node dev.mjs",
@@ -82,6 +82,8 @@
       "runtime-capabilities.mjs",
       "native-agent-delegations.mjs",
       "editorial-publications.mjs",
+      "editorial-publication-execution.mjs",
+      "publication-connector.mjs",
       "publication-model.mjs",
       "editorial-media.mjs",
       "runtime-tool-policy.mjs",

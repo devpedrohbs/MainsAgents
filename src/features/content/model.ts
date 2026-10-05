@@ -70,7 +70,8 @@ export interface PublicationMedia {assetId:string;versionId:string;sha256:string
 export interface PublicationPayload {platform:Platform;text:string;media:PublicationMedia[];plannedAt?:string;timeZone:string}
 export interface PublicationDelivery extends PublicationPayload {
   id:string;contentId:string;workspaceId:string;version:number;status:PublicationStatus;createdAt:string;updatedAt:string;
-  receipt?:{id:string;checkedAt:string;version:number};
+  receipt?:{id:string;checkedAt:string;version:number;provider?:string;status?:string;scheduledAt?:string;platformPostId?:string};
+  operation?:{id:string;provider:'publora';phase:'preview'|'requesting'|'uncertain'|'confirmed';mode:'draft'|'schedule';accountId:string;payloadHash:string;expiresAt:string;createdAt:string;externalId?:string;cancelRequestId?:string;error?:string;arguments:{content:string;platforms:string[];scheduledTime?:string;idempotencyKey:string}};
   history:Array<{version:number;status:PublicationStatus;decision:string;notes:string;payloadHash:string;payload:PublicationPayload;at:string}>;
 }
 export interface EditorialJob {

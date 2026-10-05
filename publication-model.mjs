@@ -17,6 +17,14 @@ export function validatePublications(state){
     if(item.history.some(entry=>!Number.isSafeInteger(entry.version)||!states.includes(entry.status)||!text(entry.notes,5000)||!date(entry.at)||!/^[a-f0-9]{64}$/.test(entry.payloadHash)))return false;
     if(['approved','sending','scheduled','published'].includes(item.status)&&!item.history.some(entry=>entry.version===item.version&&entry.status==='approved'&&JSON.stringify(normalize(entry.payload))===JSON.stringify(normalize(publicationPayload(item)))))return false;
     if(['scheduled','published'].includes(item.status)&&(!item.receipt||!text(item.receipt.id,500)||!item.receipt.id||!date(item.receipt.checkedAt)||item.receipt.version!==item.version))return false;
+    const op=item.operation;
+    if(op){
+      if(!text(op.id,100)||!op.id||op.provider!=='publora'||!['preview','requesting','uncertain','confirmed'].includes(op.phase)||!['draft','schedule'].includes(op.mode)||!/^linkedin-[A-Za-z0-9_-]{1,200}$/.test(op.accountId)||!date(op.createdAt)||!date(op.expiresAt)||!/^[a-f0-9]{64}$/.test(op.payloadHash)||!text(op.arguments?.idempotencyKey,100)||!op.arguments.idempotencyKey||item.platform!=='LinkedIn'||item.media.length)return false;
+      const expected={content:item.text,platforms:[op.accountId],...(op.mode==='schedule'?{scheduledTime:item.plannedAt}:{}),idempotencyKey:op.arguments.idempotencyKey};
+      if(JSON.stringify(normalize(expected))!==JSON.stringify(normalize(op.arguments))||op.mode==='schedule'&&!date(item.plannedAt)||op.externalId!==undefined&&(!text(op.externalId,500)||!op.externalId)||op.error!==undefined&&!text(op.error,5000))return false;
+      if(op.cancelRequestId!==undefined&&(!text(op.cancelRequestId,100)||!op.cancelRequestId))return false;
+      if(op.phase==='preview'&&item.status!=='approved'||['requesting','uncertain'].includes(op.phase)&&item.status!=='sending'||op.phase==='confirmed'&&(!op.externalId||item.receipt?.id!==op.externalId))return false;
+    }
   }
   return true;
 }

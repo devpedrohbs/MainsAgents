@@ -9,6 +9,7 @@ import {createRuntimeActionApprovals,actionHash} from './runtime-action-approval
 import {createNativeAgentDelegations} from './native-agent-delegations.mjs';
 import {createEditorialPublications,validatePublications} from './editorial-publications.mjs';
 import {createEditorialMedia} from './editorial-media.mjs';
+import {createPublicationExecution} from './editorial-publication-execution.mjs';
 
 const emptyState = () => ({ schemaVersion: 1, topics: [], contents: [], runs: [], artifacts: [], approvals: [] });
 const profilePattern = /^[a-zA-Z0-9_-]{1,120}$/;
@@ -29,7 +30,7 @@ async function readBody(request) {
   return JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
 }
 
-export function createContentWorkflowBridge({ dbPath, getConnector, suggestConnection = () => '',getRuntime,getChatRuntime,getAgents,getSessions,getCurrentProfile,inspect,timeoutMs,mediaOptions }) {
+export function createContentWorkflowBridge({ dbPath, getConnector, getPublicationConnector, suggestConnection = () => '',getRuntime,getChatRuntime,getAgents,getSessions,getCurrentProfile,inspect,timeoutMs,mediaOptions }) {
   mkdirSync(dirname(dbPath), { recursive: true });
   const db = new DatabaseSync(dbPath);
   db.exec('PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000; CREATE TABLE IF NOT EXISTS editorial_state (profile_id TEXT PRIMARY KEY, revision INTEGER NOT NULL, state_json TEXT NOT NULL, updated_at TEXT NOT NULL)');
@@ -40,6 +41,7 @@ export function createContentWorkflowBridge({ dbPath, getConnector, suggestConne
   const work=createEditorialWorkflowQueue(db,{getRuntime,getAgents,getCurrentProfile,inspect,timeoutMs});
   const deliveries=createChatDeliveries(db,{getSessions,getAgents,getCurrentProfile,inspect});
   const publications=createEditorialPublications(db);
+  const publishing=createPublicationExecution(db,{getConnector:getPublicationConnector,getCurrentProfile});
   const media=createEditorialMedia(db,{directory:join(dirname(dbPath),'media'),getCurrentProfile,...mediaOptions});
   const binding=(threadId,sessionId)=>{
     if(!getAgents||!getSessions||!getCurrentProfile)return null;
@@ -58,6 +60,9 @@ export function createContentWorkflowBridge({ dbPath, getConnector, suggestConne
     if (!profilePattern.test(profileId)) { send(response, 400, { error: 'Invalid local profile.' }); return true; }
     try {
       if(getCurrentProfile&&getCurrentProfile()!==profileId){send(response,409,{error:'The active profile changed. Reopen the workspace.'});return true;}
+      if(url.pathname==='/api/content/publishing/accounts'&&request.method==='POST'){send(response,200,await publishing.accounts(profileId));return true;}
+      const publishingRoute=url.pathname.match(/^\/api\/content\/publishing\/(prepare|execute|reconcile|cancel)$/);
+      if(publishingRoute&&request.method==='POST'){send(response,200,await publishing[publishingRoute[1]](profileId,await readBody(request)));return true;}
       if(url.pathname==='/api/content/delegations'&&request.method==='GET'){send(response,200,{...delegations.snapshot(profileId),handoffs:delegations.handoffs(profileId)});return true;}
       if(url.pathname==='/api/content/delegations'&&request.method==='POST'){send(response,200,delegations.manual(profileId,await readBody(request)));return true;}
       const delegationSessionRoute=url.pathname.match(/^\/api\/content\/delegations\/sessions\/([^/]+)$/);
@@ -105,6 +110,9 @@ export function createContentWorkflowBridge({ dbPath, getConnector, suggestConne
         }
         const current = read.get(profileId);
         if ((current?.revision ?? 0) !== input.revision) { send(response, 409, { error: 'Editorial data changed in another window. Reload before editing.' }); return true; }
+        const previous=current?JSON.parse(current.state_json):{};
+        const protectedFields=item=>JSON.stringify({operation:item?.operation,receipt:item?.receipt});
+        if((state.publications??[]).some(item=>protectedFields(item)!==protectedFields(previous.publications?.find(old=>old.id===item.id)))||(previous.publications??[]).some(item=>item.operation&&!state.publications?.some(next=>next.id===item.id&&JSON.stringify(next)===JSON.stringify(item)))){send(response,409,{error:'Provider operations can only change through the publishing service. Reconcile before editing.'});return true;}
         const next = input.revision + 1;
         const json = JSON.stringify(state);
         const at = new Date().toISOString();
@@ -121,5 +129,5 @@ export function createContentWorkflowBridge({ dbPath, getConnector, suggestConne
     }
   }
 
-  return { handle, jobs, work, deliveries, publications,media,actions,binding,delegations,agents:()=>getAgents?.(getCurrentProfile?.())??[], close: async () => {actions.close();await media.close();await delegations.close();await work.close();await jobs.close();db.close();} };
+  return { handle, jobs, work, deliveries, publications,publishing,media,actions,binding,delegations,agents:()=>getAgents?.(getCurrentProfile?.())??[], close: async () => {actions.close();await publishing.close();await media.close();await delegations.close();await work.close();await jobs.close();db.close();} };
 }

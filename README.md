@@ -331,7 +331,7 @@ No desktop, os chats Codex também mostram **Aprovar uma vez** antes de cada fer
 
 Na revisão de roteiro, aprove, rejeite ou peça ajustes sem apagar versões. No chat, `aprovo esse roteiro` e `ajuste: encurte a introdução` abrem a confirmação da versão salva; não publicam nem geram uma nova resposta automaticamente.
 
-No Estúdio, **Entregas por rede** separa texto, mídia, revisão e horário planejado de Instagram, TikTok, YouTube e LinkedIn. A aba **Calendário** usa o fuso escolhido e vira agenda em telas menores. Aprovar uma entrega não a envia; confirmação externa depende do adaptador Publora, ainda pendente.
+No Estúdio, **Entregas por rede** separa texto, mídia, revisão e horário planejado de Instagram, TikTok, YouTube e LinkedIn. A aba **Calendário** usa o fuso escolhido e vira agenda em telas menores. Aprovar uma entrega não a envia. No desktop 0.3.39, LinkedIn com texto pode criar rascunho ou agendar via Publora MCP após uma autorização separada, com consulta do resultado e cancelamento autorizado. Upload de mídia e Zernio ainda não estão disponíveis nesse fluxo. Veja [publicação integrada](docs/publication-connector-increment.md).
 
 **Edição local de vídeo** permite cortar/exportar um trecho autorizado com FFmpeg e ffprobe no PATH. Gera um novo MP4, preserva o original e confere duração/áudio antes de associar o resultado. Progresso e recuperação ficam salvos; fechar interrompe e exige retomada explícita. Abra original e resultado no player padrão para revisar. Sem controle do computador nem acabamento automático.
 
