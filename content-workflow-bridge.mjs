@@ -65,11 +65,21 @@ export function createContentWorkflowBridge({ dbPath, getConnector, getPublicati
     try {
       if(getCurrentProfile&&getCurrentProfile()!==profileId){send(response,409,{error:'The active profile changed. Reopen the workspace.'});return true;}
       if(url.pathname==='/api/content/calendar'&&request.method==='GET'){send(response,200,calendar.snapshot(profileId,url.searchParams.get('workspace')));return true;}
+      if(url.pathname==='/api/content/calendar/refresh'&&request.method==='POST'){send(response,200,calendar.configureRefresh(profileId,await readBody(request)));return true;}
       if(url.pathname==='/api/content/calendar/accounts'&&request.method==='POST'){const input=await readBody(request);send(response,200,await calendar.accounts(profileId,input.workspaceId,input.provider));return true;}
       if(url.pathname==='/api/content/calendar/sync'&&request.method==='POST'){try{send(response,200,await calendar.sync(profileId,await readBody(request)))}catch{send(response,502,{error:'Calendar query failed. Previous data was preserved. Check MCP authentication and supported tools.'})}return true;}
       if(url.pathname==='/api/content/publishing/accounts'&&request.method==='POST'){send(response,200,await publishing.accounts(profileId));return true;}
-      const publishingRoute=url.pathname.match(/^\/api\/content\/publishing\/(prepare|execute|reconcile|cancel)$/);
-      if(publishingRoute&&request.method==='POST'){send(response,200,await publishing[publishingRoute[1]](profileId,await readBody(request)));return true;}
+      const publishingRoute=url.pathname.match(/^\/api\/content\/publishing\/(prepare|execute|reconcile|cancel|prepareChange|change)$/);
+      if(publishingRoute&&request.method==='POST'){
+        const input=await readBody(request),result=await publishing[publishingRoute[1]](profileId,input);
+        const delivery=result.state?.publications?.find(item=>item.id===input.id);
+        if(delivery?.operation?.phase==='confirmed'){
+          try{const source=calendar.snapshot(profileId,delivery.workspaceId).sources.find(item=>item.provider===delivery.operation.provider);
+            if(source?.accountIds.includes(delivery.operation.accountId))await calendar.sync(profileId,{workspaceId:delivery.workspaceId,provider:source.provider,accountIds:source.accountIds});
+          }catch{/* A calendar failure must not undo or hide a confirmed provider receipt. */}
+        }
+        send(response,200,result);return true;
+      }
       if(url.pathname==='/api/content/delegations'&&request.method==='GET'){send(response,200,{...delegations.snapshot(profileId),handoffs:delegations.handoffs(profileId)});return true;}
       if(url.pathname==='/api/content/delegations'&&request.method==='POST'){send(response,200,delegations.manual(profileId,await readBody(request)));return true;}
       const delegationSessionRoute=url.pathname.match(/^\/api\/content\/delegations\/sessions\/([^/]+)$/);

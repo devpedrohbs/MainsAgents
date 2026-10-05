@@ -1,3 +1,4 @@
+import {useStudioDraftField,studioDraftKey,clearStudioDraft} from '../../features/content/studioDrafts';
 import {useState} from 'react';
 import {useContentWorkflow} from '../../features/content/ContentWorkflowProvider';
 import {useLanguage} from '../../app/LanguageProvider';
@@ -10,16 +11,17 @@ import './content-media.css';
 export function ContentMediaEditor({content}:{content:EditorialContent}){
   const {state,mediaJobs,mediaCapabilities,inspectVideo,exportVideo,mediaAction}=useContentWorkflow(),{locale}=useLanguage(),pt=locale==='pt-BR';
   const videos=(state.assets??[]).filter(item=>item.contentId===content.id&&item.workspaceId===content.workspaceId&&item.kind==='video');
-  const [open,setOpen]=useState(false),[assetId,setAssetId]=useState(''),[start,setStart]=useState('0'),[duration,setDuration]=useState('');
+  const scope=studioDraftKey('trim',content.workspaceId,content.id);
+  const [open,setOpen]=useState(false),[assetId,setAssetId]=useStudioDraftField<string>(scope,'asset',''),[start,setStart]=useStudioDraftField<string>(scope,'start','0'),[duration,setDuration]=useStudioDraftField<string>(scope,'duration','');
   const [inspection,setInspection]=useState<{metadata:VideoMetadata;versionId:string;sha256:string}|null>(null),[capability,setCapability]=useState<{available:boolean;error:string}|null>(null);
   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[requestKey,setRequestKey]=useState(()=>crypto.randomUUID());
   const jobs=mediaJobs.filter(item=>item.contentId===content.id&&item.workspaceId===content.workspaceId);
   const action=async(work:()=>Promise<unknown>)=>{setBusy(true);setError('');try{await work()}catch(failure){setError(String((failure as Error).message))}finally{setBusy(false)}};
-  const prepare=()=>{setOpen(true);setInspection(null);setCapability(null);setAssetId(videos[0]?.id??'');setStart('0');setDuration('');setRequestKey(crypto.randomUUID());void action(async()=>setCapability(await mediaCapabilities()))};
-  const inspect=()=>action(async()=>{const result=await inspectVideo(content.id,assetId);setInspection(result);setDuration(String(Math.round(result.metadata.duration*100)/100));setRequestKey(crypto.randomUUID())});
+  const prepare=()=>{setOpen(true);setInspection(null);setCapability(null);if(!videos.some(item=>item.id===assetId))setAssetId(videos[0]?.id??'');setRequestKey(crypto.randomUUID());void action(async()=>setCapability(await mediaCapabilities()))};
+  const inspect=()=>action(async()=>{const result=await inspectVideo(content.id,assetId);setInspection(result);if(!duration)setDuration(String(Math.round(result.metadata.duration*100)/100));setRequestKey(crypto.randomUUID())});
   const source=videos.find(item=>item.id===assetId);
   const valid=Boolean(inspection&&source?.currentVersionId===inspection.versionId&&Number.isFinite(Number(start))&&Number(start)>=0&&Number.isFinite(Number(duration))&&Number(duration)>=0.1&&Number(duration)<=3600&&Number(start)+Number(duration)<=inspection.metadata.duration+0.05);
-  const submit=()=>action(async()=>{if(!inspection)return;await exportVideo({requestKey,contentId:content.id,assetId,versionId:inspection.versionId,sha256:inspection.sha256,start:Number(start),duration:Number(duration)});setOpen(false)});
+  const submit=()=>action(async()=>{if(!inspection)return;await exportVideo({requestKey,contentId:content.id,assetId,versionId:inspection.versionId,sha256:inspection.sha256,start:Number(start),duration:Number(duration)});clearStudioDraft(scope);setOpen(false)});
   return <section className="editorial-card content-media" aria-label={pt?'Edição local de vídeo':'Local video editing'}><div className="editorial-section-head"><div><h2>{pt?'Edição local de vídeo':'Local video editing'}</h2><p className="editorial-hint">{pt?'Recorte um trecho e exporte um novo MP4. Seu vídeo original permanece intacto.':'Trim a segment and export a new MP4. Your original video stays intact.'}</p></div><button type="button" className="soft-button" disabled={busy||!videos.length||!window.mainsAgentsDesktop?.state} onClick={prepare}>{pt?'Cortar e exportar':'Trim and export'}</button></div>
     {!videos.length&&<p className="editorial-hint">{pt?'Associe um vídeo na biblioteca acima para começar.':'Link a video in the library above to begin.'}</p>}
     {error&&!open&&<p className="delivery-error" role="alert">{error}</p>}

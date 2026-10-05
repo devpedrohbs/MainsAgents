@@ -1,3 +1,4 @@
+import {useStudioDraftField,studioDraftKey} from '../../features/content/studioDrafts';
 import {useEffect,useState} from 'react';
 import type {Agent} from '../../features/agents/model/Agent';
 import type {AgentSession,ChatMessageItem} from '../../features/chat/model/Chat';
@@ -63,9 +64,10 @@ export function ScriptDeliveryReview({artifact,onClose,initialDecision='approve'
   const options=artifact.data as ScriptOptions;
   const content=state.contents.find(item=>item.id===artifact.contentId);
   const existing=state.artifacts.find(item=>item.id===content?.approvedScriptArtifactId)?.data as ApprovedScript|undefined;
-  const [script,setScript]=useState<ApprovedScript>(()=>structuredClone(existing??{hook:options.hooks[0],cta:options.ctas[0],path:options.paths[0],text:options.draftScript,improvisationTopics:options.improvisationTopics,thumbnailDirection:options.thumbnailDirection}));
-  const [destination,setDestination]=useState<string|null>(null),[sync,setSync]=useState(false),[notes,setNotes]=useState(initialNotes);
-  const [decision,setDecision]=useState(initialDecision),[savedDecision,setSavedDecision]=useState('');
+  const scope=studioDraftKey('script-dialog',artifact.workspaceId,artifact.id,String(artifact.version),initialDecision,initialNotes.slice(0,100));
+  const [script,setScript]=useStudioDraftField<ApprovedScript>(scope,'script',existing??{hook:options.hooks[0],cta:options.ctas[0],path:options.paths[0],text:options.draftScript,improvisationTopics:options.improvisationTopics,thumbnailDirection:options.thumbnailDirection});
+  const [destination,setDestination]=useState<string|null>(null),[sync,setSync]=useState(false),[notes,setNotes]=useStudioDraftField<string>(scope,'notes',initialNotes);
+  const [decision,setDecision]=useStudioDraftField<'approve'|'rejected'|'revision-requested'>(scope,'decision',initialDecision),[savedDecision,setSavedDecision]=useState('');
   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[saved,setSaved]=useState(false);
   // Destination is frozen for the open review, not silently refreshed under its checkbox.
   useEffect(()=>{let active=true;void getNotionConnection(artifact.workspaceId).then(config=>{if(active)setDestination(config.autoSync?config.dataSourceId:'')}).catch(failure=>{if(active){setDestination('');setError(String(failure.message??failure))}});return()=>{active=false}},[artifact.workspaceId,getNotionConnection]);

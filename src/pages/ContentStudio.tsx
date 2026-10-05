@@ -1,3 +1,4 @@
+import {useStudioDraftField,studioDraftKey,clearStudioDraft} from '../features/content/studioDrafts';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useWorkspaces } from '../app/WorkspaceProvider';
 import { useLanguage } from '../app/LanguageProvider';
@@ -73,30 +74,16 @@ export function ContentStudio({
   const {allNodes,addNode,updateNodeData}=useCanvas();
   const agents = allAgents.filter((agent) => agent.workspaceId === currentWorkspaceId);
   const researchAgents = agents.filter((agent) => agent.tools.includes('web-search'));
-  const [inputKind, setInputKind] = useState<'text' | 'url' | 'ideas'>('text');
-  const [input, setInput] = useState('');
-  const [category, setCategory] = useState(locale === 'pt-BR' ? 'IA e tecnologia' : 'AI and technology');
-  const [priority, setPriority] = useState<'normal' | 'urgent'>('normal');
-  const [researchAgentId, setResearchAgentId] = useState('');
-  const [scriptAgentId, setScriptAgentId] = useState('');
+  const intakeScope=studioDraftKey('intake',currentWorkspaceId);
+  const [inputKind, setInputKind] = useStudioDraftField<'text' | 'url' | 'ideas'>(intakeScope,'inputKind','text');
+  const [input, setInput] = useStudioDraftField<string>(intakeScope,'input','');
+  const [category, setCategory] = useStudioDraftField<string>(intakeScope,'category',locale === 'pt-BR' ? 'IA e tecnologia' : 'AI and technology');
+  const [priority, setPriority] = useStudioDraftField<'normal' | 'urgent'>(intakeScope,'priority','normal');
+  const [researchAgentId, setResearchAgentId] = useStudioDraftField<string>(intakeScope,'researchAgentId','');
+  const [scriptAgentId, setScriptAgentId] = useStudioDraftField<string>(intakeScope,'scriptAgentId','');
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(requestedTopicId ?? null);
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState('');
-  const [format, setFormat] = useState<ContentFormat>('short-video');
-  const [plannedAt, setPlannedAt] = useState('');
-  const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>(['Instagram', 'TikTok']);
-  const [decisionNotes, setDecisionNotes] = useState('');
-  const [editTitle, setEditTitle] = useState('');
-  const [editSummary, setEditSummary] = useState('');
-  const [editWhy, setEditWhy] = useState('');
-  const [editAngles, setEditAngles] = useState('');
-  const [hook, setHook] = useState('');
-  const [cta, setCta] = useState('');
-  const [pathTitle, setPathTitle] = useState('');
-  const [pathOutline, setPathOutline] = useState('');
-  const [scriptText, setScriptText] = useState('');
-  const [thumbnail, setThumbnail] = useState('');
-  const [improv, setImprov] = useState('');
   const [notionId,setNotionId]=useState('');
   const [syncNotion,setSyncNotion]=useState(false);
   const [connectionReady,setConnectionReady]=useState(false);
@@ -127,6 +114,23 @@ export function ContentStudio({
     : undefined;
   const approvedScript =
     approvedArtifact?.type === 'script' ? (approvedArtifact.data as ApprovedScript) : undefined;
+  const topicScope=studioDraftKey('topic-review',currentWorkspaceId,topic?.id??'none',topic?.researchArtifactId??'none');
+  const scriptScope=studioDraftKey('script-review',currentWorkspaceId,content?.id??topic?.id??'none',optionsArtifact?.id??'none',approvedArtifact?.id??'none');
+  const [format,setFormat]=useStudioDraftField<ContentFormat>(topicScope,'format','short-video');
+  const [plannedAt,setPlannedAt]=useStudioDraftField<string>(topicScope,'plannedAt','');
+  const [selectedPlatforms,setSelectedPlatforms]=useStudioDraftField<Platform[]>(topicScope,'platforms',['Instagram','TikTok']);
+  const [decisionNotes,setDecisionNotes]=useStudioDraftField<string>(options?scriptScope:topicScope,'notes','');
+  const [editTitle,setEditTitle]=useStudioDraftField<string>(topicScope,'title',topic?.title??'');
+  const [editSummary,setEditSummary]=useStudioDraftField<string>(topicScope,'summary',topic?.summary??'');
+  const [editWhy,setEditWhy]=useStudioDraftField<string>(topicScope,'why',topic?.whyItMatters??'');
+  const [editAngles,setEditAngles]=useStudioDraftField<string>(topicScope,'angles',topic?.angles.join('\n')??'');
+  const [hook,setHook]=useStudioDraftField<string>(scriptScope,'hook',approvedScript?.hook??options?.hooks[0]??'');
+  const [cta,setCta]=useStudioDraftField<string>(scriptScope,'cta',approvedScript?.cta??options?.ctas[0]??'');
+  const [pathTitle,setPathTitle]=useStudioDraftField<string>(scriptScope,'pathTitle',approvedScript?.path.title??options?.paths[0]?.title??'');
+  const [pathOutline,setPathOutline]=useStudioDraftField<string>(scriptScope,'pathOutline',approvedScript?.path.outline??options?.paths[0]?.outline??'');
+  const [scriptText,setScriptText]=useStudioDraftField<string>(scriptScope,'text',approvedScript?.text??options?.draftScript??'');
+  const [thumbnail,setThumbnail]=useStudioDraftField<string>(scriptScope,'thumbnail',approvedScript?.thumbnailDirection??options?.thumbnailDirection??'');
+  const [improv,setImprov]=useStudioDraftField<string>(scriptScope,'improv',(approvedScript?.improvisationTopics??options?.improvisationTopics??[]).join('\n'));
   const runs = state.runs
     .filter(
       (item) =>
@@ -147,14 +151,7 @@ export function ContentStudio({
   useEffect(() => {
     if (!agents.some((agent) => agent.id === scriptAgentId)) setScriptAgentId(agents[0]?.id ?? '');
   }, [agents, scriptAgentId]);
-  useEffect(() => {
-    setEditTitle(topic?.title ?? '');
-    setEditSummary(topic?.summary ?? '');
-    setEditWhy(topic?.whyItMatters ?? '');
-    setEditAngles(topic?.angles.join('\n') ?? '');
-    setDecisionNotes('');
-  }, [topic?.id, topic?.researchArtifactId]);
-  useEffect(() => {
+useEffect(() => {
     if (!options) return;
     setHook(approvedScript?.hook??options.hooks[0] ?? '');
     setCta(approvedScript?.cta??options.ctas[0] ?? '');
@@ -194,7 +191,7 @@ export function ContentStudio({
         priority,
       });
       setSelectedTopicId(created.id);
-      setInput('');
+      clearStudioDraft(intakeScope);
       if (!researchAgentId) {
         setFeedback(
           pt

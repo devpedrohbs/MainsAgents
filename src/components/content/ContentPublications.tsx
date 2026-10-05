@@ -1,3 +1,4 @@
+import {useStudioDraftField,studioDraftKey} from '../../features/content/studioDrafts';
 import {useEffect,useState} from 'react';
 import {useContentWorkflow} from '../../features/content/ContentWorkflowProvider';
 import {useLanguage} from '../../app/LanguageProvider';
@@ -30,9 +31,11 @@ export function ContentPublications({content}:{content:EditorialContent}){
 
 export function PublicationEditor({delivery,onClose}:{delivery:PublicationDelivery;onClose:()=>void}){
   const {state,publicationCommand}=useContentWorkflow(),{locale}=useLanguage(),pt=locale==='pt-BR';
-  const [snapshot,setSnapshot]=useState(delivery),[text,setText]=useState(delivery.text),[timeZone,setTimeZone]=useState(delivery.timeZone);
-  const [planned,setPlanned]=useState(zonedDateTime(delivery.plannedAt,delivery.timeZone)),[selected,setSelected]=useState(delivery.media.map(item=>item.assetId));
-  const [notes,setNotes]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[saved,setSaved]=useState(false);
+  const [snapshot,setSnapshot]=useState(delivery);
+  const scope=studioDraftKey('publication',delivery.workspaceId,snapshot.id,String(snapshot.version),snapshot.operation?.id??'local');
+  const [text,setText]=useStudioDraftField<string>(scope,'text',snapshot.text),[timeZone,setTimeZone]=useStudioDraftField<string>(scope,'zone',snapshot.timeZone);
+  const [planned,setPlanned]=useStudioDraftField<string>(scope,'planned',zonedDateTime(snapshot.plannedAt,snapshot.timeZone)),[selected,setSelected]=useStudioDraftField<string[]>(scope,'files',snapshot.media.map(item=>item.assetId));
+  const [notes,setNotes]=useStudioDraftField<string>(scope,'notes',''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[saved,setSaved]=useState(false);
   const live=(state.publications??[]).find(item=>item.id===delivery.id);
   const stale=JSON.stringify(live)!==JSON.stringify(snapshot);
   const assets=(state.assets??[]).filter(item=>item.contentId===delivery.contentId&&item.workspaceId===delivery.workspaceId);
@@ -77,8 +80,29 @@ function PublicationSender({delivery,disabled,onChanged,onBusy}:{delivery:Public
       {op&&<><p><b>{op.accountId}</b><br/>{op.mode==='draft'?(pt?'Criar rascunho externo; não publicar.':'Create external draft; do not publish.'):(pt?'Agendar publicação: ':'Schedule publication: ')+(delivery.plannedAt?new Date(delivery.plannedAt).toLocaleString(locale,{timeZone:delivery.timeZone}):'')}{op.mode==='schedule'&&` (${delivery.timeZone})`}</p>
       {op.phase==='preview'?<><p className="editorial-hint">{pt?'A autorização envia exatamente o texto aprovado acima. A publicação agendada será executada pelo Publora no horário escolhido.':'Authorization sends exactly the approved text above. Publora executes scheduled publication at the chosen time.'}</p><button className="primary-button" disabled={busy||disabled} onClick={()=>void act('execute')}>{pt?(op.mode==='draft'?'Autorizar criação do rascunho':'Autorizar agendamento'):(op.mode==='draft'?'Authorize draft creation':'Authorize scheduling')}</button><button className="text-link" disabled={busy||disabled} onClick={()=>void act('prepare')}>{pt?'Renovar prévia':'Renew preview'}</button></>:<><p className="editorial-hint" role="status">{op.phase==='confirmed'&&delivery.receipt?`${pt?'Estado confirmado':'Confirmed state'}: ${delivery.receipt.status} · ${new Date(delivery.receipt.checkedAt).toLocaleString(locale)}`:(pt?'Resultado não confirmado. Consulte antes de tentar qualquer novo envio.':'Unconfirmed result. Check before attempting any new send.')}</p>{op.externalId?<p>ID: {op.externalId}</p>:<label>{pt?'ID do grupo de post encontrado no Publora':'Post group ID found in Publora'}<input value={externalId} onChange={event=>setExternalId(event.target.value)} disabled={busy||disabled}/><small>{pt?'Usado apenas para consultar e verificar; não cria um post.':'Only queries and verifies; does not create a post.'}</small></label>}<button className="soft-button" disabled={busy||disabled||!op.externalId&&!externalId} onClick={()=>void act('reconcile')}>{pt?'Consultar resultado no Publora':'Check result in Publora'}</button>{delivery.status==='scheduled'&&op.phase==='confirmed'&&<><button className="text-link" disabled={busy||disabled} onClick={()=>setCancelConfirm(!cancelConfirm)}>{pt?'Cancelar agendamento':'Cancel schedule'}</button>{cancelConfirm&&<><p role="alert">{pt?'O post será transformado em rascunho no Publora. Autorize apenas se deseja cancelar este horário.':'The post will become a draft in Publora. Authorize only if you want to cancel this schedule.'}</p><button className="soft-button" disabled={busy||disabled} onClick={()=>void act('cancel')}>{pt?'Autorizar cancelamento no Publora':'Authorize cancellation in Publora'}</button></>}</>}</>}
       </>}
-    </>}{error&&<p className="delivery-error" role="alert">{error}</p>}
+    </>}{supported&&op?.phase==='confirmed'&&['draft','scheduled'].includes(delivery.receipt?.status??'')&&<PublicationChange delivery={delivery} disabled={busy||disabled} onChanged={onChanged} onBusy={onBusy}/>} {error&&<p className="delivery-error" role="alert">{error}</p>}
   </section>;
+}
+
+function PublicationChange({delivery,disabled,onChanged,onBusy}:{delivery:PublicationDelivery;disabled:boolean;onChanged:()=>void;onBusy:(busy:boolean)=>void}){
+  const {preparePublicationChange,publicationTransport}=useContentWorkflow(),{locale}=useLanguage(),pt=locale==='pt-BR';
+  const changeScope=studioDraftKey('publication-change',delivery.workspaceId,delivery.id,String(delivery.version),delivery.operation?.id??'none');
+  const [open,setOpen]=useState(false),[text,setText]=useStudioDraftField<string>(changeScope,'text',delivery.text),[zone,setZone]=useStudioDraftField<string>(changeScope,'zone',delivery.timeZone),[planned,setPlanned]=useStudioDraftField<string>(changeScope,'planned',zonedDateTime(delivery.plannedAt,delivery.timeZone)),[mode,setMode]=useStudioDraftField<string>(changeScope,'mode',delivery.receipt?.status==='scheduled'?'schedule':'draft');
+  const [preview,setPreview]=useState<{id:string;expiresAt:string}|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
+  useEffect(()=>{setPreview(null);setOpen(false)},[delivery]);
+  const act=async()=>{setBusy(true);onBusy(true);setError('');try{
+    if(!preview){const result=await preparePublicationChange({id:delivery.id,expectedDelivery:delivery,mode,draft:{text,timeZone:zone,plannedAt:mode==='schedule'?localTimeToInstant(planned,zone):undefined}});setPreview(result.preview);}
+    else {await publicationTransport('change',{id:delivery.id,expectedDelivery:delivery,changeId:preview.id,authorize:true});setPreview(null);setOpen(false);onChanged();}
+  }catch(e){setError((e as Error).message);if(preview)onChanged();}finally{setBusy(false);onBusy(false)}};
+  return <div className="publication-change"><button type="button" className="text-link" disabled={disabled||busy} onClick={()=>{setOpen(!open);setPreview(null);setError('')}}>{pt?'Editar ou reagendar no Publora':'Edit or reschedule in Publora'}</button>{open&&<div className="delivery-review-fields">
+    <p className="editorial-hint">{pt?'Altera o mesmo post e guarda uma nova versão aprovada. Confira o texto e o horário antes de autorizar.':'Updates the same post and keeps a new approved version. Review text and time before authorizing.'}</p>
+    <label>{pt?'Novo texto':'New text'}<textarea aria-label={pt?'Novo texto':'New text'} value={text} disabled={disabled||busy||!!preview} onChange={e=>setText(e.target.value)}/></label>
+    <label>{pt?'Novo destino':'New destination'}<SelectMenu ariaLabel={pt?'Novo destino':'New destination'} value={mode} disabled={disabled||busy||!!preview} onChange={setMode} options={[{value:'draft',label:pt?'Rascunho':'Draft'},{value:'schedule',label:pt?'Agendado':'Scheduled'}]}/></label>
+    {mode==='schedule'&&<><label>{pt?'Fuso horário da alteração':'Edit time zone'}<SelectMenu ariaLabel={pt?'Fuso horário da alteração':'Edit time zone'} value={zone} disabled={disabled||busy||!!preview} onChange={next=>{if(planned){try{setPlanned(zonedDateTime(localTimeToInstant(planned,zone),next))}catch{setPlanned('')}}setZone(next)}} options={[...new Set([zone,...zones])].map(value=>({value,label:value}))}/></label><label>{pt?'Novo horário':'New time'}<input type="datetime-local" aria-label={pt?'Novo horário':'New time'} value={planned} disabled={disabled||busy||!!preview} onChange={e=>setPlanned(e.target.value)}/></label></>}
+    {preview&&<p role="status">{pt?'Prévia pronta para o post':'Preview ready for post'} {delivery.operation?.externalId} · {delivery.operation?.accountId}. {pt?'A alteração só é enviada ao autorizar abaixo.':'The change is sent only after authorization below.'}</p>}
+    <button className={preview?'primary-button':'soft-button'} disabled={disabled||busy||!text.trim()||mode==='schedule'&&!planned} onClick={()=>void act()}>{preview?(pt?'Autorizar alteração no Publora':'Authorize change in Publora'):(pt?'Conferir alteração':'Review change')}</button>{preview&&<button className="text-link" disabled={disabled||busy} onClick={()=>setPreview(null)}>{pt?'Voltar para editar':'Back to edit'}</button>}
+    {error&&<p role="alert" className="delivery-error">{error}</p>}
+  </div>}</div>;
 }
 
 export function PublicationCalendar({workspaceId}:{workspaceId:string}){

@@ -13,6 +13,7 @@ export function createPublicationConnector(getMcp){
     async accounts(){const data=await invoke('list_connections',{});if(!Array.isArray(data.connections))throw Error('Publora returned an unsupported account list.');return data.connections.filter(item=>typeof item.platformId==='string'&&item.platformId.startsWith('linkedin-')&&item.tokenStatus==='valid'&&item.connectionStatus==='active').map(item=>({id:item.platformId,name:String(item.displayName??item.username??item.platformId).slice(0,200)}));},
     async create(operation){const data=await invoke('create_post',operation.arguments);if(typeof data.postGroupId!=='string'||!data.postGroupId||data.postGroupId.length>500)throw Error('Publora returned no post identifier. Do not repeat the create operation.');return data.postGroupId;},
     async read(id){return invoke('get_post',{postGroupId:id});},
+    async update(operation){return invoke('update_post',{postGroupId:operation.externalId,...operation.arguments,status:operation.mode==='schedule'?'scheduled':'draft'});},
     async cancel(id,key){return invoke('update_post',{postGroupId:id,status:'draft',idempotencyKey:key});},
   };
 }

@@ -1,6 +1,7 @@
+import {validateStudioDrafts} from '../features/content/studioDraftModel.ts';
 import {validateEditorialAssets} from '../../editorial-assets-validation.mjs';
 import {validatePublications} from '../../publication-model.mjs';
-export const dataKeys = ['workspaces', 'current-workspace', 'agents', 'sessions', 'active-sessions', 'tasks', 'canvas-workspaces', 'language', 'focus-mode', 'text-scale', 'reduced-motion', 'welcome-dismissed', 'sidebar-width', 'inspector-width', 'default-codex-model', 'chat-presentation', 'chat-drafts', 'chat-inbox'] as const;
+export const dataKeys = ['workspaces', 'current-workspace', 'agents', 'sessions', 'active-sessions', 'tasks', 'canvas-workspaces', 'language', 'focus-mode', 'text-scale', 'reduced-motion', 'welcome-dismissed', 'sidebar-width', 'inspector-width', 'default-codex-model', 'chat-presentation', 'chat-drafts', 'studio-drafts', 'chat-inbox'] as const;
 const collectionKeys = new Set(['workspaces', 'agents', 'sessions', 'tasks']);
 export interface BackupFile { format:'mainsagents-backup'; version:1; exportedAt:string; data:Record<string, unknown>; editorial?:Record<string,unknown>; execution?:Record<string,unknown>; recovery?:boolean; fileManifest?:Array<{agentId:string;directory?:string;skills:unknown}> }
 export type ImportMode = 'replace' | 'merge';
@@ -28,6 +29,7 @@ export function parseBackup(text:string):BackupFile {
   const sessions=parsed.data.sessions;if(Array.isArray(sessions)&&sessions.some((session)=>!isObject(session)||typeof session.agentId!=='string'||typeof session.title!=='string'||!Array.isArray(session.messages)))throw new Error('Invalid sessions in backup.');
   const tasks=parsed.data.tasks;if(Array.isArray(tasks)&&tasks.some((task)=>!isObject(task)||typeof task.agentId!=='string'||typeof task.workspaceId!=='string'||typeof task.title!=='string'))throw new Error('Invalid tasks in backup.');
   for(const key of ['active-sessions','canvas-workspaces'])if(key in parsed.data && !isObject(parsed.data[key]))throw new Error(`Invalid ${key} data in backup.`);
+  if ('studio-drafts' in parsed.data&&!validateStudioDrafts(parsed.data['studio-drafts']))throw new Error('Invalid Studio drafts in backup.');
   if ('chat-drafts' in parsed.data) {
     const drafts = parsed.data['chat-drafts'];
     if (!isObject(drafts) || Object.entries(drafts).some(([key, value]) => {
@@ -87,7 +89,7 @@ export function composeImport(current:Record<string,unknown>,file:BackupFile,mod
   for(const [key,value] of Object.entries(incoming)) {
     if(collectionKeys.has(key))merged[key]=mergeRows(current[key],value);
     else if(key==='canvas-workspaces')merged[key]=mergeCanvas(current[key],value);
-    else if(key==='active-sessions'||key==='chat-drafts')merged[key]={...(isObject(value)?value:{}),...(isObject(current[key])?current[key]:{})};
+    else if(key==='active-sessions'||key==='chat-drafts'||key==='studio-drafts')merged[key]={...(isObject(value)?value:{}),...(isObject(current[key])?current[key]:{})};
     else if(!(key in current))merged[key]=value;
   }
   return merged;

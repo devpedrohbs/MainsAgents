@@ -42,7 +42,9 @@ interface ContentContextValue {
   reviewFiles:(artifact:EditorialArtifact,decision:'approved'|'rejected'|'revision-requested',notes:string)=>Promise<void>;
   publicationCommand:(input:Record<string,unknown>)=>Promise<void>;
   publicationAccounts:()=>Promise<{accounts:Array<{id:string;name:string}>}>;
-  publicationTransport:(action:'prepare'|'execute'|'reconcile'|'cancel',input:Record<string,unknown>)=>Promise<void>;
+  preparePublicationChange:(input:Record<string,unknown>)=>Promise<{preview:{id:string;externalId:string;accountId:string;mode:'draft'|'schedule';text:string;timeZone:string;plannedAt?:string;expiresAt:string}}>;
+  publicationTransport:(action:'prepare'|'execute'|'reconcile'|'cancel'|'change',input:Record<string,unknown>)=>Promise<void>;
+  configureCalendarRefresh:(workspaceId:string,provider:CalendarProvider,enabled:boolean,intervalMinutes:number)=>Promise<CalendarSource>;
   publicationCalendar:(workspaceId:string)=>Promise<{sources:CalendarSource[]}>;
   calendarAccounts:(workspaceId:string,provider:CalendarProvider)=>Promise<{accounts:CalendarAccount[]}>;
   syncCalendar:(workspaceId:string,provider:CalendarProvider,accountIds:string[])=>Promise<CalendarSource>;
@@ -175,11 +177,17 @@ export function ContentWorkflowProvider({children}:PropsWithChildren){
   const reviewScript=useCallback((artifact:EditorialArtifact,decision:'rejected'|'revision-requested',notes:string)=>storage.command(`/api/content/review?profile=${encodeURIComponent(profile())}`,{artifactId:artifact.id,expectedArtifact:artifact,decision,notes}),[storage]);
   const reviewFiles=useCallback((artifact:EditorialArtifact,decision:'approved'|'rejected'|'revision-requested',notes:string)=>storage.command(`/api/content/file-review?profile=${encodeURIComponent(profile())}`,{artifactId:artifact.id,expectedArtifact:artifact,decision,notes}),[storage]);
   const publicationCommand=useCallback((input:Record<string,unknown>)=>storage.command(`/api/content/publications?profile=${encodeURIComponent(profile())}`,input),[storage]);
+  const preparePublicationChange=useCallback(async(input:Record<string,unknown>)=>{
+    const owner=profile();await storage.flush();await storage.refresh();
+    if(owner!==profile())throw new Error('The active profile changed.');
+    return request('publishing/prepareChange',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...input,revision:storage.revision})});
+  },[request,storage]);
   const publicationAccounts=useCallback(()=>request('publishing/accounts',{method:'POST'}),[request]);
+  const configureCalendarRefresh=useCallback((workspaceId:string,provider:CalendarProvider,enabled:boolean,intervalMinutes:number)=>request('calendar/refresh',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({workspaceId,provider,enabled,intervalMinutes})}),[request]);
   const publicationCalendar=useCallback((workspaceId:string)=>request(`calendar?workspace=${encodeURIComponent(workspaceId)}`),[request]);
   const calendarAccounts=useCallback((workspaceId:string,provider:CalendarProvider)=>request('calendar/accounts',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({workspaceId,provider})}),[request]);
   const syncCalendar=useCallback((workspaceId:string,provider:CalendarProvider,accountIds:string[])=>request('calendar/sync',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({workspaceId,provider,accountIds})}),[request]);
-  const publicationTransport=useCallback((action:'prepare'|'execute'|'reconcile'|'cancel',input:Record<string,unknown>)=>storage.command(`/api/content/publishing/${action}?profile=${encodeURIComponent(profile())}`,input),[storage]);
+  const publicationTransport=useCallback((action:'prepare'|'execute'|'reconcile'|'cancel'|'change',input:Record<string,unknown>)=>storage.command(`/api/content/publishing/${action}?profile=${encodeURIComponent(profile())}`,input).then(()=>{window.dispatchEvent(new Event('mainsagents:provider-calendar-changed'))}),[storage]);
   const mediaCapabilities=useCallback(()=>request('media/capabilities'),[request]);
   const inspectVideo=useCallback((contentId:string,assetId:string)=>request('media/inspect',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({contentId,assetId})}),[request]);
   const exportVideo=useCallback((input:Record<string,unknown>)=>storage.command(`/api/content/media?profile=${encodeURIComponent(profile())}`,input),[storage]);
@@ -211,6 +219,6 @@ export function ContentWorkflowProvider({children}:PropsWithChildren){
   const changeFile=useCallback((assetId:string,role:AssetRole,sourceAssetId?:string)=>commit(current=>changeAssetMetadata(current,assetId,role,sourceAssetId)),[commit]);
   const removeFile=useCallback((assetId:string)=>commit(current=>removeAsset(current,assetId)),[commit]);
   const transferWork=useCallback((contentId:string,sourceAgentId:string,targetAgentId:string,instructions:string,assetIds:string[],newSession:boolean,expectedArtifactId?:string)=>enqueueWork('handoff',contentId,targetAgentId,{sourceAgentId,instructions,assetIds,newSession,expectedArtifactId}),[enqueueWork]);
-  return <Context.Provider value={{state,ready,storageError,jobs,jobsError,workJobs,workError,mediaJobs,mediaCapabilities,inspectVideo,exportVideo,mediaAction,transferWork,retryWork,cancelWork,workDetail,getNotionConnection,configureNotion,retryJob,setProductionStage,createTopic,runResearch,reviseTopic,decideTopic,runScript,approveScript,reviewScript,reviewFiles,publicationCommand,publicationAccounts,publicationTransport,publicationCalendar,calendarAccounts,syncCalendar,captureChatDelivery,attachFiles,reviseFile,verifyFiles,changeFile,removeFile}}>{children}</Context.Provider>;
+  return <Context.Provider value={{state,ready,storageError,jobs,jobsError,workJobs,workError,mediaJobs,mediaCapabilities,inspectVideo,exportVideo,mediaAction,transferWork,retryWork,cancelWork,workDetail,getNotionConnection,configureNotion,retryJob,setProductionStage,createTopic,runResearch,reviseTopic,decideTopic,runScript,approveScript,reviewScript,reviewFiles,publicationCommand,publicationAccounts,preparePublicationChange,publicationTransport,configureCalendarRefresh,publicationCalendar,calendarAccounts,syncCalendar,captureChatDelivery,attachFiles,reviseFile,verifyFiles,changeFile,removeFile}}>{children}</Context.Provider>;
 }
 export function useContentWorkflow(){const context=useContext(Context);if(!context)throw new Error('useContentWorkflow requires ContentWorkflowProvider');return context}

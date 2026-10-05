@@ -2,10 +2,18 @@
 
 Data: 02/10/2026. Base: [auditoria](C:/Users/pacas/Documents/ChatGPT/MainsAgents/docs/analysis/mainsagents-audit-2026-10-02.md). A execução começou na versão 0.3.31; o estado abaixo distingue o que foi entregue das partes ainda pendentes.
 
+## Fechamento de edição, calendário e rascunhos — 0.3.41
+
+- Edição/reagendamento do mesmo post LinkedIn texto no Publora, com prévia, nova aprovação, versão persistente, leitura antes/depois, expiração e recuperação sem recriação.
+- Atualização automática opcional do calendário por perfil/workspace/provedor, com intervalo persistente e preservação do cache em falhas.
+- Rascunhos persistentes nos formulários editoriais, revisões, briefing, entregas, alterações externas e parâmetros de corte. Incluídos no backup JSON; sem credenciais/autorizações.
+- Validação local: 199 testes e regressões Electron de publicação, rascunhos, arquivos, Inbox, handoff e preservação do pacote. [Uso e limites](../publication-edit-and-drafts-increment.md).
+- Ainda parcial: mídia/publicação Zernio e suas opções de rede; validação real autorizada de escrita Notion/Publora; equivalência de runtimes externos ao recorte existente. FFmpeg avançado continua adiado; observação de pastas e sincronização Notion bidirecional são extensões opcionais, não aceites obrigatórios do primeiro recorte.
+
 ## Calendário dos provedores — 0.3.40
 
 - Consulta manual de contas/posts Publora e Zernio pelo MCP, seleção por workspace, calendário mensal e agenda compacta, detalhes, cache SQLite por perfil, paginação e aviso de dados desatualizados. [Fluxo, contratos e limites](../provider-calendar-increment.md).
-- Publora validado em leitura real: duas contas e zero posts. Zernio MCP retornou resumos insuficientes; alternativa API preparada com chave criptografada por perfil no desktop, aguardando cadastro para validação real. Não considerar mídia/publicação Zernio ou edição/reagendamento nativos concluídos.
+- Publora validado em leitura real: duas contas e zero posts. Zernio MCP retornou resumos insuficientes; alternativa API com chave criptografada por perfil no desktop. Em 05/10/2026 o usuário cadastrou a chave e confirmou que a consulta funcionou. Isso valida a consulta, não mídia/publicação Zernio ou edição/reagendamento nativos.
 - Prioridades: mídia + publicação Zernio → edição/reagendamento → validação real autorizada → AUTO-16 → AUTO-17/18 → AUTO-19/20. FFmpeg/novas funções de edição de vídeo adiados pelo usuário em 05/10/2026.
 
 ## Publicação integrada — 0.3.39

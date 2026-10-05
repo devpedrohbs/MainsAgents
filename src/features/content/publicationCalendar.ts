@@ -9,4 +9,5 @@ export interface CalendarSource {
  provider:CalendarProvider;workspaceId:string;items:ProviderPost[];accountIds:string[];
  accounts?:CalendarAccount[];complete:boolean;checkedAt?:string;failedAt?:string;error?:string;
  transport?:'mcp'|'api';
+ autoRefresh?:{enabled:boolean;intervalMinutes:number;nextAt?:string};
 }

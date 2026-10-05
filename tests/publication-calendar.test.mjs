@@ -61,3 +61,18 @@ test('Zernio API fallback uses only fixed GET endpoints, native credentials, bou
  const failed=createZernioCalendarApi(()=>key,{fetchImpl:async()=>{throw Error(key)}});await assert.rejects(failed.accounts(),e=>!e.message.includes(key)&&e.message.includes('query failed'));
  let changed=key;const race=createZernioCalendarApi(()=>changed,{fetchImpl:async()=>{changed='different';return new Response(JSON.stringify({accounts:[]}))}});await assert.rejects(race.accounts(),/credentials changed/);
 });
+
+test('automatic calendar refresh is opt-in, persists intervals, isolates profiles and backs off after failure',async()=>{
+ const db=new DatabaseSync(':memory:');let profile='owner',now=Date.now(),calls=0,offline=false;
+ const options={clock:()=>now,getCurrentProfile:()=>profile,getConnector:()=>({accounts:async()=>[{id:'a',name:'A',platform:'linkedin'}],list:async()=>{calls++;if(offline)throw Error('secret upstream error');return {items:[],complete:true}}})};
+ let calendar=createPublicationCalendar(db,options);
+ try{
+ assert.throws(()=>calendar.configureRefresh('owner',{workspaceId:'w',provider:'publora',enabled:true,intervalMinutes:5}),/Query/);
+ await calendar.sync('owner',{workspaceId:'w',provider:'publora',accountIds:['a']});assert.equal(calls,1);now+=3600000;await calendar.refreshDue();assert.equal(calls,1);
+ calendar.configureRefresh('owner',{workspaceId:'w',provider:'publora',enabled:true,intervalMinutes:5});assert.throws(()=>calendar.configureRefresh('owner',{workspaceId:'w',provider:'publora',enabled:true,intervalMinutes:1}),/supported/);
+ await calendar.close();calendar=createPublicationCalendar(db,options);assert.equal(calendar.snapshot('owner','w').sources[0].autoRefresh.enabled,true);
+ now+=300000;profile='other';await calendar.refreshDue();assert.equal(calls,1);profile='owner';offline=true;await calendar.refreshDue();assert.equal(calls,2);assert(calendar.snapshot('owner','w').sources[0].error);await calendar.refreshDue();assert.equal(calls,2);
+ now+=300000;offline=false;await calendar.refreshDue();assert.equal(calls,3);assert.equal(calendar.snapshot('owner','w').sources[0].error,undefined);
+ calendar.configureRefresh('owner',{workspaceId:'w',provider:'publora',enabled:false,intervalMinutes:5});now+=3600000;await calendar.refreshDue();assert.equal(calls,3);
+ }finally{await calendar.close();db.close()}
+});

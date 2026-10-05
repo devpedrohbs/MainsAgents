@@ -1,3 +1,4 @@
+import {useStudioDraftField,studioDraftKey} from '../../features/content/studioDrafts';
 import {useEffect,useState} from 'react';
 import {useLanguage} from '../../app/LanguageProvider';
 import {useAgents} from '../../features/agents/AgentsProvider';
@@ -29,7 +30,8 @@ export function EditorialWorkPanel({topicId,content,requestedJobId,initialSource
   const workspaceId=state.topics.find(topic=>topic.id===topicId)?.workspaceId;
   const eligible=agents.filter(agent=>agent.workspaceId===workspaceId&&(agent.providerId??'codex')==='codex');
   const sources=eligible.filter(agent=>agent.tools.includes('subagents'));
-  const [sourceId,setSourceId]=useState(initialSourceAgentId??''),[targetId,setTargetId]=useState(''),[brief,setBrief]=useState(''),[selectedFiles,setSelectedFiles]=useState<string[]>([]),[newSession,setNewSession]=useState(false);
+  const draftScope=studioDraftKey('handoff',workspaceId??'none',content?.id??topicId,content?.approvedScriptArtifactId??'none');
+  const [sourceId,setSourceId]=useStudioDraftField<string>(draftScope,'source',initialSourceAgentId??''),[targetId,setTargetId]=useStudioDraftField<string>(draftScope,'target',''),[brief,setBrief]=useStudioDraftField<string>(draftScope,'brief',''),[selectedFiles,setSelectedFiles]=useStudioDraftField<string[]>(draftScope,'files',[]),[newSession,setNewSession]=useStudioDraftField<boolean>(draftScope,'newSession',false);
   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[openId,setOpenId]=useState<string>(),[confirmId,setConfirmId]=useState<string>();
   const jobs=workJobs.filter(job=>job.workspaceId===workspaceId&&job.topicId===topicId);
   const assets=(state.assets??[]).filter(asset=>asset.contentId===content?.id&&asset.workspaceId===workspaceId);
