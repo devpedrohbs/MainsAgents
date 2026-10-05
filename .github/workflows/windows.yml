@@ -23,8 +23,8 @@ jobs:
         run: npm ci
       - name: Install FFmpeg for synthetic media tests
         run: choco install ffmpeg --yes --no-progress
-      - name: Validate TypeScript
-        run: npm run typecheck
+      - name: Validate TypeScript and generate frontend preview
+        run: npm run build
       - name: Run isolated tests
         run: npm test
       - name: Build desktop installer

@@ -29,8 +29,8 @@ test('duplicates are scoped to content; version history and moved file identity 
   const {root,path}=fixture();try{
     const file=await inspect(path);let state=attachAssetFiles(empty(),'one',[file,file],'source');assert.equal(state.assets.length,1);state=attachAssetFiles(state,'two',[file],'source');assert.equal(state.assets.length,2);assert.ok(validateEditorialAssets(state));
     const asset=state.assets[0],originalVersion=asset.currentVersionId;const moved=join(root,'moved.mp4');renameSync(path,moved);
-    state=verifyAssetFiles(state,[{id:asset.id,versionId:originalVersion,inspection:await inspect(path)}]);assert.equal(state.assets[0].status,'missing');
-    state=reviseAssetFile(state,asset.id,originalVersion,await inspect(moved),true);assert.equal(state.assets[0].versions.length,1);assert.equal(state.assets[0].versions[0].path,moved);
+    state=verifyAssetFiles(state,[{id:asset.id,versionId:originalVersion,inspection:await inspect(file.path)}]);assert.equal(state.assets[0].status,'missing');
+    const movedFile=await inspect(moved);state=reviseAssetFile(state,asset.id,originalVersion,movedFile,true);assert.equal(state.assets[0].versions.length,1);assert.equal(state.assets[0].versions[0].path,movedFile.path);
     writeFileSync(moved,'new-edit');const next=await inspect(moved);
     assert.throws(()=>reviseAssetFile(state,asset.id,originalVersion,next,true),/different file/);
     state=verifyAssetFiles(state,[{id:asset.id,versionId:originalVersion,inspection:next}]);assert.equal(state.assets[0].status,'changed');
@@ -54,7 +54,7 @@ test('file metadata survives SQLite restart and atomic restore; malformed backup
   const {root,path}=fixture();const storage=join(root,'storage'),dbPath=join(storage,'workspace-state.sqlite');let store=createDesktopStateStore(storage,'test');store.initialize('owner',{agents:[{id:'keep'}]});let bridge=createContentWorkflowBridge({dbPath});
   try{
     const state=attachAssetFiles(empty(),'one',[await inspect(path)],'source');assert.equal((await call(bridge,'PUT',{revision:0,state})).status,200);await bridge.close();store.close();store=createDesktopStateStore(storage,'test');bridge=createContentWorkflowBridge({dbPath});assert.deepEqual((await call(bridge,'GET')).data.state,state);
-    const backup={format:'mainsagents-backup',version:1,data:{agents:[{id:'keep'}]},editorial:state};assert.ok(backupFileReferences(parseBackup(JSON.stringify(backup))).includes(path));const invalid=structuredClone(backup);invalid.editorial.assets[0].currentVersionId='missing';assert.throws(()=>parseBackup(JSON.stringify(invalid)),/library/);
+    const backup={format:'mainsagents-backup',version:1,data:{agents:[{id:'keep'}]},editorial:state};assert.ok(backupFileReferences(parseBackup(JSON.stringify(backup))).includes(state.assets[0].versions[0].path));const invalid=structuredClone(backup);invalid.editorial.assets[0].currentVersionId='missing';assert.throws(()=>parseBackup(JSON.stringify(invalid)),/library/);
     assert.equal((await call(bridge,'PUT',{revision:1,state:invalid.editorial})).status,400);
     const snapshot=store.workspaceSnapshot('owner');store.restoreWorkspace('owner',snapshot.values,state,{revisions:snapshot.revisions,editorialRevision:snapshot.editorial.revision});assert.equal(store.workspaceSnapshot('owner').editorial.state.assets[0].status,'unchecked');assert.deepEqual(store.readAll('owner').agents,[{id:'keep'}]);
   }finally{await bridge.close();store.close();rmSync(root,{recursive:true,force:true});}
