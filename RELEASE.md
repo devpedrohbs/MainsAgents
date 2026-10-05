@@ -37,3 +37,13 @@ O workflow Windows produz um artefato de build, sem publicar automaticamente uma
 - Assinatura verificada: NotSigned. Nenhuma release pública foi publicada nesta rodada.
 - Instalado sobre a versão anterior, com backup consistente e comparação integral do estado principal/editorial.
 - O comando `npm run desktop:dist` também verifica o fechamento das dependências empacotadas e gera checksum/recibo JSON.
+
+## Build Windows da CI validado
+
+- Commit: `9b8a361`; [execução aprovada](https://github.com/devpedrohbs/MainsAgents/actions/runs/37256301995).
+- Checkout limpo: 172 testes, build, instalação NSIS, revisão/calendário, exportação de vídeo sintético, handoff e preservação de dados passaram. O teste de persistência usa o preload, frontend e SQLite do app.asar instalado, em perfil temporário.
+- Artefato `MainsAgents-Windows` baixado e conferido contra checksum e recibo.
+- Instalador SHA-256: `fd77fb647f35cc95b47b5a447c41960cb081f99e04fb5104773d233c71ecba41`.
+- app.asar SHA-256: `c4e11310a467af87bbf49917ac9ef830f7bfc82aa5af3c7acd9d720268b8f820`.
+- Assinatura do instalador baixado: NotSigned. Este é um build independente do build local acima; seus hashes são distintos.
+- Nenhuma release pública foi criada. O build usa `--publish never`; publicar uma release é uma etapa explícita separada.

@@ -33,7 +33,7 @@ O instalador verifica a inclusão dos 41 módulos nativos e suas dependências l
 
 ## Gates que permanecem
 
-- CI executada e download/release públicos no GitHub: autenticação do mantenedor estava inválida nesta rodada. Workflow e artefatos estão preparados; publicação não foi simulada nem declarada concluída.
+- CI Windows aprovada no commit `9b8a361`: [execução validada](https://github.com/devpedrohbs/MainsAgents/actions/runs/37256301995). Checkout limpo, 172 testes, build, instalação NSIS, interface/editorial, vídeo sintético, handoff e persistência usando o app.asar instalado passaram. O artefato foi baixado e seu SHA-256 conferido. Uma release pública ainda não foi criada; artefatos de Actions não substituem a distribuição pública por Releases.
 - Assinatura Windows: artefato local sem assinatura. Assinatura é opcional e depende de certificado do mantenedor; checksum não substitui uma assinatura.
 - MCP com decisões equivalentes em Claude/outros runtimes, testes de negócio específicos para demais servidores e automação de edição pelo especialista exigem incrementos próprios. O modo atual informa/recusa capacidades ausentes.
 - AUTO-15–20 seguem fora desta rodada: publicação nativa Zernio/Pub­lora com reconciliação, rotinas locais, memória, modelos de projeto, radar e benchmark.
