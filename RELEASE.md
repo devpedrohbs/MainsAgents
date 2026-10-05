@@ -52,6 +52,6 @@ O workflow Windows produz um artefato de build, sem publicar automaticamente uma
 
 - LinkedIn texto via Publora MCP: rascunho/agendamento, autorização separada, reconciliação sem recriar e cancelamento para rascunho. Contrato e limites em [publicação integrada](docs/publication-connector-increment.md).
 - 182 testes automatizados e teste Electron de publicação com provedor simulado passaram. O teste de persistência passou usando o app.asar 0.3.39 e estado sintético da versão anterior. Nenhuma postagem em contas pessoais foi realizada.
-- Instalador SHA-256: `758fec064d589d7ce8b7befdf52a73a7d0a69bf1b41ce697512c9cfda25a31c4`.
-- app.asar SHA-256: `2e52b378c68e0f3ebe64e5a4e09ac07ae6fba6cdcaa2db6496c91cf4d47a6b4c`.
+- Instalador SHA-256: `8064058dc29ff765a193df841df3e16d3215f72cf9b8b38d9de05dd0c1a74e30`.
+- app.asar SHA-256: `460ff5a8d741a9bba37da22b0651a669874fe439fad383d450f2fb6cbc4df6c0`.
 - 43 módulos nativos verificados; assinatura NotSigned. A instalação pessoal do desktop não foi substituída nesta rodada.

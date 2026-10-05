@@ -68,6 +68,10 @@ export function createDesktopStateStore(directory, version) {
         if(execution.actions?.some(action=>['pending','approved','running'].includes(action.status)))throw new Error('Finish or deny active tool actions before restoring a backup.');
         if(execution.delegations?.some(job=>['queued','running'].includes(job.status)))throw new Error('Finish or cancel agent collaboration before restoring a backup.');
         if(execution.mediaJobs?.some(job=>['queued','running'].includes(job.status)))throw new Error('Finish or cancel video exports before restoring a backup.');
+        for(const delivery of editorial(profile).state?.publications??[]){
+          if(delivery.operation?.phase==='requesting')throw new Error('Wait for the provider operation to finish before restoring a backup.');
+          if(delivery.operation?.phase==='uncertain'&&JSON.stringify(delivery.operation)!==JSON.stringify(nextEditorial.publications?.find(item=>item.id===delivery.id)?.operation))throw new Error('Reconcile unresolved provider operations before replacing their history with a backup.');
+        }
         if(expected.executionRevision&&executionRevision(execution)!==expected.executionRevision)throw new Error('Executions changed while preparing the restore. Review the backup again.');
         if(JSON.stringify(current.revisions)!==JSON.stringify(expected.revisions)||editorial(profile).revision!==expected.editorialRevision)throw new Error('Saved data changed while preparing the restore. Review the backup again.');
         preserveAgents(profile);

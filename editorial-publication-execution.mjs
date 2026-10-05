@@ -6,6 +6,13 @@ import {verifiedPublication} from './publication-connector.mjs';
 /** Persist the write intent before any network operation; never auto-repeat a create. */
 export function createPublicationExecution(db,{getConnector,getCurrentProfile,clock=()=>Date.now()}={}){
   db.exec('CREATE TABLE IF NOT EXISTS publication_intents (profile TEXT NOT NULL,id TEXT NOT NULL,hash TEXT NOT NULL,used INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(profile,id))');
+  // A prior process cannot still be issuing calls after this service restarts.
+  // Preserve every identifier; recovery is read-only and never repeats the write.
+  for(const row of db.prepare('SELECT profile_id,revision,state_json FROM editorial_state').all()){
+    const state=JSON.parse(row.state_json);let changed=false;
+    for(const item of state.publications??[])if(item.operation?.phase==='requesting'){item.operation.phase='uncertain';item.operation.error='The app stopped during a provider operation. Check its result before any new write.';changed=true;}
+    if(changed)db.prepare('UPDATE editorial_state SET revision=?,state_json=?,updated_at=? WHERE profile_id=? AND revision=?').run(row.revision+1,JSON.stringify(state),new Date(clock()).toISOString(),row.profile_id,row.revision);
+  }
   const locks=new Set(),pending=new Set();let closing=false;
   const read=profile=>{const row=db.prepare('SELECT revision,state_json FROM editorial_state WHERE profile_id=?').get(profile);if(!row)throw Error('Open an existing content workspace.');return {revision:row.revision,state:JSON.parse(row.state_json)};};
   const active=profile=>{if(getCurrentProfile&&getCurrentProfile()!==profile)throw Error('The active profile changed. Reopen the workspace.');};
