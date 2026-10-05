@@ -7,7 +7,7 @@ export function classifyMcpAction(tool,args={}) {
  if(/(?:^|_)(publish|send|reply)(?:_|$)/.test(name))return 'publish';
  if(/(?:^|_)(schedule|reschedule)(?:_|$)/.test(name))return 'schedule';
  if(/(?:^|_)(create|update|edit|upload|append|insert|set)(?:_|$)/.test(name))return 'write';
- if(['accounts_list','posts_list','posts_get','get_social_accounts','list_posts','get_post','list_scheduled_posts','get_scheduled_posts','get_post_analytics','get_account_analytics','get-profile','list-accounts','retrieve-a-page','retrieve-a-database','query-a-data-source'].includes(name))return 'read';
+ if(['accounts_list','accounts_list_accounts','list_connections','posts_list','posts_list_posts','posts_get','get_social_accounts','list_posts','get_post','list_scheduled_posts','get_scheduled_posts','get_post_analytics','get_account_analytics','get-profile','list-accounts','retrieve-a-page','retrieve-a-database','query-a-data-source'].includes(name))return 'read';
  return 'unknown';
 }
 export function permittedMcpAction(agent,kind){

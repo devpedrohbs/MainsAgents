@@ -1,3 +1,4 @@
+import {createZernioPublicationConnector} from './zernio-publication-connector.mjs';
 import { setDesktopDiagnosticWriter } from './desktop-diagnostics.mjs';
 import { app, BrowserWindow, dialog, ipcMain, safeStorage, session, shell, Notification } from 'electron';
 import { attachCanvasBrowserPolicy } from './canvas-browser-security.mjs';
@@ -334,7 +335,7 @@ async function createWindow() {
     getSessions:profile=>desktopStateStore.read(profile,'sessions')??[],
     getCurrentProfile:()=>desktopStateStore.currentProfile(),
     getConnector:()=>codexBridge?.isAlive()?createNotionEditorialConnector(()=>codexBridge.notionMcp):null,
-    getPublicationConnector:()=>codexBridge?.isAlive()?createPublicationConnector(()=>codexBridge.publicationMcp):null,
+    getPublicationConnector:(provider,profile)=>provider==='zernio'?contentWorkflowBridge?.calendarCredentials.status(profile).configured?createZernioPublicationConnector(()=>contentWorkflowBridge.calendarCredentials.key(profile)):null:codexBridge?.isAlive()?createPublicationConnector(()=>codexBridge.publicationMcp):null,
     secureStorage:safeStorage,
     getCalendarConnector:(provider,profile)=>provider==='zernio'&&contentWorkflowBridge?.calendarCredentials.status(profile).configured?createZernioCalendarApi(()=>contentWorkflowBridge.calendarCredentials.key(profile)):codexBridge?.isAlive()?createCalendarConnector(()=>codexBridge.publicationMcp,provider):null,
     suggestConnection:(profile,workspaceId)=>{

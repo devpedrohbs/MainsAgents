@@ -1,7 +1,7 @@
 import {randomUUID} from 'node:crypto';
 import {artifactHash} from './editorial-jobs.mjs';
 
-import {publicationPlatforms,publicationPayload,validTimeZone,validatePublications} from './publication-model.mjs';
+import {publicationPlatforms,publicationPayload,validTimeZone,validatePublications,validNetworkSettings} from './publication-model.mjs';
 export {publicationPlatforms,publicationPayload,validTimeZone,validatePublications} from './publication-model.mjs';
 const text=(value,max=100000)=>typeof value==='string'&&value.length<=max;
 const date=value=>typeof value==='string'&&Number.isFinite(Date.parse(value));
@@ -28,14 +28,14 @@ export function createEditorialPublications(db){
       if(['sending','scheduled','published'].includes(delivery.status)||delivery.operation&&delivery.operation.phase!=='preview')throw new Error('Reconcile or cancel the external delivery before changing it.');
       if(['create','edit'].includes(input.action)){
         const draft=input.draft??{};
-        if(!text(draft.text)||!validTimeZone(draft.timeZone)||draft.plannedAt!==undefined&&draft.plannedAt!==''&&!date(draft.plannedAt)||!Array.isArray(draft.assetIds)||draft.assetIds.length>30)throw new Error('Enter text, valid time zone and linked files.');
+        if(!text(draft.text)||!validTimeZone(draft.timeZone)||draft.plannedAt!==undefined&&draft.plannedAt!==''&&!date(draft.plannedAt)||!Array.isArray(draft.assetIds)||draft.assetIds.length>30||!validNetworkSettings(delivery.platform,draft.networkSettings))throw new Error('Enter text, valid time zone and linked files.');
         const media=[...new Set(draft.assetIds)].map(id=>{
           const asset=state.assets?.find(item=>item.id===id&&item.contentId===content.id&&item.workspaceId===content.workspaceId);
           const version=asset?.versions.find(item=>item.id===asset.currentVersionId);
           if(!asset||!version||asset.status!=='available')throw new Error('Check the linked file before selecting it.');
           return {assetId:asset.id,versionId:version.id,sha256:version.sha256};
         });
-        const next={...delivery,text:draft.text.trim(),media,timeZone:draft.timeZone,plannedAt:draft.plannedAt?new Date(draft.plannedAt).toISOString():undefined};
+        const next={...delivery,networkSettings:draft.networkSettings,text:draft.text.trim(),media,timeZone:draft.timeZone,plannedAt:draft.plannedAt?new Date(draft.plannedAt).toISOString():undefined};
         const changed=artifactHash(publicationPayload(delivery))!==artifactHash(publicationPayload(next));
         if(input.action==='edit'&&changed)delivery.version++;
         Object.assign(delivery,publicationPayload(next));

@@ -2,12 +2,20 @@
 
 Data: 02/10/2026. Base: [auditoria](C:/Users/pacas/Documents/ChatGPT/MainsAgents/docs/analysis/mainsagents-audit-2026-10-02.md). A execução começou na versão 0.3.31; o estado abaixo distingue o que foi entregue das partes ainda pendentes.
 
+## Fechamento de mídia e Zernio — 0.3.42
+
+- AUTO-14/15: implementados upload verificado, seleção de conta/provedor, opções básicas Instagram/TikTok, rascunho/agendamento Zernio, edição/reagendamento do mesmo ID, cancelamento e recuperação sem recriação. Upload Publora fica no rascunho até a mídia ser validada; horários expirados não viram publicação imediata.
+- AUTO-12: testes de leitura Zernio/Publora reconhecem contratos atuais, exigem aprovação, verificam dados estruturados e liberam sessões temporárias; requisitos de skills já possuem declaração e diagnóstico.
+- Desktop pessoal 0.3.42 instalado com backup e comparação exata do estado: três agentes, skills e oito sessões preservados. 212 testes aprovados. [Verificação local](../validation-0.3.42.md).
+- [Uso, limites e evidências](../publication-media-and-zernio-increment.md). O código de envio está implementado e testado com provedores simulados; escrita real em contas pessoais/Notion ainda requer destino e autorização. Não confundir esse estado com validação pública real.
+- A equivalência completa dos outros runtimes continua parcial. Claude não ganhou MCP/escrita externa nem reconciliação equivalente ao Codex nesta rodada. FFmpeg avançado permanece adiado. AUTO-16–20 continuam pendentes; este incremento não inicia essas tarefas.
+
 ## Distribuição pública Windows — 0.3.41
 
 - [CI Windows aprovada no commit bc6bfb5](https://github.com/devpedrohbs/MainsAgents/actions/runs/37351382504): 199 testes, instalação limpa, interfaces e preservação do pacote.
 - [Prévia pública v0.3.41](https://github.com/devpedrohbs/MainsAgents/releases/tag/v0.3.41) com instalador validado pela CI, checksum e manifesto. SHA-256 do instalador publicado: `8192a709bbbf1899ad679b7f914f2cf853eb0b8169f70ad5121b5cbdb55f54e2`.
 - AUTO-21 entregue no recorte de distribuição pública Windows/MIT. Certificado de assinatura é opcional e não está configurado; outras plataformas não receberam instalador nesta rodada.
-- Instalação pessoal 0.3.41 ainda aguarda o usuário fechar o app. A geração/publicação não altera a versão que está aberta no desktop.
+- A instalação pessoal 0.3.41 foi substituída pela 0.3.42 conforme o relatório acima; a prévia pública 0.3.41 mantém a evidência do seu próprio build.
 
 ## Fechamento de edição, calendário e rascunhos — 0.3.41
 

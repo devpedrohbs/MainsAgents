@@ -68,8 +68,9 @@ export function createContentWorkflowBridge({ dbPath, getConnector, getPublicati
       if(url.pathname==='/api/content/calendar/refresh'&&request.method==='POST'){send(response,200,calendar.configureRefresh(profileId,await readBody(request)));return true;}
       if(url.pathname==='/api/content/calendar/accounts'&&request.method==='POST'){const input=await readBody(request);send(response,200,await calendar.accounts(profileId,input.workspaceId,input.provider));return true;}
       if(url.pathname==='/api/content/calendar/sync'&&request.method==='POST'){try{send(response,200,await calendar.sync(profileId,await readBody(request)))}catch{send(response,502,{error:'Calendar query failed. Previous data was preserved. Check MCP authentication and supported tools.'})}return true;}
-      if(url.pathname==='/api/content/publishing/accounts'&&request.method==='POST'){send(response,200,await publishing.accounts(profileId));return true;}
-      const publishingRoute=url.pathname.match(/^\/api\/content\/publishing\/(prepare|execute|reconcile|cancel|prepareChange|change)$/);
+      if(url.pathname==='/api/content/publishing/accounts'&&request.method==='POST'){send(response,200,await publishing.accounts(profileId,await readBody(request)));return true;}
+      if(url.pathname==='/api/content/publishing/options'&&request.method==='POST'){send(response,200,await publishing.options(profileId,await readBody(request)));return true;}
+      const publishingRoute=url.pathname.match(/^\/api\/content\/publishing\/(prepare|execute|reconcile|cancel|prepareChange|change|continue)$/);
       if(publishingRoute&&request.method==='POST'){
         const input=await readBody(request),result=await publishing[publishingRoute[1]](profileId,input);
         const delivery=result.state?.publications?.find(item=>item.id===input.id);

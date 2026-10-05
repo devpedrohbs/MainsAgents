@@ -2,7 +2,7 @@
 
 [Baixar a prévia desktop Windows 0.3.41](https://github.com/devpedrohbs/MainsAgents/releases/tag/v0.3.41) — instalador, SHA-256 e manifesto.
 
-O Calendário de entregas também pode consultar posts existentes no Publora e Zernio pelos MCPs do Codex CLI, com contas escolhidas por workspace e cache local. [Configuração e limites do calendário](docs/provider-calendar-increment.md). A publicação nativa continua limitada ao recorte descrito abaixo.
+O Calendário de entregas também pode consultar posts existentes no Publora e Zernio pelos MCPs do Codex CLI, com contas escolhidas por workspace e cache local. [Configuração e limites do calendário](docs/provider-calendar-increment.md). A versão 0.3.42 amplia a publicação nativa para mídia e Zernio, conforme os limites descritos abaixo.
 
 MainsAgents é um workspace desktop para criar e operar agentes de IA especializados. Ele reúne agentes, sessões, tarefas, Canvas e contexto em uma interface única, com integração local às CLIs do Codex e Claude Code e histórico persistente.
 
@@ -75,7 +75,7 @@ A biblioteca usa a persistência editorial e aparece nos backups. O JSON contém
 
 A Home também reúne respostas não vistas e bloqueios de chats. Avisos podem ser ativados ou silenciados. Entregas de arquivos têm conferência do arquivo real e revisão por versão; modificar o arquivo invalida o estado pronto. O envio manual entre agentes usa uma fila nativa e pode continuar a sessão do especialista Codex/Claude.
 
-Em **Configurações → Conexões de IA**, o diagnóstico distingue catálogo MCP de leitura efetivamente autorizada; o teste específico de Zernio pede aprovação antes de consultar contas. Nas configurações do agente Codex, permissões por categoria complementam a aprovação de cada chamada. Claude permanece sem MCP/escrita/controle do computador e usa seu login normal da CLI. Veja [fluxos, comandos, requisitos de skills e limites](docs/completion-increment.md).
+Em **Configurações → Conexões de IA**, o diagnóstico distingue catálogo MCP de leitura efetivamente autorizada; os testes específicos de Zernio/Publora pedem aprovação antes de consultar contas e exigem dados verificáveis. Nas configurações do agente Codex, permissões por categoria complementam a aprovação de cada chamada. Claude permanece sem MCP/escrita/controle do computador e usa seu login normal da CLI. Veja [fluxos, comandos, requisitos de skills e limites](docs/completion-increment.md).
 
 ## Stack
 
@@ -335,7 +335,7 @@ No desktop, os chats Codex também mostram **Aprovar uma vez** antes de cada fer
 
 Na revisão de roteiro, aprove, rejeite ou peça ajustes sem apagar versões. No chat, `aprovo esse roteiro` e `ajuste: encurte a introdução` abrem a confirmação da versão salva; não publicam nem geram uma nova resposta automaticamente.
 
-No Estúdio, **Entregas por rede** separa texto, mídia, revisão e horário planejado de Instagram, TikTok, YouTube e LinkedIn. A aba **Calendário** usa o fuso escolhido e vira agenda em telas menores. Aprovar uma entrega não a envia. No desktop 0.3.41, LinkedIn com texto pode criar rascunho, agendar, editar, reagendar e cancelar via Publora MCP após autorização específica, mantendo o mesmo ID e histórico de versões. O calendário permite consulta automática opcional enquanto o app está aberto; rascunhos dos formulários editoriais sobrevivem ao reinício. Veja [como usar edição, calendário e rascunhos](docs/publication-edit-and-drafts-increment.md). Upload de mídia e Zernio ainda não estão disponíveis nesse fluxo. Veja [publicação integrada](docs/publication-connector-increment.md).
+No Estúdio, **Entregas por rede** separa texto, mídia, revisão e horário planejado de Instagram, TikTok, YouTube e LinkedIn. A aba **Calendário** usa o fuso escolhido e vira agenda em telas menores. Aprovar uma entrega não a envia. No desktop 0.3.42, LinkedIn com texto/mídia pode criar rascunho, agendar, editar, reagendar e cancelar via Publora MCP. Instagram/TikTok e LinkedIn podem usar a API Zernio, com seleção da conta e opções da rede. Cada envio exige autorização específica; edição preserva o mesmo ID e histórico de versões. O calendário permite consulta automática opcional enquanto o app está aberto; rascunhos dos formulários editoriais sobrevivem ao reinício. Veja [como usar edição, calendário e rascunhos](docs/publication-edit-and-drafts-increment.md). Veja [como enviar mídia, conectar Zernio e recuperar falhas](docs/publication-media-and-zernio-increment.md). Veja [publicação integrada](docs/publication-connector-increment.md).
 
 **Edição local de vídeo** permite cortar/exportar um trecho autorizado com FFmpeg e ffprobe no PATH. Gera um novo MP4, preserva o original e confere duração/áudio antes de associar o resultado. Progresso e recuperação ficam salvos; fechar interrompe e exige retomada explícita. Abra original e resultado no player padrão para revisar. Sem controle do computador nem acabamento automático.
 

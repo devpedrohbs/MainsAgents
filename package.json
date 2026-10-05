@@ -4,7 +4,7 @@
   "author": "devpedrohbs",
   "license": "MIT",
   "private": true,
-  "version": "0.3.41",
+  "version": "0.3.42",
   "type": "module",
   "scripts": {
     "dev": "node dev.mjs",
@@ -92,7 +92,9 @@
       "editorial-media.mjs",
       "runtime-tool-policy.mjs",
       "editorial-file-deliveries.mjs",
-      "runtime-read-probe.mjs"
+      "runtime-read-probe.mjs",
+      "publication-media-upload.mjs",
+      "zernio-publication-connector.mjs"
     ],
     "directories": {
       "output": "release"

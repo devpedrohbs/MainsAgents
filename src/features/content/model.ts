@@ -67,11 +67,11 @@ export interface EditorialState {
 }
 export type PublicationStatus='draft'|'in-review'|'approved'|'sending'|'scheduled'|'published'|'failed';
 export interface PublicationMedia {assetId:string;versionId:string;sha256:string}
-export interface PublicationPayload {platform:Platform;text:string;media:PublicationMedia[];plannedAt?:string;timeZone:string}
+export interface PublicationPayload {platform:Platform;text:string;media:PublicationMedia[];plannedAt?:string;timeZone:string;networkSettings?:{contentType?:'story';shareToFeed?:boolean;tiktokSettings?:{privacy_level:string;commercialContentType:string;allow_comment:boolean;allow_duet:boolean;allow_stitch:boolean;content_preview_confirmed:boolean;express_consent_given:boolean;video_made_with_ai:boolean}}}
 export interface PublicationDelivery extends PublicationPayload {
   id:string;contentId:string;workspaceId:string;version:number;status:PublicationStatus;createdAt:string;updatedAt:string;
   receipt?:{id:string;checkedAt:string;version:number;provider?:string;status?:string;scheduledAt?:string;platformPostId?:string};
-  operation?:{id:string;provider:'publora';phase:'preview'|'requesting'|'uncertain'|'confirmed';mode:'draft'|'schedule';accountId:string;payloadHash:string;expiresAt:string;createdAt:string;externalId?:string;cancelRequestId?:string;error?:string;arguments:{content:string;platforms:string[];scheduledTime?:string;idempotencyKey:string}};
+  operation?:{id:string;provider:'publora'|'zernio';platform?:string;timeZone?:string;networkSettings?:PublicationPayload['networkSettings'];stage?:'uploading'|'creating'|'finalizing'|'done'|'editing'|'canceling';files?:Array<PublicationMedia&{name:string;size:number;type:'image'|'video';contentType:string}>;uploads?:Array<PublicationMedia&{name:string;type:'image'|'video';url:string;status:'pending'|'uploaded';mediaId?:string}>;phase:'preview'|'requesting'|'uncertain'|'confirmed';mode:'draft'|'schedule';accountId:string;payloadHash:string;expiresAt:string;createdAt:string;externalId?:string;cancelRequestId?:string;finalizeRequestId?:string;error?:string;arguments:{content:string;platforms:string[];scheduledTime?:string;idempotencyKey:string}};
   history:Array<{version:number;status:PublicationStatus;decision:string;notes:string;payloadHash:string;payload:PublicationPayload;at:string}>;
 }
 export interface EditorialJob {

@@ -364,7 +364,7 @@ export async function startCodexBridge({ port = 8787, cwd = process.cwd(), runti
   // Host-only MCP access: deliberately not exposed as an unrestricted HTTP API.
   const notionTools=new Set(['notion-search','notion-fetch','notion-create-pages','notion-update-page']);
   const publicationMcp={async call(tool,args,provider='publora'){
-    const allowed=provider==='publora'?['list_connections','list_posts','create_post','get_post','update_post']:provider==='zernio'?['accounts_list_accounts','posts_list_posts']:[];if(!allowed.includes(tool))throw Error('Unsupported publishing operation.');
+    const allowed=provider==='publora'?['list_connections','list_posts','create_post','get_post','update_post','get_upload_url','complete_media','delete_media']:provider==='zernio'?['accounts_list_accounts','posts_list_posts']:[];if(!allowed.includes(tool))throw Error('Unsupported publishing operation.');
     const {config={}}=await client.request('config/read',{includeLayers:false});
     if(!config.mcp_servers?.[provider]||config.mcp_servers[provider].enabled===false)throw Error(`Configure and authenticate the ${provider} MCP in Codex CLI first.`);
     const clean=value=>Array.isArray(value)?value.filter(item=>item!==null).map(clean):value&&typeof value==='object'?Object.fromEntries(Object.entries(value).filter(([,item])=>item!==null).map(([key,item])=>[key,clean(item)])):value;
