@@ -1,5 +1,7 @@
 # MainsAgents
 
+[Baixar a prévia desktop Windows 0.3.41](https://github.com/devpedrohbs/MainsAgents/releases/tag/v0.3.41) — instalador, SHA-256 e manifesto.
+
 O Calendário de entregas também pode consultar posts existentes no Publora e Zernio pelos MCPs do Codex CLI, com contas escolhidas por workspace e cache local. [Configuração e limites do calendário](docs/provider-calendar-increment.md). A publicação nativa continua limitada ao recorte descrito abaixo.
 
 MainsAgents é um workspace desktop para criar e operar agentes de IA especializados. Ele reúne agentes, sessões, tarefas, Canvas e contexto em uma interface única, com integração local às CLIs do Codex e Claude Code e histórico persistente.

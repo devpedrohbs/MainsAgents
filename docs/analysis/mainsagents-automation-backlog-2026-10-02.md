@@ -2,6 +2,13 @@
 
 Data: 02/10/2026. Base: [auditoria](C:/Users/pacas/Documents/ChatGPT/MainsAgents/docs/analysis/mainsagents-audit-2026-10-02.md). A execução começou na versão 0.3.31; o estado abaixo distingue o que foi entregue das partes ainda pendentes.
 
+## Distribuição pública Windows — 0.3.41
+
+- [CI Windows aprovada no commit bc6bfb5](https://github.com/devpedrohbs/MainsAgents/actions/runs/37351382504): 199 testes, instalação limpa, interfaces e preservação do pacote.
+- [Prévia pública v0.3.41](https://github.com/devpedrohbs/MainsAgents/releases/tag/v0.3.41) com instalador validado pela CI, checksum e manifesto. SHA-256 do instalador publicado: `8192a709bbbf1899ad679b7f914f2cf853eb0b8169f70ad5121b5cbdb55f54e2`.
+- AUTO-21 entregue no recorte de distribuição pública Windows/MIT. Certificado de assinatura é opcional e não está configurado; outras plataformas não receberam instalador nesta rodada.
+- Instalação pessoal 0.3.41 ainda aguarda o usuário fechar o app. A geração/publicação não altera a versão que está aberta no desktop.
+
 ## Fechamento de edição, calendário e rascunhos — 0.3.41
 
 - Edição/reagendamento do mesmo post LinkedIn texto no Publora, com prévia, nova aprovação, versão persistente, leitura antes/depois, expiração e recuperação sem recriação.

@@ -27,7 +27,7 @@ Use um workspace chamado **Testes** e arquivos de exemplo para experimentar sem 
 | AUTO-13 | Corte/exportação de vídeo — parcial e novas melhorias adiadas | Operação manual delimitada com FFmpeg/ffprobe, saída nova, progresso, cancelamento e verificação. | Pode pular este teste por enquanto. Sem FFmpeg instalado deve informar indisponibilidade. Com ele, um corte de vídeo de exemplo deve gerar outro arquivo, preservando o original. Não existe editor completo ou edição automática pelo especialista. |
 | AUTO-14 | Entregas por rede e calendário — pronto no recorte atual | Texto/mídia e aprovação independentes por rede, histórico, planejamento com fuso; consulta dos provedores com cache local. | No mesmo conteúdo, crie duas entregas com horários diferentes. Devem manter estados independentes. No calendário selecione Zernio, escolha contas e atualize. Um horário local planejado não pode aparecer como confirmação externa. |
 | AUTO-15 | Publicação integrada — parcial | LinkedIn com texto via Publora: conta, prévia, autorização, rascunho/agendamento, ID, consulta e cancelamento autorizado. Consulta de posts Publora/Zernio no calendário. | Aprove uma entrega LinkedIn sem mídia, selecione a conta e o destino **Rascunho no Publora**. Confira a prévia e só então autorize. Verifique o rascunho no provedor e consulte o resultado no app. A consulta não deve recriar o post. Instagram/TikTok ainda não têm esse envio nativo completo. |
-| AUTO-21 | Preparação open source — parcial | MIT, documentação, contribuição, privacidade/segurança, build Windows, CI e instalador com verificação de integridade. | Confira versão 0.3.41 nas configurações, links de documentação e persistência ao reabrir. Release pública e assinatura Windows ainda faltam. Commit/push não equivalem a publicar um instalador em GitHub Releases. |
+| AUTO-21 | Distribuição Windows — entregue | MIT, documentação, contribuição, privacidade/segurança, build Windows, CI e instalador com verificação de integridade. | Confira versão 0.3.41 nas configurações, links de documentação e persistência ao reabrir. Prévia pública Windows disponível; assinatura digital opcional não configurada. Commit/push não equivalem a publicar um instalador em GitHub Releases. |
 
 ## Novidades validadas nesta rodada
 
@@ -36,7 +36,7 @@ Use um workspace chamado **Testes** e arquivos de exemplo para experimentar sem 
 - [ ] Digitar uma pauta, revisão de roteiro, briefing ou alteração de publicação; navegar/reiniciar e conferir o rascunho sem envio ao provedor.
 - [ ] Em falha de envio/edição, usar consulta de resultado e conferir que não foi criado outro post.
 
-A 0.3.41 foi gerada e validada localmente; instalação pessoal/distribuição pública devem ser conferidas separadamente. Testes de escrita usados no desenvolvimento são simulados.
+A 0.3.41 foi validada localmente e na [CI Windows](https://github.com/devpedrohbs/MainsAgents/actions/runs/37351382504), com [prévia pública disponível](https://github.com/devpedrohbs/MainsAgents/releases/tag/v0.3.41). A instalação pessoal ainda aguarda o app ser fechado. Testes de escrita usados no desenvolvimento são simulados.
 
 ## O que ainda falta em recursos iniciados
 
@@ -49,7 +49,7 @@ A 0.3.41 foi gerada e validada localmente; instalação pessoal/distribuição p
 - **AUTO-13:** edição avançada, legendas, montagem e execução automática pelo Editor de Vídeo. Adiados por decisão do usuário. O especialista permanece sem controle do computador.
 - **AUTO-14/15:** upload real de mídia e publicação nativa Zernio para Instagram/TikTok; opções exigidas por cada rede; edição/reagendamento e atualização automática agora entregues para o recorte Publora texto/calendário. Webhooks, upload e envio nativo Zernio ainda não foram implementados. A chave API cadastrada atualmente serve à consulta do calendário.
 - **AUTO-15:** teste real ponta a ponta, com aprovação explícita e conta/destino escolhidos. Os testes de criação/agendamento/cancelamento feitos no desenvolvimento usam provedores simulados.
-- **AUTO-21:** release pública para download, assinatura opcional do Windows e validação do percurso completo de distribuição pública.
+- **AUTO-21:** prévia pública Windows e validação de instalação limpa entregues. Assinatura opcional exige certificado; distribuição para macOS/Linux é uma extensão futura.
 
 ## Recursos pendentes
 
