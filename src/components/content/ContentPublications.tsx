@@ -7,6 +7,7 @@ import {localTimeToInstant,zonedDateTime} from '../../../publication-time.mjs';
 import {SelectMenu} from '../common/SelectMenu';
 import {FlowDialog} from '../common/FlowDialog';
 import './content-publications.css';
+import {ProviderCalendar} from './ProviderCalendar';
 
 const labels:Record<PublicationStatus,[string,string]>={draft:['Rascunho','Draft'],'in-review':['Em revisão','In review'],approved:['Aprovado para envio','Approved to send'],sending:['Envio pendente','Sending'],scheduled:['Agendamento confirmado','Schedule confirmed'],published:['Publicado','Published'],failed:['Falha','Failed']};
 export const publicationLabel=(status:PublicationStatus,pt:boolean)=>labels[status][pt?0:1];
@@ -93,6 +94,7 @@ export function PublicationCalendar({workspaceId}:{workspaceId:string}){
     <div className="calendar-agenda"><h3>{pt?'Agenda do mês':'Monthly agenda'}</h3>{deliveries.filter(item=>dateOf(item).startsWith(month)).sort((a,b)=>a.plannedAt!.localeCompare(b.plannedAt!)).map(item=><div key={item.id}><time>{new Date(item.plannedAt!).toLocaleDateString(locale,{timeZone:zone})}</time>{tile(item)}</div>)}</div>
     <details className="calendar-unscheduled" open><summary>{pt?'Sem horário planejado':'No planned time'} ({deliveries.filter(item=>!item.plannedAt).length})</summary><div>{deliveries.filter(item=>!item.plannedAt).map(tile)}</div></details>
     {!deliveries.length&&<p className="editorial-hint">{pt?'Abra um conteúdo e adicione uma entrega por rede para começar.':'Open content and add a network delivery to begin.'}</p>}
+    <ProviderCalendar key={workspaceId} workspaceId={workspaceId} zone={zone} month={month}/>
     {editing&&<PublicationEditor delivery={editing} onClose={()=>setEditing(null)}/>}
   </section>;
 }

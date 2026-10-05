@@ -363,14 +363,14 @@ export async function startCodexBridge({ port = 8787, cwd = process.cwd(), runti
   console.log(`[MainsAgents] Codex bridge ready on http://127.0.0.1:${activePort}`);
   // Host-only MCP access: deliberately not exposed as an unrestricted HTTP API.
   const notionTools=new Set(['notion-search','notion-fetch','notion-create-pages','notion-update-page']);
-  const publicationMcp={async call(tool,args){
-    const allowed=['list_connections','create_post','get_post','update_post'];if(!allowed.includes(tool))throw Error('Unsupported publishing operation.');
+  const publicationMcp={async call(tool,args,provider='publora'){
+    const allowed=provider==='publora'?['list_connections','list_posts','create_post','get_post','update_post']:provider==='zernio'?['accounts_list_accounts','posts_list_posts']:[];if(!allowed.includes(tool))throw Error('Unsupported publishing operation.');
     const {config={}}=await client.request('config/read',{includeLayers:false});
-    if(!config.mcp_servers?.publora||config.mcp_servers.publora.enabled===false)throw Error('Configure and authenticate the Publora MCP in Codex CLI first.');
+    if(!config.mcp_servers?.[provider]||config.mcp_servers[provider].enabled===false)throw Error(`Configure and authenticate the ${provider} MCP in Codex CLI first.`);
     const clean=value=>Array.isArray(value)?value.filter(item=>item!==null).map(clean):value&&typeof value==='object'?Object.fromEntries(Object.entries(value).filter(([,item])=>item!==null).map(([key,item])=>[key,clean(item)])):value;
-    const servers=Object.fromEntries(Object.entries(config.mcp_servers).map(([name,value])=>[name,{...clean(value),enabled:name==='publora',...(name==='publora'?{enabled_tools:allowed,default_tools_approval_mode:'auto',tools:{}}:{})}]));
+    const servers=Object.fromEntries(Object.entries(config.mcp_servers).map(([name,value])=>[name,{...clean(value),enabled:name===provider,...(name===provider?{enabled_tools:allowed,default_tools_approval_mode:'auto',tools:{}}:{})}]));
     const threadId=(await client.request('thread/start',{cwd,ephemeral:true,approvalPolicy:'never',sandbox:'read-only',config:{mcp_servers:servers,features:{apps:false,plugins:false,multi_agent:false}},serviceName:'mainsagents-publishing'})).thread.id;
-    try{return await client.request('mcpServer/tool/call',{threadId,server:'publora',tool,arguments:args});}
+    try{return await client.request('mcpServer/tool/call',{threadId,server:provider,tool,arguments:args});}
     finally{await client.request('thread/archive',{threadId}).catch(()=>{});}
   }};
   const notionMcp={

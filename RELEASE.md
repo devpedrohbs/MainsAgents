@@ -1,6 +1,15 @@
 # Publicação e recuperação do MainsAgents (Windows)
 
-Versão desta rodada: 0.3.39. O instalador NSIS mantém o mesmo `appId`. O estado principal e editorial do desktop ficam no SQLite permanente em `%USERPROFILE%\.mainsagents\storage`, fora da instalação. O perfil Electron em `%APPDATA%\mains-agents` mantém cookies e dados auxiliares; históricos antigos foram migrados sem substituir dados atuais.
+Versão desta rodada: 0.3.40. O instalador NSIS mantém o mesmo `appId`. O estado principal e editorial do desktop ficam no SQLite permanente em `%USERPROFILE%\.mainsagents\storage`, fora da instalação. O perfil Electron em `%APPDATA%\mains-agents` mantém cookies e dados auxiliares; históricos antigos foram migrados sem substituir dados atuais.
+
+## Validação local 0.3.40
+
+Calendário externo Publora/Zernio e alternativa API Zernio com chave criptografada. 192 testes passaram, interface Electron isolada e preservação de agentes/sessões com o app.asar empacotado. Leitura real Publora: duas conexões e zero posts; Zernio MCP retornou resumos insuficientes, por isso a API aguarda chave cadastrada no desktop. Sem publicação pessoal nos testes.
+
+- Instalador SHA-256: `f6d175c7d0287b6d15dc0e8353a2f0a0b4a690af4bd86fd25b1ad6c99dca3832`.
+- app.asar SHA-256: `9f110c429e77b20aecb7004ecbf69430fa72c01e315628bcb0e31d6fc077d7ae`.
+- 47 módulos nativos verificados no empacotamento.
+- Atualização sobre a instalação desktop 0.3.39: executável 0.3.40.0 e hash instalado conferidos; comparação do estado principal/editorial antes/depois sem alterações. Atalhos desktop/menu Windows apontam para a instalação oficial.
 
 ## Antes da publicação
 

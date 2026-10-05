@@ -2,6 +2,12 @@
 
 Data: 02/10/2026. Base: [auditoria](C:/Users/pacas/Documents/ChatGPT/MainsAgents/docs/analysis/mainsagents-audit-2026-10-02.md). A execução começou na versão 0.3.31; o estado abaixo distingue o que foi entregue das partes ainda pendentes.
 
+## Calendário dos provedores — 0.3.40
+
+- Consulta manual de contas/posts Publora e Zernio pelo MCP, seleção por workspace, calendário mensal e agenda compacta, detalhes, cache SQLite por perfil, paginação e aviso de dados desatualizados. [Fluxo, contratos e limites](../provider-calendar-increment.md).
+- Publora validado em leitura real: duas contas e zero posts. Zernio MCP retornou resumos insuficientes; alternativa API preparada com chave criptografada por perfil no desktop, aguardando cadastro para validação real. Não considerar mídia/publicação Zernio ou edição/reagendamento nativos concluídos.
+- Prioridades: mídia + publicação Zernio → edição/reagendamento → validação real autorizada → AUTO-16 → AUTO-17/18 → AUTO-19/20. FFmpeg/novas funções de edição de vídeo adiados pelo usuário em 05/10/2026.
+
 ## Publicação integrada — 0.3.39
 
 - **AUTO-15 parcial entregue:** LinkedIn texto via Publora MCP, seleção explícita da conta, rascunho externo ou agendamento, prévia da versão exata, autorização separada, intenção SQLite de uso único, idempotência, consulta verificável e cancelamento autorizado para rascunho. Falhas, perda de identificador e mudanças externas bloqueiam reenvio automático. [Fluxo e limites](../publication-connector-increment.md).

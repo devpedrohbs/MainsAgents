@@ -19,6 +19,8 @@ import { createAccountServer } from './cloud-server.mjs';
 import { openDesktopEditorialBridge } from './desktop-editorial-storage.mjs';
 import { createNotionEditorialConnector } from './notion-editorial-connector.mjs';
 import {createPublicationConnector} from './publication-connector.mjs';
+import {createCalendarConnector} from './publication-calendar-connector.mjs';
+import {createZernioCalendarApi} from './publication-calendar-api.mjs';
 import {inspectBackupFileLinks} from './backup-file-links.mjs';
 import {registerEditorialFilesIpc} from './editorial-files-ipc.mjs';
 
@@ -81,6 +83,11 @@ const claudeCodeBridge=createClaudeCodeBridge({cwdRoot:join(app.getPath('documen
 const canvasRuntimeBridge=createCanvasRuntimeBridge({cwdRoot:join(app.getPath('documents'),'MainsAgents Workspace','Canvas')});
 ipcMain.handle('provider:save-key',(event,provider,key)=>{assertTrustedSender(event);if(provider!=='gemini'||typeof key!=='string'||key.length<12||key.length>512)throw new Error('Invalid provider key');if(!safeStorage.isEncryptionAvailable())throw new Error('Secure credential storage is unavailable');writeProviderKeys({...readProviderKeys(),[provider]:safeStorage.encryptString(key).toString('base64')});return {saved:true}});
 ipcMain.handle('provider:remove-key',(event,provider)=>{assertTrustedSender(event);if(provider!=='gemini')throw new Error('Unknown provider');const keys=readProviderKeys();delete keys[provider];writeProviderKeys(keys);return {saved:false}});
+for(const action of ['status','save','remove'])ipcMain.handle(`calendar:key:${action}`,(event,profile,key)=>{
+ assertTrustedSender(event);if(!desktopStateStore||profile!==desktopStateStore.currentProfile())throw Error('Active profile changed.');
+ if(!contentWorkflowBridge)throw Error('Calendar storage is unavailable.');
+ return contentWorkflowBridge.calendarCredentials[action](profile,key);
+});
 function saveAccountToken(config,rawToken,email,userId){if(!safeStorage.isEncryptionAvailable())throw new Error('Secure credential storage is unavailable');writeAccountConfig({...config,encryptedToken:safeStorage.encryptString(rawToken).toString('base64'),email,userId});desktopStateStore?.selectProfile(userId)}
 async function accountRequest(path,method='GET',data,authenticated=true){const config=readAccountConfig();if(!config.serverUrl)throw new Error('Configure the account service first');const raw=authenticated?accountToken(config):'';if(authenticated&&!raw)throw new Error('Sign in to MainsAgents first');const response=await fetch(`${config.serverUrl}${path}`,{method,redirect:'error',headers:{'content-type':'application/json',...(raw?{authorization:`Bearer ${raw}`}:{})},body:data===undefined?undefined:JSON.stringify(data),signal:AbortSignal.timeout(30000)});const result=await response.json().catch(()=>({error:'Invalid account service response'}));if(!response.ok)throw new Error(result.error??`Account service returned ${response.status}`);return result}
 
@@ -328,6 +335,8 @@ async function createWindow() {
     getCurrentProfile:()=>desktopStateStore.currentProfile(),
     getConnector:()=>codexBridge?.isAlive()?createNotionEditorialConnector(()=>codexBridge.notionMcp):null,
     getPublicationConnector:()=>codexBridge?.isAlive()?createPublicationConnector(()=>codexBridge.publicationMcp):null,
+    secureStorage:safeStorage,
+    getCalendarConnector:(provider,profile)=>provider==='zernio'&&contentWorkflowBridge?.calendarCredentials.status(profile).configured?createZernioCalendarApi(()=>contentWorkflowBridge.calendarCredentials.key(profile)):codexBridge?.isAlive()?createCalendarConnector(()=>codexBridge.publicationMcp,provider):null,
     suggestConnection:(profile,workspaceId)=>{
       const agents=desktopStateStore.read(profile,'agents')??[];
       for(const agent of agents.filter(item=>item.workspaceId===workspaceId)){

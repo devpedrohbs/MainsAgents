@@ -1,5 +1,7 @@
 # MainsAgents
 
+O Calendário de entregas também pode consultar posts existentes no Publora e Zernio pelos MCPs do Codex CLI, com contas escolhidas por workspace e cache local. [Configuração e limites do calendário](docs/provider-calendar-increment.md). A publicação nativa continua limitada ao recorte descrito abaixo.
+
 MainsAgents é um workspace desktop para criar e operar agentes de IA especializados. Ele reúne agentes, sessões, tarefas, Canvas e contexto em uma interface única, com integração local às CLIs do Codex e Claude Code e histórico persistente.
 
 O projeto foi pensado para pesquisa, notícias, criação de conteúdo, tendências, roteiros, hooks e organização de ideias. Cada agente pode ter instruções e ferramentas próprias, enquanto suas conversas permanecem separadas em sessões.

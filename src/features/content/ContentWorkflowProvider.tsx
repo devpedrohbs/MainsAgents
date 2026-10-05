@@ -11,6 +11,7 @@ import type {AgentSession} from '../chat/model/Chat';
 import {attachAssetFiles,reviseAssetFile,verifyAssetFiles,changeAssetMetadata,removeAsset,type AssetRole,type LocalAssetInspection} from './assetModel';
 import { emptyEditorialState, newEditorialId, type ApprovedScript, type ContentFormat, type EditorialArtifact, type EditorialContent, type EditorialState, type EditorialTopic, type Platform, type Priority, type ResearchProposal, type WorkflowRun, type WorkflowJob, type EditorialJob, type NotionConnection, type ProductionStage } from './model';
 import type {MediaJob,VideoMetadata} from './model';
+import type {CalendarAccount,CalendarProvider,CalendarSource} from './publicationCalendar';
 
 type TopicInput = {workspaceId:string;inputKind:'text'|'url'|'ideas';input:string;category:string;priority:Priority};
 interface ContentContextValue {
@@ -42,6 +43,9 @@ interface ContentContextValue {
   publicationCommand:(input:Record<string,unknown>)=>Promise<void>;
   publicationAccounts:()=>Promise<{accounts:Array<{id:string;name:string}>}>;
   publicationTransport:(action:'prepare'|'execute'|'reconcile'|'cancel',input:Record<string,unknown>)=>Promise<void>;
+  publicationCalendar:(workspaceId:string)=>Promise<{sources:CalendarSource[]}>;
+  calendarAccounts:(workspaceId:string,provider:CalendarProvider)=>Promise<{accounts:CalendarAccount[]}>;
+  syncCalendar:(workspaceId:string,provider:CalendarProvider,accountIds:string[])=>Promise<CalendarSource>;
   mediaJobs:MediaJob[];
   mediaCapabilities:()=>Promise<{available:boolean;ffmpeg:boolean;ffprobe:boolean;error:string}>;
   inspectVideo:(contentId:string,assetId:string)=>Promise<{metadata:VideoMetadata;versionId:string;sha256:string}>;
@@ -172,6 +176,9 @@ export function ContentWorkflowProvider({children}:PropsWithChildren){
   const reviewFiles=useCallback((artifact:EditorialArtifact,decision:'approved'|'rejected'|'revision-requested',notes:string)=>storage.command(`/api/content/file-review?profile=${encodeURIComponent(profile())}`,{artifactId:artifact.id,expectedArtifact:artifact,decision,notes}),[storage]);
   const publicationCommand=useCallback((input:Record<string,unknown>)=>storage.command(`/api/content/publications?profile=${encodeURIComponent(profile())}`,input),[storage]);
   const publicationAccounts=useCallback(()=>request('publishing/accounts',{method:'POST'}),[request]);
+  const publicationCalendar=useCallback((workspaceId:string)=>request(`calendar?workspace=${encodeURIComponent(workspaceId)}`),[request]);
+  const calendarAccounts=useCallback((workspaceId:string,provider:CalendarProvider)=>request('calendar/accounts',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({workspaceId,provider})}),[request]);
+  const syncCalendar=useCallback((workspaceId:string,provider:CalendarProvider,accountIds:string[])=>request('calendar/sync',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({workspaceId,provider,accountIds})}),[request]);
   const publicationTransport=useCallback((action:'prepare'|'execute'|'reconcile'|'cancel',input:Record<string,unknown>)=>storage.command(`/api/content/publishing/${action}?profile=${encodeURIComponent(profile())}`,input),[storage]);
   const mediaCapabilities=useCallback(()=>request('media/capabilities'),[request]);
   const inspectVideo=useCallback((contentId:string,assetId:string)=>request('media/inspect',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({contentId,assetId})}),[request]);
@@ -204,6 +211,6 @@ export function ContentWorkflowProvider({children}:PropsWithChildren){
   const changeFile=useCallback((assetId:string,role:AssetRole,sourceAssetId?:string)=>commit(current=>changeAssetMetadata(current,assetId,role,sourceAssetId)),[commit]);
   const removeFile=useCallback((assetId:string)=>commit(current=>removeAsset(current,assetId)),[commit]);
   const transferWork=useCallback((contentId:string,sourceAgentId:string,targetAgentId:string,instructions:string,assetIds:string[],newSession:boolean,expectedArtifactId?:string)=>enqueueWork('handoff',contentId,targetAgentId,{sourceAgentId,instructions,assetIds,newSession,expectedArtifactId}),[enqueueWork]);
-  return <Context.Provider value={{state,ready,storageError,jobs,jobsError,workJobs,workError,mediaJobs,mediaCapabilities,inspectVideo,exportVideo,mediaAction,transferWork,retryWork,cancelWork,workDetail,getNotionConnection,configureNotion,retryJob,setProductionStage,createTopic,runResearch,reviseTopic,decideTopic,runScript,approveScript,reviewScript,reviewFiles,publicationCommand,publicationAccounts,publicationTransport,captureChatDelivery,attachFiles,reviseFile,verifyFiles,changeFile,removeFile}}>{children}</Context.Provider>;
+  return <Context.Provider value={{state,ready,storageError,jobs,jobsError,workJobs,workError,mediaJobs,mediaCapabilities,inspectVideo,exportVideo,mediaAction,transferWork,retryWork,cancelWork,workDetail,getNotionConnection,configureNotion,retryJob,setProductionStage,createTopic,runResearch,reviseTopic,decideTopic,runScript,approveScript,reviewScript,reviewFiles,publicationCommand,publicationAccounts,publicationTransport,publicationCalendar,calendarAccounts,syncCalendar,captureChatDelivery,attachFiles,reviseFile,verifyFiles,changeFile,removeFile}}>{children}</Context.Provider>;
 }
 export function useContentWorkflow(){const context=useContext(Context);if(!context)throw new Error('useContentWorkflow requires ContentWorkflowProvider');return context}

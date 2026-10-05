@@ -36,6 +36,11 @@ interface Window {
     refreshSkillDirectory(directory: string): Promise<SkillDirectoryResult>;
     saveProviderKey(provider:'gemini',key:string):Promise<{saved:boolean}>;
     removeProviderKey(provider:'gemini'):Promise<{saved:boolean}>;
+    calendarKey?:{
+      status(profile:string):Promise<{configured:boolean;secureStorage:boolean}>;
+      save(profile:string,key:string):Promise<{configured:boolean;secureStorage:boolean}>;
+      remove(profile:string):Promise<{configured:boolean;secureStorage:boolean}>;
+    };
     account: {
       status():Promise<{configured:boolean;signedIn:boolean;serverUrl?:string;email?:string;userId?:string;error?:string}>;
       googleConfigured():Promise<boolean>;

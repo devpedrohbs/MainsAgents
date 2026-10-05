@@ -10,6 +10,8 @@ import {createNativeAgentDelegations} from './native-agent-delegations.mjs';
 import {createEditorialPublications,validatePublications} from './editorial-publications.mjs';
 import {createEditorialMedia} from './editorial-media.mjs';
 import {createPublicationExecution} from './editorial-publication-execution.mjs';
+import {createPublicationCalendar} from './editorial-publication-calendar.mjs';
+import {createCalendarCredentials} from './publication-calendar-credentials.mjs';
 
 const emptyState = () => ({ schemaVersion: 1, topics: [], contents: [], runs: [], artifacts: [], approvals: [] });
 const profilePattern = /^[a-zA-Z0-9_-]{1,120}$/;
@@ -30,7 +32,7 @@ async function readBody(request) {
   return JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
 }
 
-export function createContentWorkflowBridge({ dbPath, getConnector, getPublicationConnector, suggestConnection = () => '',getRuntime,getChatRuntime,getAgents,getSessions,getCurrentProfile,inspect,timeoutMs,mediaOptions }) {
+export function createContentWorkflowBridge({ dbPath, getConnector, getPublicationConnector, getCalendarConnector, secureStorage, suggestConnection = () => '',getRuntime,getChatRuntime,getAgents,getSessions,getCurrentProfile,inspect,timeoutMs,mediaOptions }) {
   mkdirSync(dirname(dbPath), { recursive: true });
   const db = new DatabaseSync(dbPath);
   db.exec('PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000; CREATE TABLE IF NOT EXISTS editorial_state (profile_id TEXT PRIMARY KEY, revision INTEGER NOT NULL, state_json TEXT NOT NULL, updated_at TEXT NOT NULL)');
@@ -42,6 +44,8 @@ export function createContentWorkflowBridge({ dbPath, getConnector, getPublicati
   const deliveries=createChatDeliveries(db,{getSessions,getAgents,getCurrentProfile,inspect});
   const publications=createEditorialPublications(db);
   const publishing=createPublicationExecution(db,{getConnector:getPublicationConnector,getCurrentProfile});
+  const calendar=createPublicationCalendar(db,{getConnector:getCalendarConnector,getCurrentProfile});
+  const calendarCredentials=createCalendarCredentials(db,secureStorage);
   const media=createEditorialMedia(db,{directory:join(dirname(dbPath),'media'),getCurrentProfile,...mediaOptions});
   const binding=(threadId,sessionId)=>{
     if(!getAgents||!getSessions||!getCurrentProfile)return null;
@@ -60,6 +64,9 @@ export function createContentWorkflowBridge({ dbPath, getConnector, getPublicati
     if (!profilePattern.test(profileId)) { send(response, 400, { error: 'Invalid local profile.' }); return true; }
     try {
       if(getCurrentProfile&&getCurrentProfile()!==profileId){send(response,409,{error:'The active profile changed. Reopen the workspace.'});return true;}
+      if(url.pathname==='/api/content/calendar'&&request.method==='GET'){send(response,200,calendar.snapshot(profileId,url.searchParams.get('workspace')));return true;}
+      if(url.pathname==='/api/content/calendar/accounts'&&request.method==='POST'){const input=await readBody(request);send(response,200,await calendar.accounts(profileId,input.workspaceId,input.provider));return true;}
+      if(url.pathname==='/api/content/calendar/sync'&&request.method==='POST'){try{send(response,200,await calendar.sync(profileId,await readBody(request)))}catch{send(response,502,{error:'Calendar query failed. Previous data was preserved. Check MCP authentication and supported tools.'})}return true;}
       if(url.pathname==='/api/content/publishing/accounts'&&request.method==='POST'){send(response,200,await publishing.accounts(profileId));return true;}
       const publishingRoute=url.pathname.match(/^\/api\/content\/publishing\/(prepare|execute|reconcile|cancel)$/);
       if(publishingRoute&&request.method==='POST'){send(response,200,await publishing[publishingRoute[1]](profileId,await readBody(request)));return true;}
@@ -129,5 +136,5 @@ export function createContentWorkflowBridge({ dbPath, getConnector, getPublicati
     }
   }
 
-  return { handle, jobs, work, deliveries, publications,publishing,media,actions,binding,delegations,agents:()=>getAgents?.(getCurrentProfile?.())??[], close: async () => {actions.close();await publishing.close();await media.close();await delegations.close();await work.close();await jobs.close();db.close();} };
+  return { handle, jobs, work, deliveries, publications,publishing,calendar,calendarCredentials,media,actions,binding,delegations,agents:()=>getAgents?.(getCurrentProfile?.())??[], close: async () => {actions.close();await calendar.close();await publishing.close();await media.close();await delegations.close();await work.close();await jobs.close();db.close();} };
 }
