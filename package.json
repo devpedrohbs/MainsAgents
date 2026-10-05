@@ -12,7 +12,7 @@
     "codex:bridge": "node codex-bridge.mjs",
     "build": "tsc -b && vite build && node scripts/build-preview.mjs",
     "desktop": "npm run build && electron .",
-    "desktop:dist": "npm run build && electron-builder --win nsis && node scripts/check-desktop-release.mjs",
+    "desktop:dist": "npm run build && electron-builder --win nsis --publish never && node scripts/check-desktop-release.mjs",
     "preview": "vite preview --open app.html",
     "typecheck": "tsc -b --pretty false",
     "test": "node --experimental-strip-types --test tests/*.test.mjs",

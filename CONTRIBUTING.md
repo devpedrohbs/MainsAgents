@@ -9,9 +9,8 @@ Use Windows x64, Node.js 24 e npm. Clone o repositório e execute `npm ci`. Para
 Execute:
 
 ```powershell
-npm run typecheck
-npm test
 npm run build
+npm test
 ```
 
 Os testes automatizados usam dados temporários e processos simulados para as CLIs. Os testes de mídia geram um vídeo sintético com FFmpeg. Não autentique uma conta pessoal nem publique conteúdos para validar uma alteração.
