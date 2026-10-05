@@ -1,6 +1,6 @@
 # MainsAgents
 
-[Baixar a prévia desktop Windows 0.3.41](https://github.com/devpedrohbs/MainsAgents/releases/tag/v0.3.41) — instalador, SHA-256 e manifesto.
+[Baixar a prévia desktop Windows 0.3.42](https://github.com/devpedrohbs/MainsAgents/releases/tag/v0.3.42) — instalador, SHA-256 e manifesto.
 
 O Calendário de entregas também pode consultar posts existentes no Publora e Zernio pelos MCPs do Codex CLI, com contas escolhidas por workspace e cache local. [Configuração e limites do calendário](docs/provider-calendar-increment.md). A versão 0.3.42 amplia a publicação nativa para mídia e Zernio, conforme os limites descritos abaixo.
 

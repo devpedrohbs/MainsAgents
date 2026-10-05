@@ -19,3 +19,9 @@ SHA-256 do `app.asar` local/instalado: `cbf92ab0eaca527f6ef75d13df64138cded9c530
 O instalador não possui assinatura Authenticode. Esses hashes identificam este build local; um build independente da CI pode gerar outro hash.
 
 Os testes de envio usam contas e respostas simuladas. Não foram criados posts pessoais, agendamentos reais ou cards na base pessoal Notion nesta rodada. [Uso, limites e recuperação](publication-media-and-zernio-increment.md). [Checklist de testes manuais e pendências](backlog-test-checklist-0.3.42.md).
+
+## Distribuição pública verificada
+
+A CI Windows do commit `a333594` foi concluída com sucesso: https://github.com/devpedrohbs/MainsAgents/actions/runs/37357243495. O instalador dessa CI foi publicado na prévia https://github.com/devpedrohbs/MainsAgents/releases/tag/v0.3.42, com checksum e manifesto.
+
+SHA-256 do instalador público (build independente da CI): `a2a207fca0922c6df0e74bc25d2b9aa91d9412e6e63db72ed62134276ad25a46`. O arquivo baixado foi conferido antes da publicação. Esse hash difere do instalador local, conforme esperado para builds independentes; a instalação pessoal foi comparada com seu próprio build local.
