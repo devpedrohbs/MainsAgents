@@ -29,12 +29,12 @@ test('editorial SQLite state survives reopening and rejects stale revisions',asy
     assert.equal(saved.data.revision,1);
     const conflict=await call(bridge,'PUT',{revision:0,state:{...state,topics:[]}});
     assert.equal(conflict.status,409);
-    bridge.close();
+    await bridge.close();
     bridge=createContentWorkflowBridge({dbPath});
     const loaded=await call(bridge,'GET');
     assert.equal(loaded.data.revision,1);
     assert.equal(loaded.data.state.topics[0].id,'topic-1');
-  }finally{bridge.close();rmSync(directory,{recursive:true,force:true})}
+  }finally{await bridge.close();rmSync(directory,{recursive:true,force:true})}
 });
 
 test('structured research requires sources and angles',()=>{

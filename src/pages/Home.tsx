@@ -7,6 +7,11 @@ import { AgentAvatar } from '../components/agents/AgentAvatar';
 import { Icon } from '../components/common/Icon';
 import { useWorkspaces } from '../app/WorkspaceProvider';
 import { useLanguage } from '../app/LanguageProvider';
+import { useContentWorkflow } from '../features/content/ContentWorkflowProvider';
+import { editorialInbox, type EditorialInboxItem } from '../features/content/editorialInbox';
+import { EditorialInbox } from '../components/content/EditorialInbox';
+import {ChatInbox} from '../components/chat/ChatInbox';
+import type {ChatInboxItem} from '../features/chat/chatInbox';
 
 type TaskView = 'active' | 'review' | 'done';
 interface HomeProps {
@@ -16,6 +21,9 @@ interface HomeProps {
   onCreateTask: () => void;
   onSelectAgent: (id: string) => void;
   onNavigate: (page: PageId) => void;
+  onOpenEditorial: (item: EditorialInboxItem) => void;
+  chatInbox:ChatInboxItem[];
+  onOpenChatInbox:(item:ChatInboxItem)=>void;
   showEmptyPrompt: boolean;
 }
 
@@ -26,11 +34,15 @@ export function Home({
   onCreateTask,
   onSelectAgent,
   onNavigate,
+  onOpenEditorial,
+  chatInbox,onOpenChatInbox,
 }: HomeProps) {
   const { agents: allAgents, getAgentById } = useAgents();
   const { currentWorkspaceId, currentWorkspace } = useWorkspaces();
   const { sessions, openSession } = useChat();
   const { locale, t } = useLanguage();
+  const { state, jobs, ready, storageError, jobsError } = useContentWorkflow();
+  const pendingEditorial = editorialInbox(state, jobs, currentWorkspaceId);
   const pt = locale === 'pt-BR';
   const [taskView, setTaskView] = useState<TaskView>('active');
   const agents = allAgents.filter((agent) => agent.workspaceId === currentWorkspaceId);
@@ -123,6 +135,8 @@ export function Home({
           </button>
         ))}
       </section>
+      <EditorialInbox items={pendingEditorial} ready={ready} error={storageError || jobsError} onOpen={onOpenEditorial} onOpenStudio={() => onNavigate('content')} />
+      <ChatInbox items={chatInbox} onOpen={onOpenChatInbox}/>
       <div className="overview-grid">
         <section className="work-panel" data-od-id="workspace-tasks" aria-labelledby="tasks-heading">
           <div className="panel-heading">

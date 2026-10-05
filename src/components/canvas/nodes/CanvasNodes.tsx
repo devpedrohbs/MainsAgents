@@ -1,5 +1,6 @@
 export { TerminalNode } from './TerminalNode';
-import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useRef, type FormEvent, type KeyboardEvent, type ReactNode } from 'react';
+import { useChatDraft, writeChatDraft } from '../../../features/chat/chatDrafts';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import type { AgentSession, ChatContextReference, ChatMessageItem } from '../../../features/chat/model/Chat';
 import { useAgents } from '../../../features/agents/AgentsProvider';
@@ -12,6 +13,7 @@ import { useLanguage } from '../../../app/LanguageProvider';
 import { SelectMenu } from '../../common/SelectMenu';
 import { CanvasBrowser } from './CanvasBrowser';
 import { browserHome } from '../browserNavigation';
+import { ChatMessageImages } from '../../chat/ChatMessageImages';
 
 const nodeIcons:Record<CanvasNodeKind,IconName>={note:'note',research:'search',image:'image',contentIdea:'spark',hook:'link',script:'script',terminal:'terminal',browser:'globe',chat:'message'};
 
@@ -19,10 +21,11 @@ function CanvasNodeShell({id,data,selected,kind,children,header,showFooter=true}
   const {getAgentById}=useAgents();
   const footer=[data.meta,data.groupLabel,data.agentId?getAgentById(data.agentId)?.name:undefined].filter(Boolean).join(' · ');
 
-  return <article className={`flow-node ${kind} ${selected?'selected':''} ${data.groupId?'grouped':''}`} aria-label={`${data.label} node`}>
+  return <article className={`flow-node ${kind} ${selected?'selected':''} ${data.groupId?'grouped':''} ${data.chatHandoffId?'collaboration-chat':''}`} aria-label={`${data.label} node`}>
     <Handle className="flow-handle" type="target" position={Position.Left}/>
     {header??<div className="flow-node-type"><Icon name={nodeIcons[kind]}/><span>{data.label}</span></div>}
     <div className="flow-node-content">{children}</div>
+    {data.contentId&&<button type="button" className="soft-button nodrag nopan" onClick={()=>window.dispatchEvent(new CustomEvent('mainsagents:open-content',{detail:{contentId:data.contentId}}))}>↗ {document.documentElement.lang==='pt-BR'?'Abrir conteúdo':'Open content'}</button>}
     {showFooter&&footer&&<footer><span>{footer}</span><span aria-hidden="true">•••</span></footer>}
     <Handle className="flow-handle" type="source" position={Position.Right}/>
   </article>;
@@ -71,22 +74,32 @@ export function BrowserNode({id,data,selected}:NodeProps<CanvasFlowNode>) {
 export function ChatNode({id,data,selected}:NodeProps<CanvasFlowNode>) {
   const {currentWorkspaceId}=useWorkspaces();
   const {agents}=useAgents();
-  const {nodes,edges,updateNodeData}=useCanvas();
-  const {sessions,createSession,openSession,sendMessage,getRunState}=useChat();
-  const {t}=useLanguage();
+  const {nodes,edges,allNodes,updateNodeData}=useCanvas();
+  const {sessions,createSession,openSession,sendMessage,getRunState,refreshSessionImages}=useChat();
+  const {t,locale}=useLanguage();
   const workspaceId=String(data.workspaceId??currentWorkspaceId);
   const availableAgents=agents.filter(agent=>agent.workspaceId===workspaceId);
   const agent=agents.find(item=>item.id===data.chatAgentId);
-  const session=sessions.find(item=>item.id===data.chatSessionId);
+  const session=sessions.find(item=>item.id===data.chatSessionId&&item.agentId===agent?.id);
   const messages=session?.messages.filter((item):item is ChatMessageItem=>item.type==='message')??[];
   const state=getRunState(session?.id);
   const busy=['thinking','searching','using-tool'].includes(state);
-  const [draft,setDraft]=useState('');
+  const chatDraft=useChatDraft(agent?.id??'',session?.id);
+  const draft=chatDraft.text;
+  const setDraft=(text:string)=>{if(agent&&session)writeChatDraft(agent.id,session.id,{...chatDraft,text})};
   const transcriptRef=useRef<HTMLDivElement>(null);
+  const followRef=useRef(true);
   const inbound=getUpstreamNodes(id,nodes,edges);
-  const contextNodes:ChatContextReference[]=inbound.map(node=>({nodeId:node.id,label:contextLabel(node),kind:node.type??'note',content:contextContent(node,sessions)}));
+  const savedContext=(chatDraft.context??[]).flatMap(ref=>{
+    const node=allNodes.find(item=>item.workspaceId===workspaceId&&ref.workspaceId===workspaceId&&item.node.id===ref.nodeId)?.node;
+    return node?[{nodeId:node.id,label:contextLabel(node),kind:node.type??'note',content:contextContent(node,sessions)}]:[];
+  });
+  const contextNodes:ChatContextReference[]=[...new Map([...savedContext,...inbound.map(node=>({nodeId:node.id,label:contextLabel(node),kind:node.type??'note',content:contextContent(node,sessions)}))].map(ref=>[ref.nodeId,ref])).values()];
+  const missingContext=(chatDraft.context??[]).filter(ref=>!savedContext.some(item=>item.nodeId===ref.nodeId));
 
-  useEffect(()=>{const element=transcriptRef.current;if(element)element.scrollTop=element.scrollHeight},[messages.length,session?.id]);
+  useEffect(()=>{followRef.current=true},[session?.id]);
+  useEffect(()=>{if(session?.codexThreadId)void refreshSessionImages(session.id).catch(()=>{});},[session?.id,session?.codexThreadId,refreshSessionImages]);
+  useEffect(()=>{const element=transcriptRef.current;if(element&&followRef.current)element.scrollTop=element.scrollHeight},[messages.length,messages.at(-1)?.content,session?.id,busy]);
 
   const chooseAgent=(agentId:string)=>{
     const next=availableAgents.find(item=>item.id===agentId);
@@ -99,19 +112,23 @@ export function ChatNode({id,data,selected}:NodeProps<CanvasFlowNode>) {
     const content=draft.trim();
     if(!content||!agent||!session||busy)return;
     openSession(agent.id,session.id);
-    sendMessage(agent,content,contextNodes,session.id);
-    setDraft('');
+    followRef.current=true;
+    sendMessage(agent,content,contextNodes,session.id,chatDraft.skill??undefined);
+    writeChatDraft(agent.id,session.id,{text:'',skill:null,context:[]});
   };
   const handleKeyDown=(event:KeyboardEvent<HTMLTextAreaElement>)=>{if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();event.currentTarget.form?.requestSubmit()}};
 
-  return <CanvasNodeShell id={id} data={data} selected={selected} kind="chat">
+  return <CanvasNodeShell id={id} data={data} selected={selected} kind="chat" showFooter={!data.chatHandoffId}>
     <div className="canvas-chat-head nodrag"><SelectMenu className="canvas-node-select" ariaLabel={t('Choose an agent')} value={data.chatAgentId??''} onChange={chooseAgent} options={[{value:'',label:t('Choose an agent')},...availableAgents.map(item=>({value:item.id,label:item.name}))]}/>{agent&&<span>{agent.role}</span>}</div>
     {agent&&session?<>
-      <div className="canvas-chat-transcript nodrag nowheel" ref={transcriptRef} aria-live="polite">
-        {messages.length?messages.map(message=><div key={message.id} className={`canvas-chat-message ${message.role}`}><small>{message.role==='user'?t('You'):agent.name}</small><p>{message.content}</p>{message.contextNodes&&message.contextNodes.length>0&&<span className="canvas-chat-context-used">{t('Used {{count}} connected objects',{count:message.contextNodes.length})}</span>}</div>):<p className="canvas-chat-empty">{inbound.length?t('Connected objects will be included with your message.') :t('Start a conversation or connect objects to provide context.')}</p>}
+      {data.chatHandoffId&&<div className="canvas-chat-session" title={session.title}>{session.title}</div>}
+      <div className="canvas-chat-transcript nodrag nowheel" ref={transcriptRef} aria-live="polite" onScroll={event=>{const element=event.currentTarget;followRef.current=element.scrollHeight-element.scrollTop-element.clientHeight<48}}>
+        {messages.length?messages.map(message=><div key={message.id} className={`canvas-chat-message ${message.role} ${message.sourceAgentName?'received-task':''}`}><small>{message.sourceAgentName??(message.role==='user'?t('You'):agent.name)}</small>{message.sourceAgentName?<details className="canvas-chat-briefing"><summary>{t('Task')} · {message.sourceAgentName}</summary><p>{message.content}</p></details>:message.content&&<p>{message.content}</p>}{message.images?.length?<ChatMessageImages images={message.images} onLoad={()=>{if(followRef.current&&transcriptRef.current)transcriptRef.current.scrollTop=transcriptRef.current.scrollHeight;}}/>:null}{message.contextNodes&&message.contextNodes.length>0&&<span className="canvas-chat-context-used">{t('Used {{count}} connected objects',{count:message.contextNodes.length})}</span>}</div>):<p className="canvas-chat-empty">{inbound.length?t('Connected objects will be included with your message.') :t('Start a conversation or connect objects to provide context.')}</p>}
         {busy&&<div className="canvas-chat-thinking">{t(state==='using-tool'?'Using a tool…':state==='searching'?'Searching…':'Thinking…')}</div>}
+        {state==='error'&&<p className="canvas-chat-error" role="alert">{t('Error')} · {t('Check your AI connection and try again.')}</p>}
       </div>
-      {inbound.length>0&&<div className="canvas-chat-connections"><Icon name="link"/><span>{t('{{count}} connected objects as context',{count:inbound.length})}</span></div>}
+      {contextNodes.length>0&&<div className="canvas-chat-connections"><Icon name="link"/><span>{t('{{count}} connected objects as context',{count:contextNodes.length})}</span></div>}
+      {missingContext.length>0&&<p className="composer-draft-warning" role="status">{locale==='pt-BR'?'Contexto indisponível; não será enviado: ':'Unavailable context; will not be sent: '}{missingContext.map(ref=>ref.label).join(', ')}</p>}
       <form className="canvas-chat-composer nodrag" onSubmit={submit}><textarea className="nodrag nowheel" aria-label={t('Message')} placeholder={t('Message {{name}}…',{name:agent.name})} value={draft} onChange={event=>setDraft(event.target.value)} onKeyDown={handleKeyDown} rows={2}/><button className="canvas-chat-send nodrag" type="submit" disabled={!draft.trim()||busy} aria-label={t('Send message')}><Icon name="play"/></button></form>
     </>:<div className="canvas-chat-setup"><Icon name="message"/><p>{availableAgents.length?t('Choose an agent to give this chat its own conversation.'):t('Create an agent in this workspace to start a Canvas chat.')}</p></div>}
   </CanvasNodeShell>;

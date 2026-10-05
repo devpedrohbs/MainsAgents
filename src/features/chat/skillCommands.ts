@@ -1,9 +1,29 @@
 import type { Agent } from '../agents/model/Agent';
 
-/** A slash picker is shown only while the opening command is being typed. */
-export function slashSkillQuery(draft:string):string|null {
-  const match=/^\/([^\s]*)$/.exec(draft.trimStart());
-  return match?match[1]:null;
+export interface SlashSkillToken { query:string; start:number; end:number }
+
+/** Read the command at the caret, without treating URLs or file paths as skills. */
+export function slashSkillToken(draft:string,caret=draft.length):SlashSkillToken|null {
+  const cursor=Math.max(0,Math.min(caret,draft.length));
+  const match=/(?:^|\s)\/([^\s/]*)$/.exec(draft.slice(0,cursor));
+  if(!match)return null;
+  const start=cursor-match[1].length-1;
+  const suffix=/^[^\s/]*/.exec(draft.slice(cursor))![0];
+  const end=cursor+suffix.length;
+  if(draft[end]==='/')return null;
+  return {query:match[1],start,end};
+}
+
+export function slashSkillQuery(draft:string,caret=draft.length):string|null {
+  return slashSkillToken(draft,caret)?.query??null;
+}
+
+/** Selecting a chip removes only its command, keeping the surrounding request. */
+export function removeSlashSkillToken(draft:string,token:SlashSkillToken):{text:string;caret:number} {
+  const before=draft.slice(0,token.start);
+  let after=draft.slice(token.end);
+  if(!before||(/[\t ]$/.test(before)&&/^[\t ]/.test(after)))after=after.replace(/^[\t ]+/,'');
+  return {text:before+after,caret:before.length};
 }
 
 export function matchingSkills(skills:readonly string[],query:string):string[] {

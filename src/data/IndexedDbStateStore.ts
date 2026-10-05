@@ -13,7 +13,7 @@ function readAccountProfile(): string {
   }
 }
 const accountProfile = readAccountProfile();
-const databaseName = accountProfile ? `mainsagents-account-${accountProfile}` : 'mainsagents-desktop-v1';
+let databaseName = accountProfile ? `mainsagents-account-${accountProfile}` : 'mainsagents-desktop-v1';
 const storeName = 'app-state';
 const databaseVersion = 2;
 
@@ -82,22 +82,36 @@ const legacyStateStore: StateStore = {
 };
 
 const desktopState = typeof window !== 'undefined' ? window.mainsAgentsDesktop?.state : undefined;
-const profile = accountProfile || 'default';
+let profile = accountProfile || 'default';
+let desktopReady = false;
 let initialization: Promise<void> | undefined;
 async function readyDesktopState() {
   if (!desktopState) return;
   initialization ??= (async () => {
+    // Resolve from SQLite instead of an origin-specific browser cache. A missing
+    // native profile must not silently open a different user's workspace.
+    const nativeProfile = desktopState.getProfile ? await desktopState.getProfile() : desktopState.profile;
+    if (!nativeProfile) throw new Error('Could not identify the local storage profile');
+    profile = nativeProfile;
+    databaseName = profile === 'default' ? 'mainsagents-desktop-v1' : `mainsagents-account-${profile}`;
     if (!await desktopState.hasProfile(profile)) {
       // A failed legacy read aborts migration; never seed a new store with defaults.
       await desktopState.initialize(profile, await legacyStateStore.readAll());
     }
+    desktopReady = true;
   })().catch(error => { initialization = undefined; throw error; });
   await initialization;
 }
 
+export function storageProfile(): string { return profile; }
+
 export const indexedDbStateStore: StateStore = desktopState ? {
   async read<T>(key: string) { await readyDesktopState(); return desktopState.read<T>(profile, key); },
   async write<T>(key: string, value: T) { await readyDesktopState(); await desktopState.write(profile, key, value); },
+  ...(desktopState.writeSync ? { writeSync<T>(key: string, value: T) {
+    if (!desktopReady) throw new Error('Local storage has not been restored');
+    desktopState.writeSync!(profile, key, value);
+  } } : {}),
   async readAll() { await readyDesktopState(); return desktopState.readAll(profile); },
   async replaceAll(values) { await readyDesktopState(); await desktopState.replaceAll(profile, values); },
 } : legacyStateStore;

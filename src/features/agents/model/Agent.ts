@@ -13,6 +13,7 @@ export interface Agent {
   workspaceId: string;
   tools: AgentTool[];
   providerId?: AgentProviderId;
+  mcpPermissions?:Array<'read'|'write'|'schedule'|'publish'|'delete'|'unknown'>;
   modelId?: string;
   avatarImage?: string;
   skillsDirectory?: string;
@@ -34,10 +35,10 @@ export const agentToolDetails: Record<AgentTool, { label: string; description: s
   'web-search': { label: 'Web Search', description: 'Search and read public sources.' },
   files: { label: 'Files', description: 'Read files attached to the workspace.' },
   'canvas-context': { label: 'Canvas Context', description: 'Read selected nodes and create canvas results.' },
-  subagents: { label: 'Subagents', description: 'Delegate focused work to other agents.' },
+  subagents: { label: 'Agent collaboration', description: 'Send briefings to agents in this workspace and follow both chats.' },
 };
 
-export type AgentEditorValues = Pick<Agent, 'name' | 'role' | 'description' | 'instructions' | 'workspaceId' | 'tools' | 'skillsDirectory' | 'skills' | 'skillFiles' | 'disabledSkills' | 'skillsInstallKey' | 'providerId' | 'modelId' | 'avatarImage'>;
+export type AgentEditorValues = Pick<Agent, 'name' | 'role' | 'description' | 'instructions' | 'workspaceId' | 'tools' | 'skillsDirectory' | 'skills' | 'skillFiles' | 'disabledSkills' | 'skillsInstallKey' | 'providerId' | 'modelId' | 'avatarImage'|'mcpPermissions'>;
 
 export function getAgentInitials(agent: Pick<Agent, 'name'>): string {
   return agent.name

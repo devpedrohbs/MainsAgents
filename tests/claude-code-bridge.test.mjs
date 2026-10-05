@@ -29,7 +29,15 @@ test('Claude status explains when the CLI is not installed', async () => {
 test('Claude CLI bridge creates a resumable session and streams CLI output', async () => {
   const root = mkdtempSync(join(tmpdir(), 'mainsagents-claude-test-'));
   const fakeCli = `
+const fs=require('node:fs'),assert=require('node:assert/strict');
 const args = process.argv.slice(2);
+if(args.includes('--print')){
+ assert(!args.includes('--bare'));assert(args.includes('--strict-mcp-config'));assert(args.includes('--disable-slash-commands'));
+ assert.equal(args[args.indexOf('--permission-mode')+1],'dontAsk');
+ assert.deepEqual(JSON.parse(fs.readFileSync(args[args.indexOf('--mcp-config')+1])),{mcpServers:{}});
+ assert.equal(JSON.parse(fs.readFileSync(args[args.indexOf('--settings')+1])).disableAllHooks,true);
+ assert(!args[args.indexOf('--tools')+1].includes('Bash'));assert(!args[args.indexOf('--tools')+1].includes('Skill'));
+}
 if (args[0] === 'auth' && args[1] === 'status') {
   process.stdout.write(JSON.stringify({ loggedIn: true }));
 } else {

@@ -1,6 +1,7 @@
 import { createContext, useContext, useMemo, type PropsWithChildren } from 'react';
 import type { Agent, AgentEditorValues, AgentId } from './model/Agent';
 import { usePersistentState } from '../../data/localPersistence';
+import { deleteAgentDrafts } from '../chat/chatDrafts';
 
 interface AgentsContextValue {
   agents: readonly Agent[];
@@ -33,6 +34,7 @@ export function AgentsProvider({ children }: PropsWithChildren) {
       setAgents((current) => current.map((agent) => agent.id === agentId ? { ...agent, ...values, updatedAt: new Date().toISOString() } : agent));
     },
     deleteAgent: (agentId) => {
+      deleteAgentDrafts(agentId);
       setAgents((current) => current.filter((agent) => agent.id !== agentId));
     },
   }), [agents]);

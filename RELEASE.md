@@ -1,6 +1,6 @@
 # Publicação e recuperação do MainsAgents (Windows)
 
-Versão atual: 0.3.0. O instalador NSIS usa o mesmo `appId` entre versões. O perfil de dados fica em `%APPDATA%\mains-agents`, separado dos arquivos instalados.
+Versão desta rodada: 0.3.38. O instalador NSIS mantém o mesmo `appId`. O estado principal e editorial do desktop ficam no SQLite permanente em `%USERPROFILE%\.mainsagents\storage`, fora da instalação. O perfil Electron em `%APPDATA%\mains-agents` mantém cookies e dados auxiliares; históricos antigos foram migrados sem substituir dados atuais.
 
 ## Antes da publicação
 
@@ -13,11 +13,27 @@ Versão atual: 0.3.0. O instalador NSIS usa o mesmo `appId` entre versões. O pe
 ## Rollback
 
 1. Exporte um backup em **Settings → Your data** antes de trocar de versão, quando possível.
-2. Reinstale o último instalador validado. O instalador não remove o perfil em `%APPDATA%\mains-agents`.
+2. Reinstale o último instalador validado. O instalador preserva o SQLite permanente e o perfil Electron.
 3. Se o esquema de dados mudou, importe o backup criado na versão anterior. Não apague o perfil para tentar corrigir um erro de instalação.
 
 O banco IndexedDB é atualizado de forma aditiva. Alterações futuras incompatíveis devem incluir migração testada e não devem sobrescrever dados desconhecidos.
 
 ## Limitações atuais
 
-Não existe canal de atualização automática. A atualização é feita instalando uma versão nova sobre a anterior. O projeto não possui certificado de assinatura comercial; isso precisa ser providenciado antes de distribuição ampla.
+Não existe canal de atualização automática. A atualização é feita instalando uma versão nova sobre a anterior. O projeto não possui certificado de assinatura comercial; a assinatura pode ser configurada pelo mantenedor quando houver um certificado.
+
+
+## Verificações desta rodada
+
+Execute `npm test`, `npm run build` e os testes Electron de publicações e mídia descritos em CONTRIBUTING.md. Para FFmpeg, use vídeo sintético; não autentique nem publique com contas pessoais em testes automáticos. Feche o app antes de instalar e preserve um snapshot SQLite consistente e os diretórios de skills. Compare o estado salvo antes/depois da instalação e confirme o destino dos atalhos. Guarde o SHA-256 do instalador e do app.asar.
+
+O workflow Windows produz um artefato de build, sem publicar automaticamente uma release. A licença do código é MIT; não substitui os termos de assets ou dependências. FFmpeg não é embutido no instalador e precisa estar no PATH para editar vídeo.
+
+## Build local 0.3.38 validado
+
+- Instalador: `MainsAgents-Setup-0.3.38.exe`.
+- SHA-256: `4e19da87c0d3631eb8cd41f4f05900f9963034a7488d75b837f8f092a6b90f2e`.
+- app.asar SHA-256: `4ac01c9294c14b6323b3aadb7493d627f4026625708406bdaba7006f02b49117`.
+- Assinatura verificada: NotSigned. Nenhuma release pública foi publicada nesta rodada.
+- Instalado sobre a versão anterior, com backup consistente e comparação integral do estado principal/editorial.
+- O comando `npm run desktop:dist` também verifica o fechamento das dependências empacotadas e gera checksum/recibo JSON.

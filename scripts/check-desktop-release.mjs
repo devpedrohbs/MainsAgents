@@ -1,0 +1,10 @@
+import{readFileSync,writeFileSync,existsSync}from'node:fs';import{createHash}from'node:crypto';import{join}from'node:path';import{listPackage,extractFile}from'@electron/asar';
+const pkg=JSON.parse(readFileSync('package.json','utf8')),version=pkg.version,installer=join('release',`MainsAgents-Setup-${version}.exe`),asar=join('release','win-unpacked','resources','app.asar');
+if(!existsSync(installer)||!existsSync(asar))throw Error('Desktop build is missing');
+const packed=JSON.parse(extractFile(asar,'package.json'));if(packed.version!==version)throw Error('Installer version mismatch');
+const files=new Set(listPackage(asar).map(p=>p.replaceAll('\\','/').replace(/^\//,'')));
+for(const file of pkg.build.files.filter(p=>!p.includes('*')))if(!files.has(file))throw Error(`Missing packaged file: ${file}`);
+const visited=new Set();function inspect(p){if(visited.has(p))return;visited.add(p);for(const match of extractFile(asar,p).toString().matchAll(/(?:from\s*|import\s*|import\s*\()(['"])(\.\/[^'"]+\.mjs)\1/g)){const dep=match[2].slice(2);if(!files.has(dep))throw Error(`${p} imports missing ${dep}`);inspect(dep)}}for(const file of pkg.build.files)if(file.endsWith('.mjs'))inspect(file);
+for(const entry of ['dist/app.html','LICENSE','PRIVACY.md'])if(!files.has(entry))throw Error(`Missing ${entry}`);
+const hash=path=>createHash('sha256').update(readFileSync(path)).digest('hex'),receipt={version,installer,installerSha256:hash(installer),appAsarSha256:hash(asar),nativeModules:visited.size,checkedAt:new Date().toISOString()};
+writeFileSync(join('release',`MainsAgents-${version}-verification.json`),JSON.stringify(receipt,null,2));writeFileSync(installer+'.sha256',receipt.installerSha256+'  '+installer.split(/[\\/]/).pop()+'\n');console.log(JSON.stringify(receipt,null,2));

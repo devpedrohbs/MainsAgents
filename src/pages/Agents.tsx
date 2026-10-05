@@ -125,7 +125,7 @@ export function Agents({
           </button>
         </section>
       ) : filtered.length ? (
-        <AgentList agents={filtered} selectedId={selected?.id} onSelect={setSelectedId} onConfigure={onSelect} onChat={onChat} />
+        <AgentList agents={filtered} selectedId={selected?.id} onSelect={setSelectedId} onConfigure={onSelect} onChat={id=>{setSelectedId(null);onChat(id);}} />
       ) : (
         <section className="work-panel workspace-empty" data-od-id="agents-no-results">
           <h2>{t('No results')}</h2>
@@ -147,6 +147,6 @@ export function Agents({
         </section>
       )}
       {agents.length>0 && <div className="team-page-tip"><Icon name="link"/><div><strong>{pt?'Contexto transforma especialistas em uma equipe.':'Context brings specialists together.'}</strong><p>{pt?'Organize as referências no Canvas e envie-as como contexto na conversa.':'Organize references on the Canvas and send them as conversation context.'}</p></div><a className="soft-button" href="#canvas">{pt?'Abrir Canvas':'Open Canvas'}</a></div>}
-    </div>{selected && <AgentDetails key={selected.id} agent={selected} workspaceName={currentWorkspace.name} onClose={()=>setSelectedId(null)} onChat={()=>onChat(selected.id)} onConfigure={()=>onSelect(selected.id)}/>}</div>
+    </div>{selected && <AgentDetails key={selected.id} agent={selected} workspaceName={currentWorkspace.name} onClose={()=>setSelectedId(null)} onChat={()=>{setSelectedId(null);onChat(selected.id);}} onConfigure={()=>onSelect(selected.id)}/>}</div>
   );
 }

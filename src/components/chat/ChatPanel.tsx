@@ -4,16 +4,28 @@ import { agentStatusLabels, agentToolDetails, getAgentInitials } from '../../fea
 import { useChat } from '../../features/chat/ChatProvider';
 import type { ChatRunState, ReasoningEffort } from '../../features/chat/model/Chat';
 import { Icon } from '../common/Icon';
-import { useCanvas } from '../canvas/CanvasProvider';
+import { useCanvas, getNodeContextContent, getNodeContextLabel } from '../canvas/CanvasProvider';
 import { useWorkspaces } from '../../app/WorkspaceProvider';
 import { useLanguage } from '../../app/LanguageProvider';
 import { AgentAvatar } from '../agents/AgentAvatar';
 import type { ProviderId, ProviderConnectionState } from '../../features/chat/AiProvider';
 import { sessionProviderId } from '../../features/chat/AiProvider';
 import { SelectMenu } from '../common/SelectMenu';
-import { readChatDraft, writeChatDraft } from '../../features/chat/chatDrafts';
-import { matchingSkills, slashSkillQuery, typedSkillCommand } from '../../features/chat/skillCommands';
+import { readChatDraft, writeChatDraft, useChatDraft } from '../../features/chat/chatDrafts';
+import { matchingSkills, slashSkillToken, removeSlashSkillToken, typedSkillCommand } from '../../features/chat/skillCommands';
 import { useAgents } from '../../features/agents/AgentsProvider';
+import { AgentHandoffDialog } from './AgentHandoffDialog';
+import { AgentConnectionBar } from './AgentConnectionBar';
+import { ChatMessageImages } from './ChatMessageImages';
+import {ChatDeliveryCard,ScriptDeliveryReview} from './ChatDeliveryCard';
+import {useContentWorkflow} from '../../features/content/ContentWorkflowProvider';
+import type {EditorialArtifact} from '../../features/content/model';
+import {editorialReviewCommand} from '../../features/content/reviewCommands';
+import {FlowDialog} from '../common/FlowDialog';
+import {RuntimeActionApprovals} from './RuntimeActionApprovals';
+import {NativeDelegationWork} from './NativeDelegationWork';
+import {markChatSessionSeen} from '../../features/chat/chatInboxState';
+import {FileDeliveryReview} from './FileDeliveryReview';
 
 type ChatTab = 'chat' | 'sessions' | 'context';
 const stateLabels: Record<ChatRunState, string> = {
@@ -37,6 +49,7 @@ interface ChatPanelProps {
   presentation: 'side' | 'floating';
   onTogglePresentation: () => void;
   onClose: () => void;
+  sessionId?: string;
 }
 
 export function ChatPanel({
@@ -50,17 +63,21 @@ export function ChatPanel({
   presentation,
   onTogglePresentation,
   onClose,
+  sessionId,
 }: ChatPanelProps) {
   const { getWorkspaceById } = useWorkspaces();
   const { agents } = useAgents();
   const { locale, t, reducedMotion } = useLanguage();
-  const [message, setMessage] = useState('');
+  const {state:editorialState}=useContentWorkflow();
+  const [reviewRequest,setReviewRequest]=useState<{artifacts:EditorialArtifact[];selectedId:string;decision:'approve'|'rejected'|'revision-requested';notes:string;confirmedTarget:boolean}|null>(null);
+  const [composerSelection, setComposerSelection] = useState({ start:0, end:0 });
+  const [dismissedSlash, setDismissedSlash] = useState<string|null>(null);
   const [showLatest, setShowLatest] = useState(false);
-  const [selectedSkill, setSelectedSkill] = useState<string | null>(null);
   const [skillsPickerOpen, setSkillsPickerOpen] = useState(false);
   const [skillMenuIndex, setSkillMenuIndex] = useState(0);
   const [tab, setTab] = useState<ChatTab>('chat');
   const [composerOptionsOpen, setComposerOptionsOpen] = useState(false);
+  const [handoffBrief, setHandoffBrief] = useState<{text:string;sessionId:string}|null>(null);
   const composerOptionsRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     setComposerOptionsOpen(false);
@@ -97,28 +114,56 @@ export function ChatPanel({
     getProviderStatus,
     setSessionModel,
     setSessionReasoningEffort,
+    sessions,
+    handoffs,
+    showCollaboration,
+    refreshSessionImages,
   } = useChat();
-  const { addAgentResponse, hasMessageNode, getAgentContext, removeNodeFromAgentContext, clearAgentContext } =
+  const { addAgentResponse, hasMessageNode, getAgentContext, clearAgentContext, allNodes } =
     useCanvas();
   const agentSessions = getAgentSessions(agent.id);
-  const activeSession = getActiveSession(agent.id);
+  const activeSession = sessionId?sessions.find(item=>item.id===sessionId&&item.agentId===agent.id):getActiveSession(agent.id);
+  useEffect(()=>{if(activeSession&&tab==='chat'&&document.visibilityState==='visible')markChatSessionSeen(activeSession);},[activeSession,tab]);
+  const linkedHandoffs=handoffs.filter(item=>item.sourceSessionId===activeSession?.id||item.targetSessionId===activeSession?.id);
   const lastMessage = activeSession?.messages[activeSession.messages.length - 1];
   const lastMessageContent = lastMessage?.type === 'message' ? lastMessage.content : undefined;
   const lastRunError = activeSession?.messages
     .slice()
     .reverse()
     .find((item) => item.type === 'activity' && item.status === 'error');
-  const contextNodes = getAgentContext(agent.id);
+  const draft = useChatDraft(agent.id, activeSession?.id);
+  const message = draft.text;
+  const selectedSkill = draft.skill;
+  const pendingContext = getAgentContext(agent.id);
+  const contextNodes = (draft.context ?? []).flatMap(ref => {
+    const node = allNodes.find(item => item.workspaceId === agent.workspaceId && ref.workspaceId === agent.workspaceId && item.node.id === ref.nodeId)?.node;
+    return node ? [{ nodeId: node.id, label: getNodeContextLabel(node), kind: node.type, content: getNodeContextContent(node) }] : [];
+  });
+  const missingContext = (draft.context ?? []).filter(ref => !contextNodes.some(item => item.nodeId === ref.nodeId));
+  const pendingContextKey = pendingContext.map(item => item.nodeId).join('\n');
+  useEffect(() => {
+    if (!pendingContext.length) return;
+    const latest = readChatDraft(agent.id, activeSession?.id);
+    const refs = new Map((latest.context ?? []).map(ref => [ref.nodeId, ref]));
+    pendingContext.forEach(item => refs.set(item.nodeId, { nodeId: item.nodeId, label: item.label, workspaceId: agent.workspaceId }));
+    writeChatDraft(agent.id, activeSession?.id, { ...latest, context: [...refs.values()] });
+    clearAgentContext(agent.id);
+  }, [agent.id, agent.workspaceId, activeSession?.id, pendingContextKey, clearAgentContext]);
   const runState = getRunState(activeSession?.id);
   const busy = runState === 'thinking' || runState === 'searching' || runState === 'using-tool';
   const providerId: ProviderId = activeSession
     ? sessionProviderId(activeSession)
     : (agent.providerId ?? 'codex');
+  useEffect(()=>{
+    if(connection!=='connected'||!activeSession?.id||!activeSession.codexThreadId)return;
+    void refreshSessionImages(activeSession.id).catch(()=>{/* Existing local images and messages remain available offline. */});
+  },[connection,activeSession?.id,activeSession?.codexThreadId,refreshSessionImages]);
   const selectedModelId = activeSession?.modelId ?? '';
   const selectedEffort: ReasoningEffort = activeSession?.reasoningEffort ?? 'medium';
-  const slashQuery = slashSkillQuery(message);
-  const skillMenuOpen = (skillsPickerOpen || slashQuery !== null) && !busy;
-  const skillChoices = skillMenuOpen ? matchingSkills(agent.skills ?? [], slashQuery ?? '') : [];
+  const slashToken = composerSelection.start===composerSelection.end ? slashSkillToken(message,composerSelection.end) : null;
+  const slashKey = slashToken ? `${slashToken.start}:${composerSelection.end}:${slashToken.query}` : null;
+  const skillMenuOpen = (skillsPickerOpen || (slashKey!==null && slashKey!==dismissedSlash)) && !busy;
+  const skillChoices = skillMenuOpen ? matchingSkills(agent.skills ?? [], skillsPickerOpen?'':slashToken?.query??'') : [];
 
   useEffect(() => {
     let mounted = true;
@@ -167,26 +212,25 @@ export function ChatPanel({
   }, [agent.id]);
 
   useEffect(() => {
-    const draft = readChatDraft(agent.id, activeSession?.id);
-    setMessage(draft.text);
-    setSelectedSkill(draft.skill);
+    const restored = readChatDraft(agent.id, activeSession?.id);
+    setComposerSelection({ start:restored.text.length, end:restored.text.length });
+    setDismissedSlash(null);
     setShowLatest(false);
     setSkillMenuIndex(0);
   }, [agent.id, activeSession?.id]);
   const updateDraft = (text: string, skill: string | null = selectedSkill) => {
-    setMessage(text);
-    setSelectedSkill(skill);
-    writeChatDraft(agent.id, activeSession?.id, { text, skill });
+    setComposerSelection({ start:text.length, end:text.length });
+    writeChatDraft(agent.id, activeSession?.id, { ...readChatDraft(agent.id, activeSession?.id), text, skill });
   };
   const ensureSession = () => {
     if (activeSession) return activeSession;
     const session = createSession(agent.id, undefined, providerId, agent.modelId);
-    writeChatDraft(agent.id, session.id, { text: message, skill: selectedSkill });
+    writeChatDraft(agent.id, session.id, draft);
     writeChatDraft(agent.id, undefined, { text: '', skill: null });
     return session;
   };
   useEffect(() => {
-    if (selectedSkill && !agent.skills?.includes(selectedSkill)) setSelectedSkill(null);
+    if (selectedSkill && !agent.skills?.includes(selectedSkill)) updateDraft(message, null);
   }, [agent.skills, selectedSkill]);
 
   useEffect(() => {
@@ -215,7 +259,6 @@ export function ChatPanel({
   const startSession = () => {
     createSession(agent.id, undefined, agent.providerId ?? 'codex', agent.modelId);
     setTab('chat');
-    setMessage('');
     onToast(locale === 'pt-BR' ? `Nova conversa com ${agent.name}` : `New conversation with ${agent.name}`);
   };
 
@@ -223,14 +266,25 @@ export function ChatPanel({
   const changeEffort = (effort: string) =>
     setSessionReasoningEffort(ensureSession().id, effort as ReasoningEffort);
   const chooseSkill = (skill: string) => {
-    updateDraft(skillsPickerOpen ? message : '', skill);
+    const next = !skillsPickerOpen && slashToken ? removeSlashSkillToken(message,slashToken) : {text:message,caret:composerSelection.end};
+    updateDraft(next.text, skill);
+    setComposerSelection({start:next.caret,end:next.caret});
     setSkillsPickerOpen(false);
     setSkillMenuIndex(0);
-    requestAnimationFrame(() => composerRef.current?.focus());
+    requestAnimationFrame(() => {
+      composerRef.current?.focus();
+      composerRef.current?.setSelectionRange(next.caret,next.caret);
+    });
   };
 
   const send = () => {
     if (busy || connection !== 'connected') return;
+    const decision=!selectedSkill&&!contextNodes.length?editorialReviewCommand(message):null;
+    const targets=decision?editorialState.artifacts.filter(artifact=>artifact.type===(decision.target==='files'?'file-delivery':'script-options')&&artifact.source?.sessionId===activeSession?.id&&editorialState.contents.some(content=>content.id===artifact.contentId&&content.workspaceId===agent.workspaceId&&(decision.target==='files'?content.fileDeliveryArtifactId:content.scriptOptionsArtifactId)===artifact.id)):[];
+    if(decision&&targets.length){
+      setReviewRequest({artifacts:structuredClone(targets),selectedId:targets[0].id,...decision,confirmedTarget:targets.length===1});
+      return;
+    }
     const typed = selectedSkill ? null : typedSkillCommand(message, agent.skills ?? []);
     const skill = selectedSkill ?? typed?.skill;
     const content = typed ? typed.content : message.trim();
@@ -238,9 +292,9 @@ export function ChatPanel({
       if (typed) chooseSkill(typed.skill);
       return;
     }
-    sendMessage(agent, content, contextNodes, undefined, skill ?? undefined);
+    sendMessage(agent, content, contextNodes, activeSession?.id, skill ?? undefined);
     clearAgentContext(agent.id);
-    updateDraft('', null);
+    writeChatDraft(agent.id, activeSession?.id, { text: '', skill: null, context: [] });
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -265,8 +319,8 @@ export function ChatPanel({
       }
       if (event.key === 'Escape') {
         event.preventDefault();
-        if (skillsPickerOpen) setSkillsPickerOpen(false);
-        else updateDraft('');
+        setSkillsPickerOpen(false);
+        setDismissedSlash(slashKey);
         return;
       }
     }
@@ -292,13 +346,14 @@ export function ChatPanel({
       <div className="chat-top">
         <header className="chat-head">
           <span className="conversation-avatar" title={`${agent.role} · ${t(agentStatusLabels[agent.status])}`}><AgentAvatar name={agent.name} image={agent.avatarImage} /></span>
-          <SelectMenu className="conversation-agent-picker" value={agent.id} onChange={onSelectAgent} ariaLabel={locale==='pt-BR'?'Conversar com':'Chat with'} options={agents.filter(item=>item.workspaceId===agent.workspaceId).map(item=>({value:item.id,label:item.name}))}/>
+          {sessionId?<strong className="collaboration-agent-name">{agent.name}</strong>:<SelectMenu className="conversation-agent-picker" value={agent.id} onChange={onSelectAgent} ariaLabel={locale==='pt-BR'?'Conversar com':'Chat with'} options={agents.filter(item=>item.workspaceId===agent.workspaceId).map(item=>({value:item.id,label:item.name}))}/>}
           <div className="chat-head-actions">
             <details className="conversation-options" onClick={event=>{if((event.target as HTMLElement).closest('button'))event.currentTarget.open=false;}} onKeyDown={event=>{if(event.key==='Escape'&&event.currentTarget.open){event.preventDefault();event.currentTarget.open=false;event.currentTarget.querySelector('summary')?.focus();}}}><summary aria-label={locale==='pt-BR'?'Opções da conversa':'Conversation options'} title={locale==='pt-BR'?'Opções da conversa':'Conversation options'}><Icon name="more"/></summary><div>
             <button
               className="icon-button"
               aria-label={t('New session')}
               title={t('New session')}
+              disabled={!!sessionId}
               onClick={startSession}
             >
               <Icon name="plus" />
@@ -311,7 +366,8 @@ export function ChatPanel({
             >
               <Icon name="history" />
             </button>
-            <button className="icon-button" title={locale==='pt-BR'?'Sessões deste agente':'Agent sessions'} onClick={()=>setTab('sessions')}><Icon name="history"/></button>
+            <button className="icon-button" disabled={!!sessionId} title={locale==='pt-BR'?'Sessões deste agente':'Agent sessions'} onClick={()=>setTab('sessions')}><Icon name="history"/></button>
+            {agent.tools.includes('subagents')&&<button className="icon-button" disabled={busy||!agents.some(item=>item.workspaceId===agent.workspaceId&&item.id!==agent.id)} aria-label={locale==='pt-BR'?'Enviar a outro agente':'Send to another agent'} title={locale==='pt-BR'?'Enviar a outro agente':'Send to another agent'} onClick={()=>setHandoffBrief({text:'',sessionId:ensureSession().id})}><Icon name="users"/></button>}
             <button className="icon-button" title={t('Context')} onClick={()=>setTab('context')}><Icon name="folder"/></button>
             <button
               className="icon-button"
@@ -342,6 +398,8 @@ export function ChatPanel({
             </button>
           </div>
         </header>
+        <AgentConnectionBar agent={agent} session={activeSession} ensureSession={ensureSession}
+          busy={busy} providerId={providerId} onError={onToast}/>
         <nav className="chat-tabs" hidden={tab==='chat'} aria-label={`${agent.name} panel`}>
           {(['chat', 'sessions', 'context'] as ChatTab[]).map((item) => (
             <button
@@ -373,9 +431,12 @@ export function ChatPanel({
           {activeSession && (
             <div className="active-session-bar">
               <span>{activeSession.title}</span>
-              <button onClick={() => setTab('sessions')}>{t('All sessions')}</button>
+              {activeSession.contentId&&<button type="button" onClick={()=>window.dispatchEvent(new CustomEvent('mainsagents:open-content',{detail:{contentId:activeSession.contentId}}))}>{locale==='pt-BR'?'Abrir conteúdo':'Open content'}</button>}
+              {!sessionId&&<button onClick={() => setTab('sessions')}>{t('All sessions')}</button>}
             </div>
           )}
+          {activeSession&&<RuntimeActionApprovals sessionId={activeSession.id}/>}
+          {activeSession&&<NativeDelegationWork sessionId={activeSession.id}/>}
           {(!activeSession || activeSession.messages.length === 0) && (
             <div className="chat-empty">
               <AgentAvatar name={agent.name} image={agent.avatarImage} />
@@ -396,10 +457,14 @@ export function ChatPanel({
             ) : (
               <article className={`chat-message ${item.role === 'user' ? 'user' : ''}`} key={item.id}>
                 <div className="message-meta">
-                  <b>{item.role === 'user' ? t('You') : agent.name}</b>
+                  <b>{item.sourceAgentName??(item.role === 'user' ? t('You') : agent.name)}</b>
                   <span>{formatTime(item.createdAt, locale)}</span>
                 </div>
-                <p className="message-content">{item.content}</p>
+                {item.role==='user'&&item.sourceAgentName?<details className="received-agent-task">
+                  <summary>{locale==='pt-BR'?`Tarefa recebida de ${item.sourceAgentName}`:`Task received from ${item.sourceAgentName}`}</summary>
+                  <p className="message-content">{item.content}</p>
+                </details>:item.content&&(item.role==='agent'&&activeSession?<ChatDeliveryCard agent={agent} session={activeSession} message={item}/>:<p className="message-content">{item.content}</p>)}
+                {item.images?.length ? <ChatMessageImages images={item.images} onLoad={()=>{if(followLatestRef.current&&bodyRef.current)bodyRef.current.scrollTop=bodyRef.current.scrollHeight;}}/>:null}
                 {item.selectedSkill && (
                   <div className="message-skill-used">
                     <span>/</span>
@@ -421,7 +486,10 @@ export function ChatPanel({
                     <button
                       disabled={hasMessageNode(item.id)}
                       onClick={() => {
-                        const result = addAgentResponse(item, agent);
+                        const origins=editorialState.artifacts.filter(artifact=>artifact.source?.messageId===item.id&&artifact.source?.sessionId===activeSession?.id);
+                        const origin=origins.length===1?origins[0]:undefined;
+                        const link=origin?{contentId:origin.contentId,topicId:origin.topicId}:origins.length?undefined:{contentId:activeSession?.contentId,topicId:activeSession?.topicId};
+                        const result = addAgentResponse(item, agent, link);
                         onOpenCanvas();
                         onToast(
                           locale === 'pt-BR'
@@ -442,11 +510,19 @@ export function ChatPanel({
                     >
                       {t('Copy')}
                     </button>
+                    {agent.tools.includes('subagents')&&agents.some(candidate=>candidate.workspaceId===agent.workspaceId&&candidate.id!==agent.id)&&<button disabled={busy} onClick={()=>setHandoffBrief({text:item.content,sessionId:ensureSession().id})}>{locale==='pt-BR'?'Enviar a outro agente':'Send to another agent'}</button>}
                   </div>
                 )}
               </article>
             ),
           )}
+          {linkedHandoffs.map(item=><div className={`handoff-card ${item.status}`} key={item.id}>
+            <div><span>{agents.find(candidate=>candidate.id===item.sourceAgentId)?.name??'Agent'} → {agents.find(candidate=>candidate.id===item.targetAgentId)?.name??'Agent'}</span><small>{locale==='pt-BR'?({running:'Trabalhando',completed:'Concluído',error:'Erro',cancelled:'Interrompido',interrupted:'Interrompido ao fechar o app'}[item.status]):item.status}</small></div>
+            <b>{item.title}</b>
+            {item.files.length>0&&<small>{item.files.length} {locale==='pt-BR'?'arquivo(s) referenciado(s)':'file reference(s)'}</small>}
+            {item.error&&<p>{item.error}</p>}
+            <button onClick={()=>showCollaboration(item.id)}>{locale==='pt-BR'?'Ver os dois chats':'View both chats'}</button>
+          </div>)}
           {runState === 'thinking' && (
             <div className="thinking-row">
               <Icon name="spark"/> {t('Thinking')}…
@@ -709,7 +785,7 @@ export function ChatPanel({
                           ? `Remover ${context.label} do contexto`
                           : `Remove ${context.label} from context`
                       }
-                      onClick={() => removeNodeFromAgentContext(agent.id, context.nodeId)}
+                      onClick={() => writeChatDraft(agent.id, activeSession?.id, { ...draft, context: draft.context?.filter(ref => ref.nodeId !== context.nodeId) })}
                     >
                       {context.label}
                       <b aria-hidden="true">×</b>
@@ -718,12 +794,22 @@ export function ChatPanel({
                 </div>
               </div>
             )}
+            {missingContext.length > 0 && <div className="composer-draft-warning" role="status">
+              <span>{locale === 'pt-BR' ? 'Contexto indisponível: ' : 'Unavailable context: '}{missingContext.map(ref => ref.label).join(', ')}. {locale === 'pt-BR' ? 'Não será enviado.' : 'Will not be sent.'}</span>
+              <button type="button" className="text-link" onClick={() => writeChatDraft(agent.id, activeSession?.id, { ...draft, context: draft.context?.filter(ref => contextNodes.some(item => item.nodeId === ref.nodeId)) })}>{locale === 'pt-BR' ? 'Remover referências' : 'Remove references'}</button>
+            </div>}
             <textarea
               ref={composerRef}
               value={message}
-              disabled={busy}
               onChange={(event) => {
                 updateDraft(event.target.value);
+                setComposerSelection({start:event.target.selectionStart,end:event.target.selectionEnd});
+                setDismissedSlash(null);
+                setSkillMenuIndex(0);
+              }}
+              onSelect={(event)=>{
+                const input=event.currentTarget;
+                setComposerSelection({start:input.selectionStart,end:input.selectionEnd});
                 setSkillMenuIndex(0);
               }}
               onKeyDown={onKeyDown}
@@ -736,7 +822,7 @@ export function ChatPanel({
               aria-label={locale === 'pt-BR' ? `Pergunte para ${agent.name}` : `Ask ${agent.name}`}
               placeholder={
                 busy
-                  ? locale==='pt-BR'?'O agente está trabalhando…':'The agent is working…'
+                  ? locale==='pt-BR'?'Prepare a próxima mensagem enquanto o agente responde…':'Draft your next message while the agent responds…'
                   : locale === 'pt-BR'
                     ? 'O que vamos criar juntos?'
                     : 'What shall we create together?'
@@ -821,6 +907,8 @@ export function ChatPanel({
           </p>
         </footer>
       )}
+      {handoffBrief!==null&&<AgentHandoffDialog agent={agent} sessionId={handoffBrief.sessionId} initialBriefing={handoffBrief.text} context={contextNodes} onClose={()=>setHandoffBrief(null)}/>}
+      {reviewRequest&&(reviewRequest.confirmedTarget?(reviewRequest.artifacts.find(item=>item.id===reviewRequest.selectedId)?.type==='file-delivery'?<FileDeliveryReview artifact={reviewRequest.artifacts.find(item=>item.id===reviewRequest.selectedId)!} initialDecision={reviewRequest.decision} initialNotes={reviewRequest.notes} onClose={()=>setReviewRequest(null)}/>:<ScriptDeliveryReview artifact={reviewRequest.artifacts.find(item=>item.id===reviewRequest.selectedId)!} initialDecision={reviewRequest.decision} initialNotes={reviewRequest.notes} onClose={()=>setReviewRequest(null)}/>):<FlowDialog title={locale==='pt-BR'?'Qual roteiro você quer revisar?':'Which script do you want to review?'} onClose={()=>setReviewRequest(null)}><div className="delivery-review-fields"><SelectMenu ariaLabel={locale==='pt-BR'?'Roteiro para revisar':'Script to review'} value={reviewRequest.selectedId} onChange={selectedId=>setReviewRequest({...reviewRequest,selectedId})} options={reviewRequest.artifacts.map(item=>({value:item.id,label:`${editorialState.contents.find(content=>content.id===item.contentId)?.title} · v${item.version}`}))}/><button className="primary-button" onClick={()=>setReviewRequest({...reviewRequest,confirmedTarget:true})}>{locale==='pt-BR'?'Revisar esta versão':'Review this version'}</button></div></FlowDialog>)}
     </div>
   );
 }

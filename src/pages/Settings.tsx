@@ -11,9 +11,12 @@ import {
 } from '../data/backup';
 import { usePersistentState } from '../data/localPersistence';
 import { SelectMenu } from '../components/common/SelectMenu';
+import {backupFileReferences} from '../data/backupFormat';
+import {RuntimeDiagnostics} from '../components/chat/RuntimeDiagnostics';
 
 export type SettingsSection = 'interface' | 'providers' | 'data' | 'account' | 'help';
 export function Settings({ initialSection = 'interface' }: { initialSection?: SettingsSection }) {
+  const [backupLinks,setBackupLinks]=useState<Array<{path:string;available:boolean}>|null>(null);
   const { currentWorkspace } = useWorkspaces();
   const {
     locale,
@@ -300,10 +303,14 @@ export function Settings({ initialSection = 'interface' }: { initialSection?: Se
   };
   const selectBackup = async (file?: File) => {
     setSelectedBackup(null);
+    setBackupLinks(null);
     setFeedback('');
     if (!file) return;
     try {
-      setSelectedBackup(parseBackup(await file.text()));
+      const parsed=parseBackup(await file.text());
+      const paths=backupFileReferences(parsed);
+      if(window.mainsAgentsDesktop?.backup?.inspectFiles)setBackupLinks(await window.mainsAgentsDesktop.backup.inspectFiles(paths));
+      setSelectedBackup(parsed);
     } catch (error) {
       setFeedback(error instanceof Error ? error.message : String(error));
     }
@@ -546,6 +553,7 @@ export function Settings({ initialSection = 'interface' }: { initialSection?: Se
             </div>
           </div>
           <div id="settings-providers" className="settings-group" hidden={section !== 'providers'}>
+            {section==='providers'&&<RuntimeDiagnostics/>}
             <div className="setting-row">
               <div className="setting-copy">
                 <b>{t('Codex CLI connection')}</b>
@@ -697,6 +705,9 @@ export function Settings({ initialSection = 'interface' }: { initialSection?: Se
               <div className="backup-preview" role="region" aria-label={t('Import backup')}>
                 <b>{describeBackup(selectedBackup)}</b>
                 <p>{t('Review the backup before importing. Replacing keeps only the selected backup.')}</p>
+                {selectedBackup.recovery&&<p>{locale==='pt-BR'?'Este é um backup de recuperação com alterações ainda não confirmadas em disco.':'This recovery backup includes changes not yet confirmed on disk.'}</p>}
+                {backupLinks&&backupLinks.some(link=>!link.available)&&<details open><summary>{locale==='pt-BR'?'Arquivos e pastas a religar':'Files and folders to relink'} · {backupLinks.filter(link=>!link.available).length}</summary><p>{locale==='pt-BR'?'Após importar, religue skills nas configurações do agente e arquivos na biblioteca do conteúdo. Estes arquivos externos não estão incluídos no JSON.':'After importing, relink skills in agent settings and files in the content library. These external files are not included in the JSON.'}</p><ul>{backupLinks.filter(link=>!link.available).map(link=><li key={link.path}><code>{link.path}</code></li>)}</ul></details>}
+                {!backupLinks&&backupFileReferences(selectedBackup).length>0&&<p>{locale==='pt-BR'?'Confira as pastas de skills e os arquivos dos conteúdos após importar; o navegador não verifica arquivos locais.':'Check skill folders and content files after importing; the browser cannot inspect local files.'}</p>}
                 <div>
                   <button
                     className="soft-button"

@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useState, type Dispatch, type PropsWithChildren, type SetStateAction } from 'react';
+import { createContext, useCallback, useContext, useMemo, useRef, useState, type Dispatch, type PropsWithChildren, type SetStateAction } from 'react';
 import { applyEdgeChanges, applyNodeChanges, type Edge, type EdgeChange, type NodeChange, type Viewport } from '@xyflow/react';
 import { useWorkspaces } from '../../app/WorkspaceProvider';
 import type { Agent, AgentId } from '../../features/agents/model/Agent';
@@ -6,6 +6,8 @@ import type { ChatContextReference, ChatMessageItem } from '../../features/chat/
 import type { CanvasFlowNode, CanvasNodeData, CanvasNodeKind } from './canvasTypes';
 import { usePersistentState } from '../../data/localPersistence';
 import { browserHome } from './browserNavigation';
+import { chatImageSource } from '../../features/chat/chatImages';
+import { addCollaborationChats, type CollaborationCanvasInput } from './collaborationCanvas';
 
 interface CanvasViewState { viewport:Viewport; width:number; height:number; ready:boolean }
 interface WorkspaceCanvasState { nodes:CanvasFlowNode[]; edges:Edge[]; view:CanvasViewState }
@@ -22,7 +24,7 @@ interface CanvasContextValue {
   updateView:(viewport:Viewport,width:number,height:number)=>void;
   addNode:(kind:CanvasNodeKind,position?:{x:number;y:number})=>string;
   updateNodeData:(workspaceId:string,nodeId:string,change:Partial<CanvasNodeData>|((data:CanvasNodeData)=>CanvasNodeData))=>void;
-  addAgentResponse:(message:ChatMessageItem,agent:Agent)=>AddResponseResult;
+  addAgentResponse:(message:ChatMessageItem,agent:Agent,link?:{contentId?:string;topicId?:string})=>AddResponseResult;
   hasMessageNode:(messageId:string)=>boolean;
   attachNodesToAgent:(agentId:AgentId,nodeIds:string[])=>void;
   getAgentContext:(agentId:AgentId)=>ChatContextReference[];
@@ -30,6 +32,11 @@ interface CanvasContextValue {
   clearAgentContext:(agentId:AgentId)=>void;
   groupNodes:(nodeIds:string[])=>string;
   selectNode:(workspaceId:string,nodeId:string)=>void;
+  addCollaboration:(input:CollaborationCanvasInput)=>void;
+  focusRequest:(CollaborationCanvasInput & {requestId:string})|null;
+  clearFocusRequest:(requestId:string)=>void;
+  registerVisibleChats:(sessionIds:string[])=>void;
+  hasVisibleChats:(sourceSessionId:string,targetSessionId:string)=>boolean;
 }
 
 const kindLabels:Record<CanvasNodeKind,string>={note:'Note',research:'Research',image:'Image',contentIdea:'Content idea',hook:'Hook',script:'Script',terminal:'Terminal',browser:'Browser',chat:'Chat'};
@@ -45,6 +52,19 @@ export function CanvasProvider({children}:PropsWithChildren) {
   const setNodes=useCallback<Dispatch<SetStateAction<CanvasFlowNode[]>>>((update)=>setWorkspaceCanvases((current)=>{const state=current[currentWorkspaceId]??{nodes:[],edges:[],view:{...initialView,viewport:{...initialView.viewport}}};const next=typeof update==='function'?update(state.nodes):update;return {...current,[currentWorkspaceId]:{...state,nodes:next}}}),[currentWorkspaceId]);
   const setEdges=useCallback<Dispatch<SetStateAction<Edge[]>>>((update)=>setWorkspaceCanvases((current)=>{const state=current[currentWorkspaceId]??{nodes:[],edges:[],view:{...initialView,viewport:{...initialView.viewport}}};const next=typeof update==='function'?update(state.edges):update;return {...current,[currentWorkspaceId]:{...state,edges:next}}}),[currentWorkspaceId]);
   const [contextNodeIds,setContextNodeIds]=useState<Record<AgentId,string[]>>({});
+  const [focusRequest,setFocusRequest]=useState<CanvasContextValue['focusRequest']>(null);
+  const visibleChats=useRef<string[]>([]);
+  const registerVisibleChats=useCallback((sessionIds:string[])=>{visibleChats.current=sessionIds},[]);
+  const hasVisibleChats=useCallback((sourceSessionId:string,targetSessionId:string)=>visibleChats.current.includes(sourceSessionId)&&visibleChats.current.includes(targetSessionId),[]);
+  const clearFocusRequest=useCallback((requestId:string)=>setFocusRequest(current=>current?.requestId===requestId?null:current),[]);
+  const addCollaboration=useCallback((input:CollaborationCanvasInput)=>{
+    setWorkspaceCanvases(current=>{
+      const state=current[input.workspaceId]??{nodes:[],edges:[],view:initialView};
+      const next=addCollaborationChats(state.nodes,state.edges,state.view,input);
+      return {...current,[input.workspaceId]:{...state,nodes:next.nodes,edges:next.edges}};
+    });
+    setFocusRequest({...input,requestId:crypto.randomUUID()});
+  },[setWorkspaceCanvases]);
 
   const onNodesChange=useCallback((changes:NodeChange<CanvasFlowNode>[])=>setNodes((current)=>applyNodeChanges(changes,current)),[setNodes]);
   const onEdgesChange=useCallback((changes:EdgeChange[])=>setEdges((current)=>applyEdgeChanges(changes,current)),[setEdges]);
@@ -52,13 +72,13 @@ export function CanvasProvider({children}:PropsWithChildren) {
   const addNode=useCallback((kind:CanvasNodeKind,position?:{x:number;y:number})=>{const nodeId=`node-${kind}-${Date.now().toString(36)}`;setNodes((current)=>[...current.map((node)=>({...node,selected:false})),{id:nodeId,type:kind,position:position??findFreePosition(current,view),selected:true,data:newNodeData(kind,currentWorkspaceId)}]);return nodeId},[currentWorkspaceId,setNodes,view]);
   const updateNodeData=useCallback((workspaceId:string,nodeId:string,change:Partial<CanvasNodeData>|((data:CanvasNodeData)=>CanvasNodeData))=>setWorkspaceCanvases((current)=>{const state=current[workspaceId];if(!state)return current;return {...current,[workspaceId]:{...state,nodes:state.nodes.map((node)=>{if(node.id!==nodeId)return node;return {...node,data:typeof change==='function'?change(node.data):{...node.data,...change}}})}}}),[setWorkspaceCanvases]);
 
-  const addAgentResponse=useCallback((message:ChatMessageItem,agent:Agent):AddResponseResult=>{
-    const kind=classifyResponse(message.content,agent);
+  const addAgentResponse=useCallback((message:ChatMessageItem,agent:Agent,link?:{contentId?:string;topicId?:string}):AddResponseResult=>{
+    const kind=message.images?.some(image=>chatImageSource(image))?'image':classifyResponse(message.content,agent);
     const nodeId=`chat-${message.id}-${Date.now().toString(36)}`;
     setNodes((current)=>{
       if(current.some((node)=>node.data.sourceMessageId===message.id))return current;
       const position=findFreePosition(current,view);
-      const node:CanvasFlowNode={id:nodeId,type:kind,position,selected:true,data:{...responseData(kind,message,agent),workspaceId:currentWorkspaceId}};
+      const node:CanvasFlowNode={id:nodeId,type:kind,position,selected:true,data:{...responseData(kind,message,agent),...link,workspaceId:currentWorkspaceId}};
       return [...current.map((item)=>({...item,selected:false})),node];
     });
     return {kind,label:kindLabels[kind],nodeId};
@@ -71,7 +91,7 @@ export function CanvasProvider({children}:PropsWithChildren) {
   const groupNodes=useCallback((nodeIds:string[])=>{const groupId=`group-${Date.now().toString(36)}`;setNodes((current)=>{const groupNumber=new Set(current.map((node)=>node.data.groupId).filter(Boolean)).size+1;return current.map((node)=>nodeIds.includes(node.id)?{...node,data:{...node.data,groupId,groupLabel:`Group ${String(groupNumber).padStart(2,'0')}`}}:node)});return groupId},[setNodes]);
   const selectNode=useCallback((workspaceId:string,nodeId:string)=>setWorkspaceCanvases((current)=>{const state=current[workspaceId];if(!state)return current;return {...current,[workspaceId]:{...state,nodes:state.nodes.map((node)=>({...node,selected:node.id===nodeId}))}}}),[setWorkspaceCanvases]);
 
-  const value=useMemo<CanvasContextValue>(()=>({nodes,allNodes,edges,setNodes,setEdges,onNodesChange,onEdgesChange,view,updateView,addNode,updateNodeData,addAgentResponse,hasMessageNode:(messageId)=>nodes.some((node)=>node.data.sourceMessageId===messageId),attachNodesToAgent,getAgentContext,removeNodeFromAgentContext,clearAgentContext,groupNodes,selectNode}),[addAgentResponse,addNode,allNodes,attachNodesToAgent,clearAgentContext,edges,getAgentContext,groupNodes,nodes,onEdgesChange,onNodesChange,removeNodeFromAgentContext,selectNode,updateNodeData,updateView,view]);
+  const value=useMemo<CanvasContextValue>(()=>({nodes,allNodes,edges,setNodes,setEdges,onNodesChange,onEdgesChange,view,updateView,addNode,updateNodeData,addAgentResponse,hasMessageNode:(messageId)=>nodes.some((node)=>node.data.sourceMessageId===messageId),attachNodesToAgent,getAgentContext,removeNodeFromAgentContext,clearAgentContext,groupNodes,selectNode,addCollaboration,focusRequest,clearFocusRequest,registerVisibleChats,hasVisibleChats}),[addAgentResponse,addNode,allNodes,attachNodesToAgent,clearAgentContext,edges,getAgentContext,groupNodes,nodes,onEdgesChange,onNodesChange,removeNodeFromAgentContext,selectNode,updateNodeData,updateView,view,addCollaboration,focusRequest,clearFocusRequest,registerVisibleChats,hasVisibleChats]);
   return <CanvasContext.Provider value={value}>{children}</CanvasContext.Provider>;
 }
 
@@ -98,6 +118,7 @@ function classifyResponse(content:string,agent:Agent):CanvasNodeKind {
 function responseData(kind:CanvasNodeKind,message:ChatMessageItem,agent:Agent):CanvasNodeData {
   const content=message.content.trim();
   const base={label:kindLabels[kind],meta:`${agent.name} · now`,agentId:agent.id,sourceMessageId:message.id};
+  if(kind==='image')return {...base,imageUrl:message.images?.map(chatImageSource).find(Boolean),caption:content};
   if(kind==='research')return {...base,source:agent.name,title:makeTitle(content),summary:content,url:findUrl(content)};
   if(kind==='contentIdea')return {...base,platform:findPlatform(content),title:makeTitle(content),description:content};
   if(kind==='hook')return {...base,hook:content};
@@ -135,13 +156,13 @@ function findFreePosition(nodes:CanvasFlowNode[],view:CanvasViewState):{x:number
   return available ?? {x:Math.max(20,base.x+nodes.length*24),y:Math.max(20,base.y+nodes.length*24)};
 }
 
-function getNodeContextLabel(node:CanvasFlowNode):string {
+export function getNodeContextLabel(node:CanvasFlowNode):string {
   const data=node.data;
   const label=data.title||data.caption||data.hook||data.text||data.summary||data.description||data.label;
   return label.length>34?`${label.slice(0,31).trim()}…`:label;
 }
 
-function getNodeContextContent(node:CanvasFlowNode):string {
+export function getNodeContextContent(node:CanvasFlowNode):string {
   const data=node.data;
   const fields=[data.title,data.text,data.summary,data.description,data.hook,data.preview,data.caption,data.url,data.browserUrl,data.command,data.terminalOutput].filter((value):value is string=>typeof value==='string'&&Boolean(value.trim()));
   return fields.join('\n\n').slice(0,12_000);

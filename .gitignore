@@ -21,3 +21,15 @@ mock-data.js
 DESIGN-HANDOFF.md
 DESIGN-MANIFEST.json
 /canvas-reference.svg
+
+# Local credentials, databases and signing keys
+.env
+.env.*
+!.env.example
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.db
+*.pem
+*.pfx
+*.p12

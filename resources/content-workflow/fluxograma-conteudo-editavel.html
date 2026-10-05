@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fluxo de conteúdo — Editor de Conteúdo + Editor de Vídeo</title>
+  <style>
+    :root {
+      --card-w: 176px;
+      --gap: 40px;
+      --ink: #182236;
+      --muted: #526079;
+      --line: #b8c4d7;
+      --you-bg: #fff2c8;
+      --you-line: #bd7d10;
+      --agent-bg: #e4f0ff;
+      --agent-line: #386cc6;
+      --video-bg: #e0f4ed;
+      --video-line: #297563;
+      --skill-bg: #eee8ff;
+      --skill-line: #7955bd;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: var(--ink); background: #f5f7fb; font: 15px/1.45 system-ui, -apple-system, Segoe UI, sans-serif; }
+    header { max-width: 1320px; margin: 0 auto; padding: 30px 24px 12px; }
+    h1 { margin: 0 0 8px; font-size: clamp(26px, 3vw, 38px); line-height: 1.1; }
+    header p { margin: 0 0 16px; max-width: 900px; color: var(--muted); }
+    .toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+    button { border: 0; background: #24365a; color: white; padding: 10px 15px; border-radius: 9px; font: inherit; font-weight: 650; cursor: pointer; }
+    button:hover { background: #162849; }
+    .hint { color: var(--muted); font-size: 13px; }
+    .legend { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; }
+    .legend span { display: inline-block; padding: 7px 11px; border-radius: 9px; font-weight: 650; font-size: 13px; border: 1px solid; }
+    .legend .you { background: var(--you-bg); border-color: var(--you-line); }
+    .legend .agent { background: var(--agent-bg); border-color: var(--agent-line); }
+    .legend .skill { background: var(--skill-bg); border-color: var(--skill-line); }
+    .diagram-scroll { overflow-x: auto; padding: 12px 24px 26px; }
+    .canvas { width: calc(6 * var(--card-w) + 5 * var(--gap)); margin: 0 auto; }
+    .row { display: grid; grid-template-columns: repeat(6, var(--card-w)); gap: var(--gap); }
+    .step { position: relative; min-height: 230px; padding: 14px 13px 12px; border: 2px solid; border-radius: 15px; box-shadow: 0 5px 13px rgba(25, 42, 76, .07); display: flex; flex-direction: column; gap: 8px; }
+    .step.you { background: var(--you-bg); border-color: var(--you-line); }
+    .step.agent { background: var(--agent-bg); border-color: var(--agent-line); }
+    .legend .video, .step.video, .route.video { background: var(--video-bg); border-color: var(--video-line); }
+    .handoff { max-width: 1320px; margin: 0 auto; padding: 0 24px 8px; color: var(--muted); }
+    .handoff strong { color: var(--ink); }
+    .step.split { background: #fff; border-color: var(--line); }
+    .step-number { color: #536078; font-size: 11px; font-weight: 800; letter-spacing: .09em; }
+    .step h2 { margin: 0; font-size: 17px; line-height: 1.18; }
+    .step p { margin: 0; font-size: 13px; color: #35425b; }
+    .skill-chip { display: block; margin-top: auto; border: 1px solid var(--skill-line); border-radius: 8px; background: var(--skill-bg); color: #3c2871; padding: 6px 7px; font-size: 11.5px; line-height: 1.25; font-weight: 700; }
+    .route { border-radius: 8px; border: 1px solid; padding: 7px; font-size: 12px; line-height: 1.3; }
+    .route.you { background: var(--you-bg); border-color: var(--you-line); }
+    .route.agent { background: var(--agent-bg); border-color: var(--agent-line); }
+    .route strong { display: block; margin-bottom: 2px; }
+    .row .step:not(:last-child)::after { position: absolute; width: 28px; right: -35px; top: 45%; text-align: center; font-size: 25px; line-height: 1; color: #62728f; font-weight: 800; }
+    .row.forward .step:not(:last-child)::after { content: "→"; }
+    .row.reverse .step:not(:last-child)::after { content: "←"; }
+    .turn { height: 58px; position: relative; }
+    .turn span { position: absolute; top: 8px; width: 28px; text-align: center; font-size: 30px; font-weight: 800; color: #62728f; }
+    .turn.right span { right: calc(var(--card-w) / 2 - 14px); }
+    .turn.left span { left: calc(var(--card-w) / 2 - 14px); }
+    .row-label { width: max-content; margin: 0 0 7px; color: #5b6880; font-size: 12px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
+    .callout { width: calc(6 * var(--card-w) + 5 * var(--gap)); margin: 23px auto 0; display: flex; gap: 12px; align-items: stretch; }
+    .callout > div { border-radius: 10px; padding: 11px 13px; font-size: 13px; flex: 1; border: 1px solid; }
+    .callout .agent { background: var(--agent-bg); border-color: var(--agent-line); }
+    .callout .you { background: var(--you-bg); border-color: var(--you-line); }
+    .callout .arrow { flex: 0 0 28px; align-self: center; border: 0; background: transparent; text-align: center; color: #62728f; font-size: 22px; padding: 0; }
+    footer { max-width: 1320px; margin: 0 auto; padding: 0 24px 35px; color: var(--muted); font-size: 13px; }
+    footer strong { color: var(--ink); }
+    [contenteditable]:hover { outline: 1px dashed #7b8aa4; outline-offset: 2px; }
+    [contenteditable]:focus { outline: 2px solid #24365a; outline-offset: 3px; border-radius: 2px; }
+    @media print {
+      @page { size: A3 landscape; margin: 8mm; }
+      body { background: white; }
+      header, footer { max-width: none; }
+      .toolbar { display: none; }
+      .diagram-scroll { overflow: visible; padding: 0; }
+      .canvas { transform: scale(.87); transform-origin: top left; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Fluxo de criação de conteúdo</h1>
+    <p>Leia seguindo as setas: <strong>esquerda → direita</strong>, desça à direita, <strong>direita → esquerda</strong>, desça à esquerda e siga <strong>esquerda → direita</strong>. Clique em qualquer título, descrição ou skill para alterar o texto.</p>
+    <div class="toolbar">
+      <button id="download" type="button">Baixar HTML com minhas alterações</button>
+      <span class="hint">O arquivo baixado mantém os textos que você editou.</span>
+    </div>
+    <div class="legend" aria-label="Legenda de cores">
+      <span class="you">Amarelo: você faz ou decide</span>
+      <span class="agent">Azul: Editor de Conteúdo</span>
+      <span class="video">Verde: Editor de Vídeo</span>
+      <span class="skill">Roxo: skill ou ferramenta necessária</span>
+    </div>
+  </header>
+
+  <aside class="handoff"><strong>Passagem entre especialistas:</strong> Editor de Conteúdo prepara o briefing e o roteiro aprovado → chama o Editor de Vídeo pelo MainsAgents → os dois chats aparecem lado a lado → o resultado retorna → você aprova → Editor de Conteúdo prepara derivados e pacote. Os brutos são referenciados por caminhos locais; edição real depende de executor disponível.</aside>
+
+  <main class="diagram-scroll">
+    <div class="canvas">
+      <div class="row-label">1. Ideia e planejamento · siga →</div>
+      <section class="row forward" aria-label="Ideia e planejamento">
+        <article class="step split">
+          <span class="step-number">01 · DUAS ENTRADAS</span>
+          <h2 data-edit="01-title" contenteditable="plaintext-only">Começar a pauta</h2>
+          <div class="route you" data-edit="01-route-a" contenteditable="plaintext-only"><strong>Você</strong> manda um link ou uma ideia, mesmo incompleta.</div>
+          <div class="route agent" data-edit="01-route-b" contenteditable="plaintext-only"><strong>Editor de Conteúdo</strong> propõe ideias quando você não tiver uma.</div>
+          <span class="skill-chip" data-edit="01-skill" contenteditable="plaintext-only">Skill: radar de ideias e fontes</span>
+        </article>
+        <article class="step agent">
+          <span class="step-number">02 · CONTEÚDO</span>
+          <h2 data-edit="02-title" contenteditable="plaintext-only">Pesquisar e triar</h2>
+          <p data-edit="02-body" contenteditable="plaintext-only">Editor de Conteúdo resume e verifica fontes, explica por que importa e propõe ângulos para o perfil.</p>
+          <span class="skill-chip" data-edit="02-skill" contenteditable="plaintext-only">Skill: pesquisa e avaliação de pautas</span>
+        </article>
+        <article class="step agent">
+          <span class="step-number">03 · CONTEÚDO</span>
+          <h2 data-edit="03-title" contenteditable="plaintext-only">Planejar a semana</h2>
+          <p data-edit="03-body" contenteditable="plaintext-only">Editor de Conteúdo propõe 5–7 ideias adaptadas e evolução para 1–2 vídeos longos, com reserva para urgências e capacidade real.</p>
+          <span class="skill-chip" data-edit="03-skill" contenteditable="plaintext-only">Skill: calendário editorial flexível</span>
+        </article>
+        <article class="step you">
+          <span class="step-number">04 · VOCÊ</span>
+          <h2 data-edit="04-title" contenteditable="plaintext-only">Escolher pautas</h2>
+          <p data-edit="04-body" contenteditable="plaintext-only">Você decide o que vai gravar, o que fica para depois e o que deve sair do plano.</p>
+        </article>
+        <article class="step agent">
+          <span class="step-number">05 · CONTEÚDO</span>
+          <h2 data-edit="05-title" contenteditable="plaintext-only">Criar opções</h2>
+          <p data-edit="05-body" contenteditable="plaintext-only">Editor de Conteúdo prepara hooks, conduções, CTAs e capa. Um card por vídeo quando houver ferramenta real para registrar.</p>
+          <span class="skill-chip" data-edit="05-skill" contenteditable="plaintext-only">Skill: roteiro com opções</span>
+        </article>
+        <article class="step you">
+          <span class="step-number">06 · VOCÊ</span>
+          <h2 data-edit="06-title" contenteditable="plaintext-only">Aprovar roteiro</h2>
+          <p data-edit="06-body" contenteditable="plaintext-only">Você escolhe as opções, ajusta sua linguagem e libera o roteiro final para produção.</p>
+        </article>
+      </section>
+
+      <div class="turn right" aria-label="Descer à direita"><span>↓</span></div>
+      <div class="row-label">2. Produção · siga ←</div>
+      <section class="row reverse" aria-label="Produção">
+        <article class="step agent">
+          <span class="step-number">12 · CONTEÚDO + VÍDEO</span>
+          <h2 data-edit="12-title" contenteditable="plaintext-only">Criar derivados</h2>
+          <p data-edit="12-body" contenteditable="plaintext-only">Conteúdo define adaptações, carrosséis e stories. Vídeo executa os cortes, legendas e exportações solicitados.</p>
+          <span class="skill-chip" data-edit="12-skill" contenteditable="plaintext-only">Conteúdo: adaptação/carrosséis · Vídeo: edição/exportação</span>
+        </article>
+        <article class="step you">
+          <span class="step-number">11 · VOCÊ</span>
+          <h2 data-edit="11-title" contenteditable="plaintext-only">Polir no CapCut</h2>
+          <p data-edit="11-body" contenteditable="plaintext-only">Se quiser, você acrescenta o acabamento visual. O corte base já deve funcionar sozinho.</p>
+        </article>
+        <article class="step you">
+          <span class="step-number">10 · VOCÊ</span>
+          <h2 data-edit="10-title" contenteditable="plaintext-only">Aprovar vídeo base</h2>
+          <p data-edit="10-body" contenteditable="plaintext-only">Você revisa a versão do vídeo. Ajustes voltam ao Editor de Vídeo; aprovação retorna ao Editor de Conteúdo.</p>
+        </article>
+        <article class="step video">
+          <span class="step-number">09 · EDITOR DE VÍDEO</span>
+          <h2 data-edit="09-title" contenteditable="plaintext-only">Fazer corte base</h2>
+          <p data-edit="09-body" contenteditable="plaintext-only">Editor de Vídeo confere o briefing e prepara transcrição e cortes de erros/silêncios. Sem executor, entrega plano de edição.</p>
+          <span class="skill-chip" data-edit="09-skill" contenteditable="plaintext-only">Skills: mainsagent-edicao-video + mainsagent-corte-base</span>
+        </article>
+        <article class="step you">
+          <span class="step-number">08 · VOCÊ + CONTEÚDO</span>
+          <h2 data-edit="08-title" contenteditable="plaintext-only">Transferir e encaminhar</h2>
+          <p data-edit="08-body" contenteditable="plaintext-only">Você transfere os brutos ao PC. Conteúdo prepara o briefing vN com roteiro aprovado, caminhos e formatos para o Editor de Vídeo.</p>
+        </article>
+        <article class="step split">
+          <span class="step-number">07 · DUAS ROTAS</span>
+          <h2 data-edit="07-title" contenteditable="plaintext-only">Produzir vídeo</h2>
+          <div class="route you" data-edit="07-route-a" contenteditable="plaintext-only"><strong>Você</strong> grava no iPhone e marca erros com uma palavra.</div>
+          <div class="route agent" data-edit="07-route-b" contenteditable="plaintext-only"><strong>Rota IA</strong> Conteúdo define conceito e direção; Vídeo recebe o briefing técnico. Geração depende de ferramenta e autorização.</div>
+          <span class="skill-chip" data-edit="07-skill" contenteditable="plaintext-only">Skill: vídeo criativo com IA</span>
+        </article>
+      </section>
+
+      <div class="turn left" aria-label="Descer à esquerda"><span>↓</span></div>
+      <div class="row-label">3. Publicação e aprendizado · siga →</div>
+      <section class="row forward" aria-label="Publicação e aprendizado">
+        <article class="step agent">
+          <span class="step-number">13 · CONTEÚDO</span>
+          <h2 data-edit="13-title" contenteditable="plaintext-only">Montar pacote final</h2>
+          <p data-edit="13-body" contenteditable="plaintext-only">Conteúdo prepara capa, título, legenda, CTA, descrição e links; Vídeo devolve os arquivos por rede, quando possível.</p>
+          <span class="skill-chip" data-edit="13-skill" contenteditable="plaintext-only">Skill: pacote de publicação</span>
+        </article>
+        <article class="step you">
+          <span class="step-number">14 · VOCÊ</span>
+          <h2 data-edit="14-title" contenteditable="plaintext-only">Conferir pacote</h2>
+          <p data-edit="14-body" contenteditable="plaintext-only">Você vê o conteúdo, a capa e a adaptação para cada rede antes de liberar.</p>
+        </article>
+        <article class="step you">
+          <span class="step-number">15 · VOCÊ</span>
+          <h2 data-edit="15-title" contenteditable="plaintext-only">Aprovar no app</h2>
+          <p data-edit="15-body" contenteditable="plaintext-only">Você aprova a versão final no MainsAgents. Essa decisão libera o agendamento.</p>
+          <span class="skill-chip" data-edit="15-skill" contenteditable="plaintext-only">Feature: fila de aprovação real</span>
+        </article>
+        <article class="step agent">
+          <span class="step-number">16 · CONTEÚDO</span>
+          <h2 data-edit="16-title" contenteditable="plaintext-only">Agendar</h2>
+          <p data-edit="16-body" contenteditable="plaintext-only">Conteúdo agenda somente com versão aprovada, fila e conector reais. Sem integração, prepara agendamento manual.</p>
+          <span class="skill-chip" data-edit="16-skill" contenteditable="plaintext-only">Skill: agendar após aprovação</span>
+        </article>
+        <article class="step agent">
+          <span class="step-number">17 · CONTEÚDO</span>
+          <h2 data-edit="17-title" contenteditable="plaintext-only">Reunir métricas</h2>
+          <p data-edit="17-body" contenteditable="plaintext-only">Editor de Conteúdo reúne dados reais das publicações: views, engajamento e retenção, com data e fonte.</p>
+          <span class="skill-chip" data-edit="17-skill" contenteditable="plaintext-only">Skill: coletar métricas</span>
+        </article>
+        <article class="step agent">
+          <span class="step-number">18 · CONTEÚDO</span>
+          <h2 data-edit="18-title" contenteditable="plaintext-only">Propor melhorias</h2>
+          <p data-edit="18-body" contenteditable="plaintext-only">Editor de Conteúdo compara resultados e propõe melhorias. Você decide quais preferências atualizar.</p>
+          <span class="skill-chip" data-edit="18-skill" contenteditable="plaintext-only">Skill: aprendizado editorial</span>
+        </article>
+      </section>
+
+      <div class="callout" aria-label="Caminho para notícia urgente">
+        <div class="agent" data-edit="urgent-a" contenteditable="plaintext-only"><strong>Notícia urgente:</strong> Editor de Conteúdo verifica o assunto e propõe qual pauta deslocar.</div>
+        <div class="arrow">→</div>
+        <div class="you" data-edit="urgent-u" contenteditable="plaintext-only"><strong>Você</strong> decide se a notícia entra e qual pauta será deslocada. Depois seguimos da etapa 05.</div>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <p><strong>Como editar:</strong> clique nos textos dos cartões e das skills. O botão no topo baixa uma nova cópia HTML com as suas alterações. Também é possível abrir este arquivo em um editor de código e mudar o texto diretamente.</p>
+    <p><strong>Estado do projeto:</strong> skills e briefings orientam os dois especialistas; não disponibilizam executores. Edição técnica, envio automático entre agentes, publicação e métricas dependem das ferramentas reais. Pauta, roteiro, vídeo base e pacote final têm aprovações separadas.</p>
+    <p><a href="guia-do-fluxo.md">Ver como usar os dois agentes</a> · <a href="briefing-edicao.md">Modelo de briefing de edição</a></p>
+  </footer>
+
+  <script>
+    const storagePrefix = "fluxograma-conteudo-v3-dois-agentes:";
+    document.querySelectorAll("[data-edit]").forEach((element) => {
+      try {
+        const saved = localStorage.getItem(storagePrefix + element.dataset.edit);
+        if (saved !== null) element.innerText = saved;
+      } catch (_) {}
+      element.addEventListener("input", () => {
+        try { localStorage.setItem(storagePrefix + element.dataset.edit, element.innerText); } catch (_) {}
+      });
+    });
+    document.getElementById("download").addEventListener("click", () => {
+      const source = "<!doctype html>\n" + document.documentElement.outerHTML;
+      const url = URL.createObjectURL(new Blob([source], { type: "text/html;charset=utf-8" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "fluxograma-conteudo-editado.html";
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    });
+  </script>
+</body>
+</html>

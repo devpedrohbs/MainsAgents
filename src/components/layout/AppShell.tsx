@@ -5,6 +5,8 @@ import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { RightPanel } from './RightPanel';
 import { useLanguage } from '../../app/LanguageProvider';
+import { useChat } from '../../features/chat/ChatProvider';
+import { AgentCollaboration } from '../chat/AgentCollaboration';
 
 interface AppShellProps extends PropsWithChildren {
   page: PageId;
@@ -42,6 +44,7 @@ export function AppShell({
   children,
 }: AppShellProps) {
   const { locale } = useLanguage();
+  const { collaborationId } = useChat();
   const [navOpen, setNavOpen] = useState(false);
   const shellRef = useRef<HTMLDivElement>(null);
   const showPanel = panelOpen && Boolean(activeAgent);
@@ -145,7 +148,7 @@ export function AppShell({
           {children}
         </div>
       </main>
-      {showPanel && activeAgent && (
+      {showPanel && activeAgent && !collaborationId && (
         <div className={'chat-layer ' + (floating ? 'floating' : '')} inert={navOpen}>
           {floating && (
             <button
@@ -167,6 +170,7 @@ export function AppShell({
           />
         </div>
       )}
+      {collaborationId&&<AgentCollaboration onCreateCanvas={()=>{if(showPanel)onTogglePanel();onNavigate('canvas');}} onNavigate={onNavigate} onEditAgent={onEditAgent} onProviderSettings={onProviderSettings} onToast={onToast}/>}
     </div>
   );
 }

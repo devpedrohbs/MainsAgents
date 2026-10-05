@@ -1,0 +1,60 @@
+name: Validate Windows desktop
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Install FFmpeg for synthetic media tests
+        run: choco install ffmpeg --yes --no-progress
+      - name: Validate TypeScript
+        run: npm run typecheck
+      - name: Run isolated tests
+        run: npm test
+      - name: Build desktop installer
+        run: npm run desktop:dist
+      - name: Install packaged application on clean runner
+        shell: pwsh
+        run: |
+          $version = (Get-Content 'package.json' | ConvertFrom-Json).version
+          $installer = Join-Path $PWD "release\MainsAgents-Setup-$version.exe"
+          $installDirectory = Join-Path $env:RUNNER_TEMP 'mainsagents-clean'
+          $result = Start-Process -FilePath $installer -ArgumentList '/S', "/D=$installDirectory" -WindowStyle Hidden -PassThru -Wait
+          if ($result.ExitCode -ne 0) { throw "Installer exited $($result.ExitCode)" }
+          $asar = Join-Path $installDirectory 'resources\app.asar'
+          if (!(Test-Path -LiteralPath $asar)) { throw 'Installed app.asar missing' }
+          $expected = (Get-Content "release/MainsAgents-$version-verification.json" | ConvertFrom-Json).appAsarSha256
+          if ((Get-FileHash -LiteralPath $asar -Algorithm SHA256).Hash.ToLowerInvariant() -ne $expected) { throw 'Installed app.asar differs from the verified build' }
+          "MAINSAGENTS_TEST_ASAR=$asar" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Validate review and calendar interface
+        run: npx electron scripts/test-publications-ui.mjs
+      - name: Validate real media export interface
+        run: npx electron scripts/test-editorial-media-ui.mjs
+      - name: Validate unread chats, real files and durable manual handoff
+        run: npx electron scripts/test-completion-ui.mjs --disable-gpu
+      - name: Validate upgrade data preservation
+        run: npx electron scripts/test-desktop-persistence-ui.mjs --disable-gpu
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MainsAgents-Windows
+          path: |
+            release/MainsAgents-Setup-*.exe
+            release/MainsAgents-Setup-*.exe.sha256
+            release/MainsAgents-*-verification.json
+          if-no-files-found: error

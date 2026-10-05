@@ -13,8 +13,15 @@ import type {
 } from '../features/content/model';
 import { SelectMenu } from '../components/common/SelectMenu';
 import { Icon } from '../components/common/Icon';
+import {useCanvas} from '../components/canvas/CanvasProvider';
+import {ContentAssetLibrary} from '../components/content/ContentAssetLibrary';
+import {EditorialWorkPanel} from '../components/content/EditorialWorkPanel';
+import {ContentPublications,PublicationCalendar} from '../components/content/ContentPublications';
+import {ContentMediaEditor} from '../components/content/ContentMediaEditor';
+import {ScriptDeliveryReview} from '../components/chat/ChatDeliveryCard';
+import type {EditorialArtifact} from '../features/content/model';
 
-const platforms: Platform[] = ['Instagram', 'TikTok', 'YouTube'];
+const platforms: Platform[] = ['Instagram', 'TikTok', 'YouTube', 'LinkedIn'];
 const topicStatus: Record<EditorialTopic['status'], [string, string]> = {
   draft: ['Aguardando pesquisa', 'Research needed'],
   researching: ['Pesquisando', 'Researching'],
@@ -28,21 +35,28 @@ const contentStatus: Record<EditorialContent['status'], [string, string]> = {
   generating: ['Gerando roteiro', 'Generating script'],
   'script-review': ['Roteiro para revisão', 'Review script'],
   'script-approved': ['Roteiro aprovado', 'Script approved'],
+  'script-rejected': ['Roteiro rejeitado', 'Script rejected'],
   error: ['Falha no roteiro', 'Script failed'],
 };
 
 export function ContentStudio({
   selectedContentId,
+  selectedTopicId: requestedTopicId,
   onOpenSession,
   onCreateAgent,
 }: {
   selectedContentId?: string | null;
+  selectedTopicId?: string | null;
   onOpenSession: (agentId: string, sessionId: string) => void;
   onCreateAgent: () => void;
 }) {
   const { currentWorkspaceId, currentWorkspace } = useWorkspaces();
   const { locale } = useLanguage();
   const pt = locale === 'pt-BR';
+  const [view,setView]=useState<'studio'|'calendar'>('studio');
+  const [reviewArtifact,setReviewArtifact]=useState<EditorialArtifact|null>(null);
+  useEffect(()=>{const open=()=>setView('calendar');window.addEventListener('mainsagents:publication-calendar',open);return()=>window.removeEventListener('mainsagents:publication-calendar',open)},[]);
+  useEffect(()=>{if(selectedContentId||requestedTopicId)setView('studio')},[selectedContentId,requestedTopicId]);
   const { agents: allAgents } = useAgents();
   const {
     state,
@@ -54,7 +68,9 @@ export function ContentStudio({
     decideTopic,
     runScript,
     approveScript,
+    jobs,getNotionConnection,configureNotion,retryJob,setProductionStage,
   } = useContentWorkflow();
+  const {allNodes,addNode,updateNodeData}=useCanvas();
   const agents = allAgents.filter((agent) => agent.workspaceId === currentWorkspaceId);
   const researchAgents = agents.filter((agent) => agent.tools.includes('web-search'));
   const [inputKind, setInputKind] = useState<'text' | 'url' | 'ideas'>('text');
@@ -63,7 +79,7 @@ export function ContentStudio({
   const [priority, setPriority] = useState<'normal' | 'urgent'>('normal');
   const [researchAgentId, setResearchAgentId] = useState('');
   const [scriptAgentId, setScriptAgentId] = useState('');
-  const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
+  const [selectedTopicId, setSelectedTopicId] = useState<string | null>(requestedTopicId ?? null);
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [format, setFormat] = useState<ContentFormat>('short-video');
@@ -81,6 +97,14 @@ export function ContentStudio({
   const [scriptText, setScriptText] = useState('');
   const [thumbnail, setThumbnail] = useState('');
   const [improv, setImprov] = useState('');
+  const [notionId,setNotionId]=useState('');
+  const [syncNotion,setSyncNotion]=useState(false);
+  const [connectionReady,setConnectionReady]=useState(false);
+  useEffect(()=>{
+    let active=true;setConnectionReady(false);
+    void getNotionConnection(currentWorkspaceId).then(config=>{if(active){setNotionId(config.dataSourceId||config.suggestedDataSourceId||'');setSyncNotion(config.autoSync);setConnectionReady(true)}}).catch(error=>{if(active)setFeedback(error.message)});
+    return()=>{active=false};
+  },[currentWorkspaceId,getNotionConnection]);
   const topics = useMemo(
     () =>
       state.topics
@@ -132,18 +156,18 @@ export function ContentStudio({
   }, [topic?.id, topic?.researchArtifactId]);
   useEffect(() => {
     if (!options) return;
-    setHook(options.hooks[0] ?? '');
-    setCta(options.ctas[0] ?? '');
-    setPathTitle(options.paths[0]?.title ?? '');
-    setPathOutline(options.paths[0]?.outline ?? '');
-    setScriptText(options.draftScript);
-    setThumbnail(options.thumbnailDirection);
-    setImprov(options.improvisationTopics.join('\n'));
-  }, [optionsArtifact?.id]);
+    setHook(approvedScript?.hook??options.hooks[0] ?? '');
+    setCta(approvedScript?.cta??options.ctas[0] ?? '');
+    setPathTitle(approvedScript?.path.title??options.paths[0]?.title ?? '');
+    setPathOutline(approvedScript?.path.outline??options.paths[0]?.outline ?? '');
+    setScriptText(approvedScript?.text??options.draftScript);
+    setThumbnail(approvedScript?.thumbnailDirection??options.thumbnailDirection);
+    setImprov((approvedScript?.improvisationTopics??options.improvisationTopics).join('\n'));
+  }, [optionsArtifact?.id,approvedArtifact?.id]);
 
   useEffect(() => {
-    if (linkedContent) setSelectedTopicId(linkedContent.topicId);
-  }, [linkedContent?.id]);
+    setSelectedTopicId(linkedContent?.topicId ?? requestedTopicId ?? null);
+  }, [linkedContent?.id, requestedTopicId]);
   const step = content?.status === 'script-approved' ? 3 : content ? 2 : topic?.researchArtifactId ? 1 : 0;
   const steps = pt
     ? ['Pesquisar pauta', 'Decidir pauta', 'Revisar roteiro', 'Roteiro aprovado']
@@ -218,11 +242,13 @@ export function ContentStudio({
       thumbnailDirection: thumbnail,
     };
     void action(async () => {
-      await approveScript(content.id, script, decisionNotes);
+      await configureNotion(currentWorkspaceId,{dataSourceId:notionId.trim().replace(/^collection:\/\//,''),autoSync:syncNotion});
+      const destination=notionId.trim().replace(/^collection:\/\//,'').replaceAll('-','').toLowerCase().replace(/^(\w{8})(\w{4})(\w{4})(\w{4})(\w{12})$/,'$1-$2-$3-$4-$5');
+      await approveScript(content.id, script, decisionNotes,syncNotion,optionsArtifact?{artifact:optionsArtifact,destination}:undefined);
       setFeedback(
         pt
-          ? 'Esta versão do roteiro foi aprovada e guardada.'
-          : 'This script version was approved and saved.',
+          ? syncNotion?'Roteiro aprovado. A criação do card está na fila; acompanhe a confirmação abaixo.':'Esta versão do roteiro foi aprovada e guardada.'
+          : syncNotion?'Script approved. The Notion card is queued; follow its confirmation below.':'This script version was approved and saved.',
       );
     });
   };
@@ -250,6 +276,8 @@ export function ContentStudio({
           {feedback}
         </p>
       )}
+      <div className="editorial-segment content-studio-tabs" aria-label={pt?'Visão do Estúdio':'Studio view'}><button type="button" aria-pressed={view==='studio'} onClick={()=>setView('studio')}>{pt?'Produção':'Production'}</button><button type="button" aria-pressed={view==='calendar'} onClick={()=>setView('calendar')}>{pt?'Calendário':'Calendar'}</button></div>
+      {view==='calendar'?<PublicationCalendar key={currentWorkspaceId} workspaceId={currentWorkspaceId}/>:<>
       <ol className="editorial-progress" aria-label={pt ? 'Etapas de produção' : 'Production stages'}>
         {steps.map((label, index) => (
           <li
@@ -625,6 +653,9 @@ export function ContentStudio({
                   </>
                 )}
               </section>
+              {content && <ContentAssetLibrary key={content.id} content={content}/>}
+              {content && <ContentMediaEditor key={`media-${content.id}`} content={content}/>}
+              {content && <ContentPublications key={`publications-${content.id}`} content={content}/>}
               {content && (
                 <section className="editorial-card">
                   <div className="editorial-section-head">
@@ -678,9 +709,10 @@ export function ContentStudio({
                   </div>
                   {options && (
                     <div className="editorial-review">
+                      {optionsArtifact&&<button className="soft-button" type="button" disabled={busy||content.status==='generating'} onClick={()=>setReviewArtifact(structuredClone(optionsArtifact))}>{pt?'Pedir ajuste ou rejeitar':'Request changes or reject'}</button>}
                       <h3>{pt ? 'Compare e escolha' : 'Compare and choose'}</h3>
                       <p className="editorial-hint">
-                        {pt
+                        {syncNotion?(pt?'Aprovar e criar card no Notion':'Approve and create Notion card'):pt
                           ? 'Escolha uma opção em cada grupo e ajuste o texto antes da aprovação.'
                           : 'Choose an option in each group and edit the text before approval.'}
                       </p>
@@ -786,14 +818,21 @@ export function ContentStudio({
                           onChange={(event) => setDecisionNotes(event.target.value)}
                         />
                       </label>
+                      <div className="editorial-notion-settings">
+                        <h3>{pt?'Destino no Notion':'Notion destination'}</h3>
+                        <label htmlFor="editorial-notion-source">{pt?'ID da base (data source)':'Data source ID'}</label>
+                        <input id="editorial-notion-source" value={notionId} disabled={busy||!connectionReady} placeholder="collection://…" onChange={event=>setNotionId(event.target.value)} />
+                        <label className="editorial-notion-toggle"><input type="checkbox" checked={syncNotion} disabled={busy||!connectionReady||!notionId.trim()} onChange={event=>setSyncNotion(event.target.checked)}/><span>{pt?'Ao aprovar, criar/atualizar o card desta versão':'On approval, create/update the card for this version'}</span></label>
+                        <small>{pt?'Usa sua conexão Notion MCP do Codex. Não agenda nem publica conteúdo.':'Uses your Codex Notion MCP connection. Does not schedule or publish content.'}</small>
+                      </div>
                       <button
                         className="primary-button"
-                        disabled={busy || content.status === 'generating' || scriptText.trim().length < 80}
+                        disabled={busy || !connectionReady || content.status === 'generating' || scriptText.trim().length < 80}
                         onClick={approveCurrentScript}
                       >
                         {pt
-                          ? `Aprovar versão ${versions.length + 1}`
-                          : `Approve version ${versions.length + 1}`}
+                          ? syncNotion?'Aprovar roteiro e enviar ao Notion':'Aprovar roteiro'
+                          : syncNotion?'Approve script and send to Notion':'Approve script'}
                       </button>
                     </div>
                   )}
@@ -808,8 +847,30 @@ export function ContentStudio({
                       <small>
                         {pt ? 'Hook' : 'Hook'}: {approvedScript.hook} · CTA: {approvedScript.cta}
                       </small>
+                      <div className="editorial-actions">
+                        <SelectMenu ariaLabel={pt?'Etapa de produção':'Production stage'} value={content.productionStage??'ready-to-record'} options={[
+                          {value:'planning',label:pt?'Planejamento':'Planning'},
+                          {value:'ready-to-record',label:pt?'Pronto para gravar':'Ready to record'},
+                          {value:'recording',label:pt?'Gravando':'Recording'},
+                          {value:'editing',label:pt?'Em edição':'Editing'},
+                          {value:'video-review',label:pt?'Revisar vídeo':'Video review'},
+                          {value:'ready',label:pt?'Pronto':'Ready'},
+                          {value:'archived',label:pt?'Arquivado':'Archived'},
+                        ]} onChange={value=>void action(()=>setProductionStage(content.id,value as NonNullable<EditorialContent['productionStage']>))}/>
+                        <button className="soft-button" type="button" disabled={busy} onClick={()=>{
+                          const existing=allNodes.find(item=>item.workspaceId===currentWorkspaceId&&item.node.data.artifactId===approvedArtifact?.id);
+                          if(!existing){const nodeId=addNode('script');updateNodeData(currentWorkspaceId,nodeId,{contentId:content.id,artifactId:approvedArtifact?.id,title:content.title,preview:approvedScript.text,wordCount:approvedScript.text.trim().split(/\s+/).length,meta:`v${approvedArtifact?.version}`});}
+                          window.location.hash='canvas';
+                        }}><Icon name="canvas"/>{pt?'Abrir roteiro no Canvas':'Open script on Canvas'}</button>
+                      </div>
                     </div>
                   )}
+                  {jobs.filter(job=>job.contentId===content.id).map(job=><div className="editorial-notion-job" key={job.id} role="status">
+                    <strong>{job.status==='succeeded'?(pt?'Card confirmado no Notion':'Notion card confirmed'):job.status==='failed'?(pt?'Precisa de atenção':'Needs attention'):job.status==='running'?(pt?'Preparando e verificando o card…':'Preparing and verifying the card…'):job.status==='canceled'?(pt?'Cancelado':'Canceled'):(pt?'Aguardando execução':'Queued')}</strong>
+                    {job.result&&<><small>{pt?'Versão':'Version'} {job.result.artifactVersion} · {new Date(job.result.verifiedAt).toLocaleString(locale)}</small><a className="text-link" href={job.result.url} target="_blank" rel="noreferrer">{pt?'Abrir card no Notion':'Open Notion card'}</a></>}
+                    {job.error&&<p>{job.error}</p>}
+                    {job.status==='failed'&&<button className="soft-button" disabled={busy||!connectionReady||!syncNotion} onClick={()=>void action(async()=>{await configureNotion(currentWorkspaceId,{dataSourceId:notionId.trim().replace(/^collection:\/\//,''),autoSync:syncNotion});await retryJob(job.id)})}>{pt?'Verificar e tentar novamente':'Verify and retry'}</button>}
+                  </div>)}
                   {versions.length > 0 && (
                     <div className="editorial-history">
                       <h3>{pt ? 'Versões guardadas' : 'Saved versions'}</h3>
@@ -832,6 +893,7 @@ export function ContentStudio({
                   )}
                 </section>
               )}
+              <EditorialWorkPanel key={topic.id} topicId={topic.id} content={content}/>
               {(runs.length > 0 || topicApprovals.length > 0) && (
                 <section className="editorial-card editorial-history">
                   <h2>{pt ? 'Sessões e decisões' : 'Sessions and decisions'}</h2>
@@ -842,13 +904,13 @@ export function ContentStudio({
                           ? pt
                             ? 'Pesquisa'
                             : 'Research'
-                          : pt
+                          : run.stage==='handoff' ? (pt?'Transferência':'Handoff') : pt
                             ? 'Roteiro'
                             : 'Script'}{' '}
                         · {run.providerId}
                         {run.modelId ? ` / ${run.modelId}` : ''} · {run.state}
                       </span>
-                      {run.sessionId && (
+                      {run.sessionId && !run.jobId && (
                         <button
                           className="text-link"
                           onClick={() => {
@@ -868,7 +930,7 @@ export function ContentStudio({
                           ? pt
                             ? 'Aprovado'
                             : 'Approved'
-                          : pt
+                          : approval.decision==='revision-requested'?(pt?'Ajuste solicitado':'Changes requested'):pt
                             ? 'Descartado'
                             : 'Rejected'}{' '}
                         · {pt ? 'artefato' : 'artifact'} v{approval.artifactVersion} ·{' '}
@@ -883,6 +945,8 @@ export function ContentStudio({
           )}
         </main>
       </div>
+      </>}
+      {reviewArtifact&&<ScriptDeliveryReview artifact={reviewArtifact} initialDecision="revision-requested" onClose={()=>setReviewArtifact(null)}/>}
     </div>
   );
 }

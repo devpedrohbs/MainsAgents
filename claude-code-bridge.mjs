@@ -1,7 +1,7 @@
 import { execFileSync, spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, statSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { extname, join, resolve } from 'node:path';
 
@@ -86,7 +86,7 @@ function toolAllowList(config) {
   const tools = new Set();
   if (config.tools?.includes('web-search')) { tools.add('WebSearch'); tools.add('WebFetch'); }
   if (config.tools?.includes('files')) { tools.add('Read'); tools.add('Glob'); tools.add('Grep'); }
-  if ((config.skills?.length ?? 0) > 0) tools.add('Skill');
+  // Associated skill instructions are provided as bounded text/file context, not executable CLI plugins.
   return [...tools];
 }
 
@@ -157,7 +157,13 @@ export function createClaudeCodeBridge({
     const resolved = resolveCli();
     if (!resolved) throw new Error('Claude Code CLI is not installed. Install it and restart MainsAgents.');
     const config = { ...record.config, ...input };
-    const args = ['--print', '--output-format', 'stream-json', '--verbose', '--include-partial-messages', '--input-format', 'text', '--permission-mode', 'dontAsk', '--bare'];
+    const directory=workspaceFor(config.workspaceId);
+    // Keep subscription authentication; --bare can bypass CLI OAuth credentials.
+    let settings={};try{settings=JSON.parse(readFileSync(join(homedir(),'.claude','settings.json'),'utf8'));}catch{}
+    const settingsPath=join(directory,'mainsagents-runtime-settings.json'),mcpPath=join(directory,'mainsagents-runtime-mcp.json');
+    writeFileSync(settingsPath,JSON.stringify({disableAllHooks:true,enabledPlugins:Object.fromEntries(Object.keys(settings.enabledPlugins??{}).map(name=>[name,false]))}));
+    writeFileSync(mcpPath,JSON.stringify({mcpServers:{}}));
+    const args = ['--print', '--output-format', 'stream-json', '--verbose', '--include-partial-messages', '--input-format', 'text', '--permission-mode', 'dontAsk', '--settings',settingsPath,'--setting-sources','user','--strict-mcp-config','--mcp-config',mcpPath,'--disable-slash-commands'];
     const tools = toolAllowList(config);
     args.push('--tools', tools.join(','));
     if (tools.length) args.push('--allowedTools', ...tools);
@@ -170,7 +176,7 @@ export function createClaudeCodeBridge({
     const skillsDirectory = typeof config.skillsDirectory === 'string' && config.skillsDirectory.trim() ? resolve(config.skillsDirectory.trim()) : '';
     if ((config.skills?.length ?? 0) > 0 && skillsDirectory && existsSync(skillsDirectory) && statSync(skillsDirectory).isDirectory()) args.push('--add-dir', skillsDirectory);
     const effort = ['low', 'medium', 'high', 'xhigh'].includes(input.reasoningEffort) ? input.reasoningEffort : undefined;
-    const child = spawnImpl(resolved, args, { cwd: workspaceFor(config.workspaceId), stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, ...(effort ? { CLAUDE_CODE_EFFORT_LEVEL: effort } : {}) } });
+    const child = spawnImpl(resolved, args, { cwd: directory, stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, ...(effort ? { CLAUDE_CODE_EFFORT_LEVEL: effort } : {}) } });
     record.child = child;
     record.stderr = '';
     let lineBuffer = '';
@@ -215,6 +221,7 @@ export function createClaudeCodeBridge({
         for (const block of message.message.content) if (block?.type === 'text' && typeof block.text === 'string') accumulated += block.text;
       }
       if (message.type === 'result') {
+        record.resultReceived=true;
         finishTools();
         if (message.is_error) record.resultError = true;
         if (!streamedText && typeof message.result === 'string') accumulated = message.result;
@@ -239,7 +246,7 @@ export function createClaudeCodeBridge({
       finishTools();
       record.child = undefined;
       if (record.cancelled) publish(record, { type: 'execution.cancelled', executionId: record.id });
-      else if (code === 0 && !record.resultError) {
+      else if (code === 0 && !record.resultError && record.resultReceived) {
         if (accumulated) publish(record, { type: 'message.completed', executionId: record.id, content: accumulated });
         publish(record, { type: 'execution.completed', executionId: record.id });
       } else {
@@ -307,7 +314,19 @@ export function createClaudeCodeBridge({
       return json(response, 500, { error: error instanceof Error ? error.message : 'Claude Code CLI request failed.' });
     }
   }
-  return { handle, status };
+  const runtime={
+    providerId:'claude',
+    connect:async(session)=>session.remoteSessionId??randomUUID(),
+    readThread:async()=>{throw new Error('Claude CLI reconciliation is unavailable. Review the saved result before explicitly confirming another send.');},
+    send:async(remoteSessionId,content,agent)=>{
+      if(activeSessions.has(remoteSessionId))throw new Error('This Claude session is already responding.');
+      const executionId=randomUUID(),firstMessage=agent.runtimeFirstMessage===true,record={id:executionId,remoteSessionId,config:agent,events:[],listeners:new Set(),done:false,firstMessage};executions.set(executionId,record);activeSessions.set(remoteSessionId,executionId);
+      try{send(record,{...agent,remoteSessionId,content,firstMessage,agentName:agent.name});}catch(error){activeSessions.delete(remoteSessionId);executions.delete(executionId);throw error;}return {executionId};
+    },
+    events:async function*(id,signal){const record=executions.get(id);if(!record)throw new Error('Claude execution unavailable.');let index=0;while(true){while(index<record.events.length)yield record.events[index++];if(record.done)return;if(signal?.aborted)throw new Error('Execution cancelled.');await new Promise(resolve=>{let timer;const wake=()=>{clearTimeout(timer);record.listeners.delete(wake);signal?.removeEventListener('abort',wake);resolve();};record.listeners.add(wake);signal?.addEventListener('abort',wake,{once:true});timer=setTimeout(wake,1000);});}},
+    cancel:async(_threadId,id)=>{const record=executions.get(id);if(record){record.cancelled=true;record.child?.kill();}},
+  };
+  return { handle, status, runtime,diagnostics:async()=>({...(await status()),models:modelOptions,modelsVerified:false,mcp:'disabled',externalWrites:'blocked',hooks:'disabled',modelCheck:'provider-aliases'}) };
 }
 
 export function startClaudeCodeBridge({ port = 0, ...options } = {}) {

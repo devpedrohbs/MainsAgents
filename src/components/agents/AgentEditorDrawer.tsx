@@ -157,7 +157,7 @@ export function AgentEditorDrawer({ agent, initialValues, onClose, onSave, onDel
 
             <section className="drawer-section">
               <div className="drawer-section-title"><b>{t('Tools')}</b><span>{t('Choose what this agent can access in the prototype.')}</span></div>
-              {providerId!=='gemini'?<div className="tool-grid">{tools.filter((tool)=>providerId!=='claude'||tool!=='subagents').map((tool) => { const detail = agentToolDetails[tool]; const selected = values.tools.includes(tool); return <button className={`tool-option ${selected ? 'selected' : ''}`} type="button" aria-pressed={selected} key={tool} onClick={() => toggleTool(tool)}><span className="tool-check">{selected ? '✓' : ''}</span><span><b>{t(detail.label)}</b><small>{t(detail.description)}</small></span></button>; })}</div>:<p className="provider-billing">{t('Canvas context is sent as text. Web, file and subagent tools are unavailable for this provider.')}</p>}
+              {providerId!=='gemini'?<div className="tool-grid">{tools.map((tool) => { const detail = agentToolDetails[tool]; const selected = values.tools.includes(tool); return <button className={`tool-option ${selected ? 'selected' : ''}`} type="button" aria-pressed={selected} key={tool} onClick={() => toggleTool(tool)}><span className="tool-check">{selected ? '✓' : ''}</span><span><b>{t(detail.label)}</b><small>{providerId==='claude'&&tool==='subagents'?(locale==='pt-BR'?'Envio manual ao especialista pelo app.':'Manual handoff to a specialist from the app.'):t(detail.description)}</small></span></button>; })}</div>:<p className="provider-billing">{t('Canvas context is sent as text. Web, file and subagent tools are unavailable for this provider.')}</p>}
             </section>
 
             {(providerId==='codex'||providerId==='claude')&&<section className="drawer-section">
@@ -171,8 +171,10 @@ export function AgentEditorDrawer({ agent, initialValues, onClose, onSave, onDel
               {skillStatus&&<p className="skill-status">{skillStatus}</p>}
             </section>}
 
+          {providerId==='codex'&&<section className="drawer-section" style={{padding:'0 24px 16px'}}><h3>{locale==='pt-BR'?'Permissões das ferramentas MCP':'MCP tool permissions'}</h3><p className="skill-status">{locale==='pt-BR'?'Cada chamada permitida ainda precisa da sua aprovação. Desmarque ações que este agente não deve realizar.':'Each permitted call still needs your approval. Uncheck actions this agent must not perform.'}</p>{(['read','write','schedule','publish','delete','unknown'] as const).map((kind,index)=><label className="delivery-notion-choice" key={kind}><input type="checkbox" checked={(values.mcpPermissions??['read','write','schedule','publish','delete','unknown']).includes(kind)} onChange={event=>setField('mcpPermissions',event.target.checked?[...(values.mcpPermissions??['read','write','schedule','publish','delete','unknown']),kind].filter((value,i,all)=>all.indexOf(value)===i):(values.mcpPermissions??['read','write','schedule','publish','delete','unknown']).filter(value=>value!==kind))}/>{(locale==='pt-BR'?['Consultar dados','Criar ou alterar dados','Agendar','Publicar ou enviar','Excluir ou cancelar','Ferramentas não classificadas']:['Read data','Create or change data','Schedule','Publish or send','Delete or cancel','Unclassified tools'])[index]}</label>)}</section>}
             {editing && onDelete && <section className="drawer-danger"><div><b>{t('Delete agent')}</b><span>{t('This permanently removes the local agent and its configuration.')}</span></div>{confirmDelete ? <div className="delete-confirm"><button className="soft-button" type="button" onClick={() => setConfirmDelete(false)}>{t('Cancel')}</button><button className="danger-button" type="button" onClick={()=>{sessionStorage.removeItem(draftKey);onDelete()}}>{t('Confirm delete')}</button></div> : <button className="danger-button" type="button" onClick={() => setConfirmDelete(true)}>{t('Delete')}</button>}</section>}
           </div>
+
 
           <footer className="drawer-footer">
             <span className="form-error" role="alert">{error}</span>
@@ -194,6 +196,7 @@ function pickValues(agent: Agent): AgentEditorValues {
     workspaceId: agent.workspaceId,
     tools: [...agent.tools],
     providerId:agent.providerId??'codex',
+    mcpPermissions:agent.mcpPermissions,
     modelId:agent.modelId??'',
     skillsDirectory: agent.skillsDirectory ?? '',
     skillFiles: agent.skillFiles ?? {},

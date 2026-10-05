@@ -9,6 +9,10 @@ async function requestJson<T>(url:string, init?:RequestInit):Promise<T> {
 
 export class HttpCodexService implements CodexService {
   constructor(private readonly baseUrl='/api/codex') {}
+  async listSessionImages(threadId:string):Promise<CodexEvent[]> {
+    const result=await requestJson<{events:CodexEvent[]}>(`${this.baseUrl}/sessions/${encodeURIComponent(threadId)}/images`);
+    return result.events;
+  }
 
   createSession(input:CreateCodexSessionInput):Promise<CodexSessionHandle> {
     return requestJson(`${this.baseUrl}/sessions`,{method:'POST',body:JSON.stringify({config:input})});
@@ -24,6 +28,10 @@ export class HttpCodexService implements CodexService {
 
   cancelExecution(executionId:CodexExecutionId):Promise<void> {
     return requestJson(`${this.baseUrl}/executions/${encodeURIComponent(executionId)}/cancel`,{method:'POST'});
+  }
+
+  resolveDelegation(executionId:string,callId:string,result:{success:boolean;content:string}):Promise<void> {
+    return requestJson(`${this.baseUrl}/executions/${encodeURIComponent(executionId)}/delegations/${encodeURIComponent(callId)}`,{method:'POST',body:JSON.stringify(result)});
   }
 
   async *streamEvents(input:StreamCodexEventsInput):AsyncIterable<CodexEvent> {

@@ -1,0 +1,14 @@
+.content-assets{min-width:0;transition:border-color .15s ease}
+.content-assets.is-dragging{border-color:var(--muted);box-shadow:inset 0 0 0 1px var(--muted)}
+.content-asset-toolbar,.content-asset-controls,.content-asset-heading,.content-asset-confirm{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.content-asset-toolbar{margin:14px 0 8px}.content-asset-toolbar .select-menu{min-width:135px}
+.content-asset-hint,.content-asset-info,.content-asset-count{font-size:12px;color:var(--muted);line-height:1.6}
+.content-asset-hint{margin:8px 0 16px}.content-asset-empty{padding:24px 0;font-size:13px;color:var(--muted)}
+.content-asset-list{display:grid;gap:12px}.content-asset{padding:16px 0;border-top:1px solid var(--border);min-width:0}
+.content-asset-heading{justify-content:space-between;flex-wrap:nowrap}.content-asset-heading strong{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.content-asset-status{font-size:11px;flex-shrink:0;color:var(--muted)}.content-asset-status[data-status=missing],.content-asset-status[data-status=changed],.content-asset-status[data-status=error]{color:var(--status-review,#a78a65)}
+.content-asset-path{display:block;font-size:11px;color:var(--muted);overflow-wrap:anywhere;margin:6px 0 12px}.content-asset-controls .select-menu{max-width:240px;min-width:115px}
+.content-asset-error{font-size:12px;color:var(--status-review,#a78a65);white-space:pre-wrap;overflow-wrap:anywhere;margin:8px 0}.content-asset-confirm{font-size:12px;margin:12px 0}
+.content-asset-versions{margin-top:12px;color:var(--muted);font-size:11px}.content-asset-versions summary{cursor:pointer}.content-asset-versions div{display:grid;gap:4px;padding-top:10px}.content-asset-versions code{overflow-wrap:anywhere}
+@media(max-width:680px){.content-asset-toolbar>*{flex:1 1 auto}.content-asset-heading{align-items:flex-start;flex-direction:column;gap:4px}.content-asset-heading strong{max-width:100%}.content-asset-controls .select-menu{max-width:100%}}
+@media(prefers-reduced-motion:reduce){.content-assets{transition:none}}

@@ -1,7 +1,7 @@
 import { setDesktopDiagnosticWriter } from './desktop-diagnostics.mjs';
-import { app, BrowserWindow, dialog, ipcMain, safeStorage, session, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, safeStorage, session, shell, Notification } from 'electron';
 import { attachCanvasBrowserPolicy } from './canvas-browser-security.mjs';
-import { createDesktopStateStore } from './desktop-state-store.mjs';
+import { desktopStorageDirectory, openDesktopWorkspaceStore } from './desktop-storage-location.mjs';
 import { findSkills } from './skill-discovery.mjs';
 import { parseSkillInstallCommand, skillInstallArgs } from './skill-install-command.mjs';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
@@ -11,11 +11,15 @@ import { createServer, request as httpRequest } from 'node:http';
 import { appendFileSync, createReadStream, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, extname, join, normalize, isAbsolute } from 'node:path';
 import { startCodexBridge } from './codex-bridge.mjs';
+import { createChatImageArtifacts } from './chat-image-artifacts.mjs';
 import { createExternalProviderBridge } from './external-providers.mjs';
 import { createClaudeCodeBridge } from './claude-code-bridge.mjs';
 import { createCanvasRuntimeBridge } from './canvas-runtime-bridge.mjs';
 import { createAccountServer } from './cloud-server.mjs';
-import { createContentWorkflowBridge } from './content-workflow-bridge.mjs';
+import { openDesktopEditorialBridge } from './desktop-editorial-storage.mjs';
+import { createNotionEditorialConnector } from './notion-editorial-connector.mjs';
+import {inspectBackupFileLinks} from './backup-file-links.mjs';
+import {registerEditorialFilesIpc} from './editorial-files-ipc.mjs';
 
 const mimeTypes = {
   '.css': 'text/css; charset=utf-8',
@@ -40,8 +44,9 @@ function authorized(request){const supplied=String(request.headers['x-mainsagent
 
 function logStartup(message) {
   try {
-    mkdirSync(app.getPath('userData'), { recursive: true });
-    appendFileSync(join(app.getPath('userData'), 'startup.log'), `${new Date().toISOString()} ${message}\n`);
+    const directory=desktopStorageDirectory(app.getPath('home'));
+    mkdirSync(directory, { recursive: true });
+    appendFileSync(join(directory, 'startup.log'), `${new Date().toISOString()} ${message}\n`);
   } catch {}
 }
 setDesktopDiagnosticWriter(logStartup);
@@ -209,11 +214,14 @@ function proxyToCodex(clientRequest, clientResponse, bridge) {
 }
 
 function startWebServer(rootDirectory, port = 47831) {
+  const images=createChatImageArtifacts(join(desktopStorageDirectory(app.getPath('home')),'images'));
   const server = createServer((request, response) => {
     const url = new URL(request.url ?? '/', 'http://127.0.0.1');
     if(url.pathname.startsWith('/api/')&&!authorized(request)){response.writeHead(403,{'content-type':'application/json','cache-control':'no-store'});return response.end(JSON.stringify({error:'Local application access denied'}));}
+    if(images.handle(request,response,url))return;
     if (url.pathname === '/api/app/version') {response.writeHead(200,{'content-type':'application/json; charset=utf-8','cache-control':'no-store'});return response.end(JSON.stringify({version:app.getVersion()}));}
     if (url.pathname.startsWith('/api/content/')) {
+      if(url.searchParams.get('profile')!==desktopStateStore.currentProfile()){response.writeHead(409,{'content-type':'application/json'});return response.end(JSON.stringify({error:'The active storage profile changed. Reopen the workspace before editing.'}));}
       const address=webServer?.address();
       const expected=address&&typeof address==='object'?`http://127.0.0.1:${address.port}`:'';
       const origin=String(request.headers.origin??'');
@@ -223,7 +231,7 @@ function startWebServer(rootDirectory, port = 47831) {
     if (url.pathname === '/api/codex/reconnect' && request.method === 'POST') {
       if (codexBridge?.isAlive()) {response.writeHead(200,{'content-type':'application/json'});return response.end(JSON.stringify({ready:true}));}
       const workspaceDirectory=join(app.getPath('documents'),'MainsAgents Workspace');
-      void (async()=>{if(codexBridge){await codexBridge.close();codexBridge=null}return startCodexBridge({port:0,cwd:workspaceDirectory})})().then((bridge)=>{codexBridge=bridge;response.writeHead(200,{'content-type':'application/json'});response.end(JSON.stringify({ready:true}))}).catch((error)=>{response.writeHead(503,{'content-type':'application/json'});response.end(JSON.stringify({ready:false,error:error instanceof Error?error.message:String(error)}))});return;
+      void (async()=>{if(codexBridge){await codexBridge.close();codexBridge=null}return startCodexBridge({port:0,cwd:workspaceDirectory,runtimeHome:join(app.getPath('userData'),'codex-runtime'),actions:contentWorkflowBridge.actions,getBinding:contentWorkflowBridge.binding,getAgents:contentWorkflowBridge.agents,delegations:contentWorkflowBridge.delegations})})().then((bridge)=>{codexBridge=bridge;response.writeHead(200,{'content-type':'application/json'});response.end(JSON.stringify({ready:true}))}).catch((error)=>{response.writeHead(503,{'content-type':'application/json'});response.end(JSON.stringify({ready:false,error:error instanceof Error?error.message:String(error)}))});return;
     }
     if (url.pathname.startsWith('/api/codex/')) {
       if (codexBridge) return proxyToCodex(request,response,codexBridge);
@@ -237,6 +245,7 @@ function startWebServer(rootDirectory, port = 47831) {
       if((request.method==='POST'&&!requestOrigin)||(requestOrigin&&requestOrigin!==appOrigin)){response.writeHead(403,{'content-type':'application/json','cache-control':'no-store'});return response.end(JSON.stringify({error:'Canvas terminal requests must come from MainsAgents.'}));}
       return void canvasRuntimeBridge.handle(request,response,url);
     }
+    if(url.pathname==='/api/providers/claude/diagnostics')return void claudeCodeBridge.diagnostics().then(data=>{response.writeHead(200,{'content-type':'application/json','cache-control':'no-store'});response.end(JSON.stringify(data));});
     if(url.pathname.startsWith('/api/providers/claude/'))return void claudeCodeBridge.handle(request,response,url);
     if(url.pathname.startsWith('/api/providers/'))return void externalProviders.handle(request,response,url);
 
@@ -245,6 +254,11 @@ function startWebServer(rootDirectory, port = 47831) {
     let filePath = join(rootDirectory, normalizedPath);
     if (!filePath.startsWith(rootDirectory) || !existsSync(filePath) || statSync(filePath).isDirectory()) filePath = join(rootDirectory, 'app.html');
 
+    if (filePath.endsWith('.html')) {
+      const html=readFileSync(filePath,'utf8').replace('<head>','<head><meta name="mainsagents-storage" content="desktop-sqlite">');
+      response.writeHead(200,{'content-type':'text/html; charset=utf-8','cache-control':'no-store','x-content-type-options':'nosniff'});
+      response.end(html); return;
+    }
     response.writeHead(200, {
       'content-type': mimeTypes[extname(filePath).toLowerCase()] ?? 'application/octet-stream',
       'cache-control': filePath.endsWith('.html') ? 'no-store' : 'public, max-age=31536000, immutable',
@@ -263,29 +277,78 @@ function startWebServer(rootDirectory, port = 47831) {
 }
 
 let desktopStateStore;
+registerEditorialFilesIpc({ipcMain,dialog,shell,getWindow:()=>mainWindow,getStore:()=>desktopStateStore});
 ipcMain.on('state:profile', event => {
   event.returnValue=event.sender===mainWindow?.webContents ? desktopStateStore?.currentProfile() : undefined;
 });
-for (const operation of ['hasProfile','initialize','read','write','readAll','replaceAll']) {
+ipcMain.handle('state:getProfile', event => {
+  assertTrustedSender(event);
+  if (!desktopStateStore) throw new Error('Local storage is not ready');
+  return desktopStateStore.currentProfile() ?? 'default';
+});
+ipcMain.on('state:writeSync', (event, profile, key, value, revision) => {
+  try {
+    assertTrustedSender(event);
+    if (!desktopStateStore || shuttingDown) throw new Error('Local storage is not ready');
+    if(profile!==desktopStateStore.currentProfile()) throw new Error('The active profile changed. Reopen the workspace before saving.');
+    const receipt=desktopStateStore.write(profile, key, value, revision);
+    event.returnValue = { saved: true, ...receipt };
+  } catch (error) {
+    event.returnValue = { saved: false, error: error instanceof Error ? error.message : String(error) };
+  }
+});
+ipcMain.handle('inbox:notify',(event,title,body)=>{assertTrustedSender(event);if(event.senderFrame!==event.sender.mainFrame)throw new Error('Untrusted notification frame');if(typeof title!=='string'||typeof body!=='string'||title.length>160||body.length>500)throw new Error('Invalid notification');const preferences=desktopStateStore?.read(desktopStateStore.currentProfile(),'chat-inbox');if(preferences?.muted!==false||!Notification.isSupported())return false;const notification=new Notification({title,body});notification.on('click',()=>{mainWindow?.show();mainWindow?.focus();});notification.show();return true;});
+ipcMain.handle('state:checkpoint',event=>{assertTrustedSender(event);return desktopStateStore.recoverySnapshot();});
+ipcMain.handle('backup:snapshot',(event)=>{assertTrustedSender(event);return desktopStateStore.workspaceSnapshot(desktopStateStore.currentProfile());});
+ipcMain.handle('backup:files',(event,paths)=>{assertTrustedSender(event);return inspectBackupFileLinks(paths);});
+ipcMain.handle('backup:restore',(event,values,editorial,expected,execution)=>{
+  assertTrustedSender(event);
+  desktopStateStore.recoverySnapshot();
+  return desktopStateStore.restoreWorkspace(desktopStateStore.currentProfile(),values,editorial,expected,execution);
+});
+for (const operation of ['hasProfile','initialize','read','write','readAll','readAllVersioned','replaceAll']) {
   ipcMain.handle(`state:${operation}`, (event, ...args) => {
     assertTrustedSender(event);
     if (!desktopStateStore) throw new Error('Local storage is not ready');
+    if(['write','replaceAll'].includes(operation)&&args[0]!==desktopStateStore.currentProfile()) throw new Error('The active profile changed. Reopen the workspace before saving.');
     return desktopStateStore[operation](...args);
   });
 }
 
 async function createWindow() {
   logStartup('Starting desktop services');
-  desktopStateStore=createDesktopStateStore(app.getPath('userData'),app.getVersion());
-  contentWorkflowBridge=createContentWorkflowBridge({dbPath:join(app.getPath('userData'),'editorial.sqlite')});
+  desktopStateStore=await openDesktopWorkspaceStore(app.getPath('home'),app.getPath('userData'),app.getVersion());
+  logStartup(`Storage profile=${desktopStateStore.currentProfile()??'default'}; version=${app.getVersion()}; data=${desktopStorageDirectory(app.getPath('home'))}`);
+  contentWorkflowBridge=openDesktopEditorialBridge(app.getPath('home'),app.getPath('userData'),{
+    getRuntime:()=>codexBridge?.isAlive()?codexBridge.workflow:null,
+    getChatRuntime:provider=>provider==='claude'?claudeCodeBridge.runtime:codexBridge?.isAlive()?codexBridge.chatRuntime:null,
+    getAgents:profile=>desktopStateStore.read(profile,'agents')??[],
+    getSessions:profile=>desktopStateStore.read(profile,'sessions')??[],
+    getCurrentProfile:()=>desktopStateStore.currentProfile(),
+    getConnector:()=>codexBridge?.isAlive()?createNotionEditorialConnector(()=>codexBridge.notionMcp):null,
+    suggestConnection:(profile,workspaceId)=>{
+      const agents=desktopStateStore.read(profile,'agents')??[];
+      for(const agent of agents.filter(item=>item.workspaceId===workspaceId)){
+        for(const [name,path] of Object.entries(agent.skillFiles??{})){
+          if(!agent.skills?.includes(name)||agent.disabledSkills?.includes(name)||typeof path!=='string'||!path.endsWith('.md')||!existsSync(path)||statSync(path).size>1_000_000)continue;
+          const source=readFileSync(path,'utf8');
+          const match=source.match(/collection:\/\/([a-f0-9-]{36})/i);
+          if(match)return match[1];
+        }
+      }
+      return '';
+    },
+  });
   accountServer=createAccountServer({dbPath:join(app.getPath('userData'),'accounts.sqlite'),host:'127.0.0.1',port:0,googleClientId:googleClientId()});
   const accountAddress=await accountServer.listen();
   writeAccountConfig({...readAccountConfig(),serverUrl:`http://127.0.0.1:${accountAddress.port}`});
   logStartup('Local account service ready');
   const workspaceDirectory = join(app.getPath('documents'), 'MainsAgents Workspace');
   mkdirSync(workspaceDirectory, { recursive: true });
-  try {codexBridge = await startCodexBridge({ port: 0, cwd: workspaceDirectory });logStartup(`Codex bridge ready on ${codexBridge.port}`);}
+  try {codexBridge = await startCodexBridge({ port: 0, cwd: workspaceDirectory, runtimeHome: join(app.getPath('userData'),'codex-runtime'),actions:contentWorkflowBridge.actions,getBinding:contentWorkflowBridge.binding,getAgents:contentWorkflowBridge.agents,delegations:contentWorkflowBridge.delegations });logStartup(`Codex bridge ready on ${codexBridge.port}; history isolated, connections shared`);}
   catch(error){logStartup(`Codex unavailable: ${error instanceof Error?error.message:String(error)}`);}
+  contentWorkflowBridge.jobs.kick();
+  contentWorkflowBridge.work.kick();
   const web = await startWebServer(join(app.getAppPath(), 'dist'));
   webServer = web.server;
   logStartup(`Web application ready on ${web.port}`);
@@ -321,7 +384,28 @@ async function createWindow() {
     return { action: 'deny' };
   });
   mainWindow.once('ready-to-show', () => mainWindow?.show());
-  await mainWindow.loadURL(`http://127.0.0.1:${web.port}/app.html#home`);
+  mainWindow.webContents.on('preload-error',(_event,_path,error)=>logStartup(`Preload failed: ${error.message}`));
+  let allowedToClose=false, preparingClose=false;
+  mainWindow.on('close',event=>{
+    if(allowedToClose)return;
+    event.preventDefault(); if(preparingClose)return; preparingClose=true;
+    void (async()=>{
+      const window=mainWindow;
+      try {
+        const result=await window.webContents.executeJavaScript('(async()=>{if(!window.mainsAgentsSaveNow)return "not-ready";await window.mainsAgentsSaveNow();return "saved"})()');
+        desktopStateStore.recoverySnapshot();
+        logStartup(`Close storage verification: ${result}`);
+        allowedToClose=true; window.close();
+      } catch(error) {
+        logStartup(`Close blocked: ${error.message}`);
+        await dialog.showMessageBox(window,{type:'warning',title:'MainsAgents',message:'Não foi possível confirmar o salvamento. O app continuará aberto para preservar suas alterações.',detail:'Use Salvar agora ou exporte um backup nas Configurações antes de sair.',buttons:['Continuar no app']});
+      } finally {preparingClose=false;}
+    })();
+  });
+  await session.defaultSession.clearCache();
+  await mainWindow.loadURL(`http://127.0.0.1:${web.port}/app.html?desktopVersion=${encodeURIComponent(app.getVersion())}#home`);
+  const renderer=await mainWindow.webContents.executeJavaScript('({nativeStorage:!!window.mainsAgentsDesktop?.state,version:document.querySelector("meta[name=mainsagents-storage]")?.content})');
+  logStartup(`Renderer storage: ${JSON.stringify(renderer)}`);
   logStartup('Main window loaded');
 }
 
@@ -329,9 +413,9 @@ async function closeServices() {
   if (shuttingDown) return;
   shuttingDown = true;
   if (webServer) await new Promise((resolve) => webServer.close(resolve));
+  if (contentWorkflowBridge) await contentWorkflowBridge.close();
   if (codexBridge) await codexBridge.close();
   if (accountServer) await accountServer.close();
-  if (contentWorkflowBridge) contentWorkflowBridge.close();
   if (desktopStateStore) desktopStateStore.close();
 }
 
@@ -355,6 +439,7 @@ else {
   app.on('before-quit', (event) => {
     if (shuttingDown) return;
     event.preventDefault();
+    if(mainWindow&&!mainWindow.isDestroyed()){mainWindow.close();return;}
     void closeServices().finally(() => app.quit());
   });
 }

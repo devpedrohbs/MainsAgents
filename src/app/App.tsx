@@ -27,6 +27,8 @@ import { TaskEditorDialog, type TaskDraft } from '../components/tasks/TaskEditor
 import { WelcomeGuide } from '../components/onboarding/WelcomeGuide';
 import { agentTemplates, localizeTemplate } from '../features/agents/agentTemplates';
 import { useContentWorkflow } from '../features/content/ContentWorkflowProvider';
+import { editorialInbox, type EditorialInboxItem } from '../features/content/editorialInbox';
+import {useChatInbox} from '../features/chat/useChatInbox';
 
 export function App() {
   const { page, navigate } = useHashRouter();
@@ -34,7 +36,8 @@ export function App() {
   const { agents: allAgents, getAgentById, createAgent, updateAgent, deleteAgent } = useAgents();
   const { currentWorkspaceId, workspaces, setCurrentWorkspaceId } = useWorkspaces();
   const { sessions, createSession, openSession } = useChat();
-  const { state: editorialState, ready: editorialReady } = useContentWorkflow();
+  const chatInbox=useChatInbox(sessions,allAgents,currentWorkspaceId);
+  const { state: editorialState, ready: editorialReady, jobs: editorialJobs } = useContentWorkflow();
   const { attachNodesToAgent, addNode, allNodes, selectNode } = useCanvas();
   const deferredWorkspaceAction = useRef<(() => void) | null>(null);
   const inWorkspace = (workspaceId: string, action: () => void) => {
@@ -52,6 +55,24 @@ export function App() {
   const [taskDialogStatus, setTaskDialogStatus] = useState<TaskStatus | null>(null);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [selectedContentId, setSelectedContentId] = useState<string | null>(null);
+  const [selectedEditorialTopicId, setSelectedEditorialTopicId] = useState<string | null>(null);
+  const openEditorialItem = (item: EditorialInboxItem) => {
+    const current = editorialInbox(editorialState, editorialJobs, currentWorkspaceId).find(candidate => candidate.id === item.id);
+    if (!current) { notify(locale === 'pt-BR' ? 'Esta pendência já mudou. Confira a lista atualizada.' : 'This item has changed. Check the updated list.'); return; }
+    setSelectedContentId(current.contentId ?? null);
+    setSelectedEditorialTopicId(current.topicId);
+    navigate('content');
+  };
+  useEffect(()=>{
+    const open=(event:Event)=>{
+      const detail=(event as CustomEvent<{contentId?:string;topicId?:string}>).detail;
+      const id=detail?.contentId;
+      const item=editorialState.contents.find(content=>content.id===id);
+      if(!item){const topic=editorialState.topics.find(topic=>topic.id===detail?.topicId);if(topic){setCurrentWorkspaceId(topic.workspaceId);setSelectedContentId(topic.contentId??null);setSelectedEditorialTopicId(topic.id);navigate('content');}return;}
+      setCurrentWorkspaceId(item.workspaceId);setSelectedContentId(item.id);setSelectedEditorialTopicId(item.topicId);navigate('content');
+    };
+    window.addEventListener('mainsagents:open-content',open);return()=>window.removeEventListener('mainsagents:open-content',open);
+  },[editorialState.contents,editorialState.topics,setCurrentWorkspaceId,navigate]);
   const [panelOpen, setPanelOpen] = useState(false);
   const [chatPresentation, setChatPresentation] = usePersistentState<'side' | 'floating'>(
     'chat-presentation',
@@ -156,6 +177,7 @@ export function App() {
   const openTask = (task: Task) => {
     if (task.contentId) {
       setSelectedContentId(task.contentId);
+      setSelectedEditorialTopicId(null);
       navigate('content');
       return;
     }
@@ -382,6 +404,7 @@ export function App() {
         onCreateAgent={startAgentCreation}
         key={currentWorkspaceId}
         selectedContentId={selectedContentId}
+        selectedTopicId={selectedEditorialTopicId}
         onOpenSession={(agentId, sessionId) => {
           selectAgent(agentId);
           openSession(agentId, sessionId);
@@ -450,6 +473,9 @@ export function App() {
           onCreateTask={() => newTask()}
           onSelectAgent={(id) => selectAgent(id)}
           onNavigate={navigate}
+          onOpenEditorial={openEditorialItem}
+          chatInbox={chatInbox}
+          onOpenChatInbox={item=>{openSession(item.agentId,item.sessionId);selectAgent(item.agentId);}}
           showEmptyPrompt={welcomeDismissed}
         />
       </>

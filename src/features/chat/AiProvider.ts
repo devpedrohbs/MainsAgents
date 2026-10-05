@@ -1,5 +1,6 @@
 import type { AgentTool } from '../agents/model/Agent';
 import type { CodexEvent } from './CodexService';
+import type { DelegationRuntimeConfig } from './CodexService';
 import type { ReasoningEffort } from './model/Chat';
 
 export type ProviderId = 'codex' | 'claude' | 'gemini';
@@ -29,14 +30,16 @@ export interface ProviderExecutionHandle { executionId: string; remoteSessionId:
 
 /** Provider-neutral runtime boundary. Adapters own API, CLI and event translation. */
 export interface AiProvider {
+  listSessionImages?(remoteSessionId:string):Promise<CodexEvent[]>;
   readonly id: ProviderId;
   getStatus(): Promise<ProviderStatus>;
   listModels(): Promise<readonly {id:string; name:string}[]>;
-  createSession(input:{agentId:string;agentName:string;workspaceId:string;instructions:string;modelId?:string;tools:readonly AgentTool[];skillsDirectory?:string;skills?:readonly string[]}):Promise<ProviderSessionHandle>;
+  createSession(input:{localSessionId?:string;agentId:string;agentName:string;workspaceId:string;instructions:string;modelId?:string;tools:readonly AgentTool[];skillsDirectory?:string;skills?:readonly string[]}):Promise<ProviderSessionHandle>;
   resumeSession(remoteSessionId:string):Promise<ProviderSessionHandle>;
-  sendMessage(input:{remoteSessionId:string;content:string;modelId?:string;reasoningEffort?:ReasoningEffort;instructions?:string;agentId?:string;agentName?:string;role?:string;workspaceId?:string;tools?:readonly AgentTool[];skillsDirectory?:string;skills?:readonly string[];firstMessage?:boolean;history?:readonly {role:'user'|'agent';content:string}[];context?:readonly {id:string;kind:string;label:string;content?:string}[]}):Promise<ProviderExecutionHandle>;
+  sendMessage(input:{remoteSessionId:string;content:string;modelId?:string;reasoningEffort?:ReasoningEffort;instructions?:string;agentId?:string;agentName?:string;role?:string;workspaceId?:string;tools?:readonly AgentTool[];skillsDirectory?:string;skills?:readonly string[];firstMessage?:boolean;history?:readonly {role:'user'|'agent';content:string}[];context?:readonly {id:string;kind:string;label:string;content?:string}[];delegation?:DelegationRuntimeConfig}):Promise<ProviderExecutionHandle>;
   cancelExecution(executionId:string):Promise<void>;
   streamEvents(input:{executionId:string;signal?:AbortSignal}):AsyncIterable<CodexEvent>;
+  resolveDelegation?(executionId:string,callId:string,result:{success:boolean;content:string}):Promise<void>;
 }
 
 export const sessionProviderId=(session:{providerId?:ProviderId}):ProviderId=>session.providerId??'codex';

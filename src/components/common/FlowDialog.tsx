@@ -30,7 +30,7 @@ export function FlowDialog({
       }
       if (event.key === 'Tab') {
         const elements = Array.from(
-          ref.current?.querySelectorAll<HTMLElement>('button:not(:disabled),input,a[href],[tabindex="0"]') ??
+          ref.current?.querySelectorAll<HTMLElement>('button:not(:disabled),input:not(:disabled),textarea:not(:disabled),summary,a[href],[tabindex="0"]') ??
             [],
         ).filter((item) => item.getClientRects().length);
         const first = elements[0],

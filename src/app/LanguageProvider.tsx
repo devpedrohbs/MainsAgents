@@ -5,6 +5,7 @@ export type AppLocale = 'en-US' | 'pt-BR';
 export type AppAppearance = 'light' | 'dark';
 
 const pt: Record<string, string> = {
+  'Agent collaboration':'Colaboração entre agentes','Send briefings to agents in this workspace and follow both chats.':'Envie briefings aos agentes deste workspace e acompanhe os dois chats.',
   'Reload skills':'Recarregar skills','Refreshing…':'Recarregando…','Could not refresh skills.':'Não foi possível recarregar as skills.',
   'No Markdown skills found in this folder.':'Nenhuma skill em Markdown foi encontrada nesta pasta.',
   'Choose a folder with .md files or SKILL.md skill folders.':'Escolha uma pasta com arquivos .md ou subpastas com SKILL.md.',

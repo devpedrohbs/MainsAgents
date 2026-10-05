@@ -1,10 +1,18 @@
 import type { AgentTool } from '../agents/model/Agent';
-import type { ReasoningEffort } from './model/Chat';
+import type { ReasoningEffort, ChatImageAttachment } from './model/Chat';
+import type { AgentHandoffRequest } from './agentHandoff';
+
+export interface DelegationRuntimeConfig {
+  sourceAgentId: string;
+  workspaceId: string;
+  targets: readonly {id: string; name: string; role: string}[];
+  connectedAgentId?: string;
+}
 
 export type CodexThreadId = string;
 export type CodexExecutionId = string;
 
-export interface CodexSessionConfig {
+export interface CodexSessionConfig {localSessionId?:string;
   agentId: string;
   agentName?: string;
   workspaceId: string;
@@ -33,6 +41,8 @@ export interface SendCodexMessageInput {
   reasoningEffort?: ReasoningEffort;
   context?: readonly CodexContextItem[];
   clientMessageId?: string;
+  delegation?: DelegationRuntimeConfig;
+  instructions?: string;
 }
 
 export interface CodexContextItem {
@@ -53,6 +63,10 @@ export interface StreamCodexEventsInput {
 }
 
 export type CodexEvent =
+  | { type:'agent.delegation-queued';executionId:CodexExecutionId;callId:string }
+  | { type:'image.completed'; executionId:CodexExecutionId; image:ChatImageAttachment }
+  | { type:'image.failed'; executionId:CodexExecutionId; callId:string; message:string }
+  | { type:'agent.delegate'; executionId:CodexExecutionId; callId:string; request:AgentHandoffRequest }
   | { type:'execution.started'; executionId:CodexExecutionId; threadId:CodexThreadId }
   | { type:'message.delta'; executionId:CodexExecutionId; delta:string }
   | { type:'message.completed'; executionId:CodexExecutionId; content:string }
@@ -66,11 +80,13 @@ export type CodexEvent =
 
 /** Runtime boundary. React components and persistence adapters must not depend on a concrete Codex client. */
 export interface CodexService {
+  listSessionImages?(threadId:string):Promise<CodexEvent[]>;
   createSession(input: CreateCodexSessionInput): Promise<CodexSessionHandle>;
   resumeSession(input: ResumeCodexSessionInput): Promise<CodexSessionHandle>;
   sendMessage(input: SendCodexMessageInput): Promise<CodexExecutionHandle>;
   cancelExecution(executionId: CodexExecutionId): Promise<void>;
   streamEvents(input: StreamCodexEventsInput): AsyncIterable<CodexEvent>;
+  resolveDelegation?(executionId:string,callId:string,result:{success:boolean;content:string}):Promise<void>;
 }
 
 export class CodexRuntimeUnavailableError extends Error {

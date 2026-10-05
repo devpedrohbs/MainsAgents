@@ -66,9 +66,21 @@ export function Canvas({onToast,onAskAgent,onSendToAgent}:CanvasProps) {
 
   const {t,locale,reducedMotion}=useLanguage();
 
-  const {nodes,edges,setNodes,setEdges,view,updateView,addNode:insertNode,updateNodeData,groupNodes}=useCanvas();
+  const {nodes,edges,setNodes,setEdges,view,updateView,addNode:insertNode,updateNodeData,groupNodes,focusRequest,clearFocusRequest,registerVisibleChats}=useCanvas();
+  const chatSessionIds=nodes.filter(node=>node.type==='chat'&&node.data.chatSessionId).map(node=>node.data.chatSessionId!);
+  const visibleChatKey=JSON.stringify(chatSessionIds);
+  useEffect(()=>{registerVisibleChats(JSON.parse(visibleChatKey));return()=>registerVisibleChats([])},[visibleChatKey,registerVisibleChats]);
 
   const flowRef=useRef<ReactFlowInstance<CanvasFlowNode,Edge>|null>(null);
+  const [flowReady,setFlowReady]=useState(false);
+  const focusing=useRef<string|null>(null);
+  useEffect(()=>{
+    if(!flowReady||!focusRequest||focusRequest.workspaceId!==currentWorkspaceId||focusing.current===focusRequest.requestId)return;
+    const pair=[focusRequest.source,focusRequest.target].map(chat=>nodes.find(node=>node.type==='chat'&&node.data.chatAgentId===chat.agent.id&&node.data.chatSessionId===chat.session.id));
+    if(pair.some(node=>!node?.measured?.width||!node?.measured?.height))return;
+    focusing.current=focusRequest.requestId;
+    void flowRef.current?.fitView({nodes:pair.map(node=>({id:node!.id})),padding:.18,maxZoom:1,minZoom:.2,duration:reducedMotion?0:220}).then(()=>clearFocusRequest(focusRequest.requestId));
+  },[flowReady,focusRequest,currentWorkspaceId,nodes,reducedMotion,clearFocusRequest]);
 
   const [objectsOpen,setObjectsOpen]=useState(false);
 
@@ -215,7 +227,7 @@ export function Canvas({onToast,onAskAgent,onSendToAgent}:CanvasProps) {
 
     <ReactFlow<CanvasFlowNode,Edge>
 
-      onInit={(instance)=>{flowRef.current=instance}}
+      onInit={(instance)=>{flowRef.current=instance;setFlowReady(true)}}
 
       nodes={nodes}
 
@@ -249,7 +261,7 @@ export function Canvas({onToast,onAskAgent,onSendToAgent}:CanvasProps) {
 
       fitViewOptions={{padding:.18,maxZoom:1}}
 
-      minZoom={.4}
+      minZoom={.2}
 
       maxZoom={1.7}
 

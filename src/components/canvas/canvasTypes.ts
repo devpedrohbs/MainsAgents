@@ -5,6 +5,9 @@ export type CanvasNodeKind = 'note' | 'research' | 'image' | 'contentIdea' | 'ho
 
 export interface CanvasNodeData extends Record<string, unknown> {
   label: string;
+  contentId?:string;
+  topicId?:string;
+  artifactId?:string;
   title?: string;
   source?: string;
   summary?: string;
@@ -36,6 +39,7 @@ export interface CanvasNodeData extends Record<string, unknown> {
   browserUrl?: string;
   chatAgentId?: AgentId;
   chatSessionId?: string;
+  chatHandoffId?: string;
 }
 
 export type CanvasFlowNode = Node<CanvasNodeData, CanvasNodeKind>;

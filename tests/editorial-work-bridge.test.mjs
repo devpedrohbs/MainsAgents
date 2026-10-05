@@ -1,0 +1,24 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {mkdtempSync,mkdirSync,writeFileSync,readFileSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {DatabaseSync} from 'node:sqlite';
+import {startCodexBridge} from '../codex-bridge.mjs';
+import {createContentWorkflowBridge} from '../content-workflow-bridge.mjs';
+const result=JSON.stringify({summary:'The supplied approved script was received.',outputFiles:[],blockers:['Editing tool unavailable']});
+test('worker reaches the official CLI transport, receives its real turn ID and saves streamed notifications',async()=>{
+ const root=mkdtempSync(join(tmpdir(),'editorial-cli-transport-')),cli=join(root,'fake-cli.mjs'),log=join(root,'requests.jsonl'),shared=join(root,'shared');mkdirSync(shared);
+ writeFileSync(cli,`import{createInterface}from'node:readline';import{appendFileSync}from'node:fs';const threads=new Map();let serial=0;const send=m=>process.stdout.write(JSON.stringify(m)+'\\n');createInterface({input:process.stdin}).on('line',line=>{const m=JSON.parse(line);if(m.id===undefined)return;appendFileSync(${JSON.stringify(log)},JSON.stringify(m)+'\\n');const p=m.params;let result={};if(m.method==='config/read')result={config:{mcp_servers:{notion:{command:'MUST_NOT_START',tool_timeout_sec:null}}}};if(m.method==='thread/start'){if(p.historyMode!=='legacy'||p.sandbox!=='read-only'||p.config.mcp_servers.notion.enabled!==false||p.config.mcp_servers.notion.tool_timeout_sec!==undefined)return send({id:m.id,error:{message:'Policy contract mismatch'}});const thread={id:'isolated-thread',status:{type:'idle'},turns:[]};threads.set(thread.id,thread);result={thread};}if(m.method==='thread/resume')result={thread:threads.get(p.threadId)};if(m.method==='mcpServerStatus/list')result={data:[],nextCursor:null};if(m.method==='thread/read'){const thread=threads.get(p.threadId);if(p.includeTurns&&!thread.turns.length)return send({id:m.id,error:{message:'thread is not materialized yet; includeTurns is unavailable before first user message'}});result={thread};}if(m.method==='turn/start'){const turn={id:'official-turn-id',status:'inProgress',items:[{type:'userMessage',content:p.input}]};threads.get(p.threadId).turns.push(turn);result={turn};setTimeout(()=>{send({method:'item/agentMessage/delta',params:{turnId:turn.id,threadId:p.threadId,delta:'partial'}});turn.status='completed';turn.items.push({type:'agentMessage',text:${JSON.stringify(result)}});send({method:'item/completed',params:{turnId:turn.id,threadId:p.threadId,item:turn.items.at(-1)}});send({method:'turn/completed',params:{turnId:turn.id,threadId:p.threadId,turn}})},20)}send({id:m.id,result})});`);
+ const old=process.env.CODEX_CLI_PATH;process.env.CODEX_CLI_PATH=cli;let codex,content,db;
+ try{
+  codex=await startCodexBridge({port:0,cwd:root,runtimeHome:join(root,'runtime'),sharedHome:shared});
+  const base={workspaceId:'space',role:'Specialist',providerId:'codex',instructions:'Honest analysis',tools:['files','subagents']},agents=[{...base,id:'source',name:'Content'},{...base,id:'video',name:'Video'}];
+  content=createContentWorkflowBridge({dbPath:join(root,'state.sqlite'),getRuntime:()=>codex.workflow,getAgents:()=>agents,getCurrentProfile:()=> 'owner'});db=new DatabaseSync(join(root,'state.sqlite'));
+  db.prepare('INSERT INTO editorial_state VALUES (?,?,?,?)').run('owner',1,JSON.stringify({schemaVersion:1,topics:[{id:'topic',workspaceId:'space',title:'My video'}],contents:[{id:'content',topicId:'topic',workspaceId:'space',title:'My video',status:'script-approved',approvedScriptArtifactId:'approved'}],artifacts:[{id:'approved',version:1,data:{text:'The actual approved script'}}],approvals:[{id:'approval',artifactId:'approved',artifactVersion:1,decision:'approved'}],runs:[],assets:[]}),'today');
+  const {job}=content.work.enqueue('owner',{revision:1,kind:'handoff',targetId:'content',agentId:'video',sourceAgentId:'source',instructions:'Analyze the approved script.',requestKey:'unique'});
+  const limit=Date.now()+5000;while(content.work.detail('owner',job.id).status!=='succeeded'&&Date.now()<limit)await new Promise(resolve=>setTimeout(resolve,5));
+  const saved=content.work.detail('owner',job.id);assert.equal(saved.status,'succeeded',saved.error);assert.equal(saved.executionId,'official-turn-id');assert.equal(saved.result.summary,'The supplied approved script was received.');
+  const calls=readFileSync(log,'utf8').trim().split('\n').map(JSON.parse),turns=calls.filter(call=>call.method==='turn/start');assert.equal(turns.length,1);assert.match(turns[0].params.input[0].text,/^\[MainsAgents work .* attempt 1\]\n/);assert.match(turns[0].params.input[0].text,/The actual approved script/);assert.equal(turns[0].params.sandboxPolicy.type,'readOnly');
+ }finally{await content?.close();db?.close();await codex?.close();if(old===undefined)delete process.env.CODEX_CLI_PATH;else process.env.CODEX_CLI_PATH=old;}
+});

@@ -2,26 +2,32 @@ import { request as httpRequest } from 'node:http';
 import { join } from 'node:path';
 import { createServer } from 'vite';
 import { startCodexBridge } from './codex-bridge.mjs';
+import { createChatImageArtifacts } from './chat-image-artifacts.mjs';
 import { createClaudeCodeBridge } from './claude-code-bridge.mjs';
 import { createCanvasRuntimeBridge } from './canvas-runtime-bridge.mjs';
 import { createContentWorkflowBridge } from './content-workflow-bridge.mjs';
+import { createNotionEditorialConnector } from './notion-editorial-connector.mjs';
 
 const claudeBridge = createClaudeCodeBridge();
 const canvasRuntimeBridge = createCanvasRuntimeBridge({ cwdRoot: join(process.cwd(), '.mainsagents-workspaces') });
-const contentWorkflowBridge = createContentWorkflowBridge({ dbPath: join(process.cwd(), '.mainsagents-workspaces', 'editorial.sqlite') });
+const contentWorkflowBridge = createContentWorkflowBridge({ dbPath: join(process.cwd(), '.mainsagents-workspaces', 'editorial.sqlite'),getConnector:()=>bridge?.isAlive()?createNotionEditorialConnector(()=>bridge.notionMcp):null,getRuntime:()=>bridge?.isAlive()?bridge.workflow:null });
+const codexOptions = { port: 0, runtimeHome: join(process.cwd(), '.mainsagents-workspaces', 'codex-runtime'), imagesDirectory:join(process.cwd(),'.mainsagents-workspaces','images') };
+const images=createChatImageArtifacts(codexOptions.imagesDirectory);
 
-let bridge = await startCodexBridge({ port: 0 }).catch((error) => {
+let bridge = await startCodexBridge(codexOptions).catch((error) => {
   console.warn(`[MainsAgents] Codex unavailable; local UI will still run: ${error.message}`);
   return null;
 });
 let reconnecting;
+contentWorkflowBridge.jobs.kick();
+contentWorkflowBridge.work.kick();
 
 async function reconnectBridge() {
   if (bridge?.isAlive()) return bridge;
   if (reconnecting) return reconnecting;
   reconnecting = (async () => {
     if (bridge) await bridge.close().catch(() => {});
-    bridge = await startCodexBridge({ port: 0 });
+    bridge = await startCodexBridge(codexOptions);
     return bridge;
   })();
   try { return await reconnecting; }
@@ -38,6 +44,7 @@ const bridgePlugin = {
   configureServer(server) {
     server.middlewares.use((request, response, next) => {
       const pathname = new URL(request.url ?? '/', 'http://127.0.0.1').pathname;
+      if(images.handle(request,response,new URL(request.url??'/','http://127.0.0.1')))return;
       if (pathname.startsWith('/api/content/')) {
         const address = server.httpServer.address();
         const port = address && typeof address === 'object' ? address.port : 0;
@@ -102,7 +109,7 @@ vite.printUrls();
 const close = async () => {
   await vite.close();
   if (bridge) await bridge.close();
-  contentWorkflowBridge.close();
+  await contentWorkflowBridge.close();
   process.exit();
 };
 process.once('SIGINT', close);

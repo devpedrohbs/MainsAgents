@@ -2,16 +2,34 @@ interface InstalledSkillInfo { name: string; path: string; filePath?: string }
 interface SkillDirectoryResult { directory: string; skills: InstalledSkillInfo[] }
 
 interface Window {
+  mainsAgentsSaveNow?: () => Promise<void>;
   mainsAgentsDesktop?: {
+    notify?(title:string,body:string):Promise<boolean>;
     canvasBrowser?: boolean;
+    files?: {
+      pathForFile(file:File):string;
+      select(profile:string,contentId:string,multiple?:boolean):Promise<import('../features/content/assetModel').LocalAssetInspection[]>;
+      inspect(profile:string,contentId:string,paths:string[]):Promise<import('../features/content/assetModel').LocalAssetInspection[]>;
+      verify(profile:string,contentId:string):Promise<Array<{id:string;versionId:string;inspection:import('../features/content/assetModel').LocalAssetInspection}>>;
+      reveal(profile:string,contentId:string,assetId:string):Promise<boolean>;
+      open(profile:string,contentId:string,assetId:string):Promise<boolean>;
+    };
+    backup?: {
+      inspectFiles(paths:string[]):Promise<Array<{path:string;available:boolean}>>;
+      snapshot():Promise<{values:Record<string,unknown>;revisions:Record<string,string>;editorial:{revision:number;state:Record<string,unknown>};execution:Record<string,unknown>;executionRevision:string}>;
+      restore(values:Record<string,unknown>,editorial:Record<string,unknown>,expected:{revisions:Record<string,string>;editorialRevision:number;executionRevision?:string},execution?:{state:Record<string,unknown>;mode:'replace'|'merge'}):Promise<void>;
+    };
     state?: {
       profile?: string;
+      getProfile?(): Promise<string>;
       hasProfile(profile: string): Promise<boolean>;
       initialize(profile: string, values: Record<string, unknown>): Promise<void>;
       read<T>(profile: string, key: string): Promise<T | undefined>;
       write<T>(profile: string, key: string, value: T): Promise<void>;
+      writeSync?<T>(profile: string, key: string, value: T): void;
       readAll(profile: string): Promise<Record<string, unknown>>;
       replaceAll(profile: string, values: Record<string, unknown>): Promise<void>;
+      saveCheckpoint?(): Promise<string>;
     };
     selectSkillDirectory(): Promise<SkillDirectoryResult | null>;
     installSkill(command: string, agentKey?: string, directory?: string): Promise<SkillDirectoryResult>;

@@ -4,6 +4,7 @@ import { Breadcrumbs } from './Breadcrumbs';
 import { useLanguage } from '../../app/LanguageProvider';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 import { CodexUsagePopover } from './CodexUsagePopover';
+import { SaveIndicator } from './SaveIndicator';
 
 interface TopbarProps {
   page: PageId;
@@ -47,6 +48,7 @@ export function Topbar({
         ))}
       </nav>
       <div className="top-actions">
+        <SaveIndicator />
         <CodexUsagePopover />
         <button
           className="soft-button global-search"
