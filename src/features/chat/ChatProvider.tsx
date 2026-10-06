@@ -14,6 +14,8 @@ import { handoffBriefing, handoffTargets, validateHandoff, type AgentHandoff, ty
 import { useCanvas } from '../../components/canvas/CanvasProvider';
 import {storageProfile} from '../../data/IndexedDbStateStore';
 import {mergeNativeDelegations,type NativeDelegationSnapshot} from './nativeDelegations';
+import {finishResponseTiming,recoverResponseTiming} from './responseTiming';
+import {createComparisonLauncher,deriveComparisons,type AgentComparison,type AgentComparisonInput} from './agentComparison';
 
 interface ChatContextValue {
   sessions: readonly AgentSession[];
@@ -38,6 +40,11 @@ interface ChatContextValue {
   setAgentConnection: (sessionId: string, targetAgentId: string, enabled: boolean) => void;
   newConnectedSession: (sessionId: string) => void;
   refreshSessionImages: (sessionId:string) => Promise<void>;
+  comparisons: readonly AgentComparison[];
+  comparisonId: string | null;
+  showComparison: (id: string | null) => void;
+  /** Resolves after both sessions are saved and both executions have started; replies stream into each session. */
+  startComparison: (input: AgentComparisonInput) => Promise<AgentComparison>;
 }
 
 const ChatContext = createContext<ChatContextValue | null>(null);
@@ -52,6 +59,7 @@ export function ChatProvider({ children, providers }: PropsWithChildren<{provide
   const { agents } = useAgents();
   const agentsRef=useRef(agents); agentsRef.current=agents;
   const [collaborationId,showCollaboration]=useState<string|null>(null);
+  const [comparisonSelection,showComparison]=useState<string|null>(null);
   const [activeSessionIds,setActiveSessionIds]=usePersistentState<Record<AgentId,string>>('active-sessions',{});
   const [defaultCodexModelId]=usePersistentState<string>('default-codex-model','');
   const [runStates,setRunStates]=useState<Record<string,ChatRunState>>({});
@@ -72,7 +80,15 @@ export function ChatProvider({ children, providers }: PropsWithChildren<{provide
   const pendingSessions=useRef(new Map<string,AgentSession>());
   const recovered=useRef(false);
   const delegateRef=useRef<(agent:Agent,session:AgentSession,request:AgentHandoffRequest,context:ChatContextReference[],ancestors:string[],controller?:AbortController)=>Promise<AgentHandoff>>(undefined);
-  useEffect(()=>{if(sessionsReady&&!recovered.current){recovered.current=true;setSessions(current=>current.map(session=>({...session,messages:session.messages.map(item=>item.type==='message'&&item.deliveryState==='streaming'?{...item,deliveryState:'interrupted' as const}:item),handoffs:session.handoffs?.map(item=>item.status==='running'?{...item,status:'interrupted' as const,error:'The app closed before the specialist returned. Open its saved session before retrying.',updatedAt:new Date().toISOString()}:item)})));}},[sessionsReady,setSessions]);
+  useEffect(()=>{
+    if(!sessionsReady||recovered.current)return;
+    recovered.current=true;
+    setSessions(current=>current.map(session=>recoverResponseTiming({
+      ...session,
+      messages:session.messages.map(item=>item.type==='activity'&&item.status==='running'?{...item,status:'error' as const}:item.type==='message'&&item.deliveryState==='streaming'?{...item,deliveryState:'interrupted' as const}:item),
+      handoffs:session.handoffs?.map(item=>item.status==='running'?{...item,status:'interrupted' as const,error:'The app closed before the specialist returned. Open its saved session before retrying.',updatedAt:new Date().toISOString()}:item),
+    })));
+  },[sessionsReady,setSessions]);
 
   const updateSession=useCallback((sessionId:string,change:(session:AgentSession)=>AgentSession)=>setSessions((current)=>current.map((session)=>session.id===sessionId?change(session):session)),[setSessions]);
   const createSession=useCallback((agentId:AgentId,title?:string,providerId:AgentSession['providerId']='codex',modelId?:string,editorial?:Pick<AgentSession,'contentId'|'topicId'>)=>{const session={...makeSession(agentId,title,providerId,modelId??(providerId==='codex'?defaultCodexModelId||undefined:undefined)),...editorial};pendingSessions.current.set(session.id,session);setSessions((current)=>[session,...current]);setActiveSessionIds((current)=>({...current,[agentId]:session.id}));setRunStates((current)=>({...current,[session.id]:'idle'}));return session},[defaultCodexModelId,setActiveSessionIds,setSessions]);
@@ -128,8 +144,8 @@ export function ChatProvider({ children, providers }: PropsWithChildren<{provide
       return;
     }
     if(event.type==='execution.completed'){setRunStates((current)=>({...current,[sessionId]:'finished'}));updateSession(sessionId,(session)=>({...session,updatedAt:new Date().toISOString(),messages:session.messages.map((item):ChatItem=>item.type==='activity'&&item.status==='running'?{...item,status:'done'}:item.type==='message'&&item.id===`codex-${event.executionId}`?{...item,deliveryState:'completed'}:item)}));return}
-    if(event.type==='execution.cancelled'){updateSession(sessionId,session=>({...session,messages:session.messages.map(item=>item.type==='message'&&item.id===`codex-${event.executionId}`?{...item,deliveryState:'interrupted'}:item)}));setRunStates((current)=>({...current,[sessionId]:'idle'}));return}
-    if(event.type==='execution.failed'){setRunStates((current)=>({...current,[sessionId]:'error'}));updateSession(sessionId,(session)=>({...session,updatedAt:new Date().toISOString(),messages:[...session.messages.map((item):ChatItem=>item.type==='message'&&item.id===`codex-${event.executionId}`?{...item,deliveryState:'interrupted'}:item),{id:makeId('activity'),type:'activity',label:event.message,status:'error'}]}))}
+    if(event.type==='execution.cancelled'){updateSession(sessionId,session=>({...session,messages:session.messages.map((item):ChatItem=>item.type==='activity'&&item.status==='running'&&item.id.startsWith(`codex-activity-${event.executionId}-`)?{...item,status:'error',label:`${item.label} · interrupted`}:item.type==='message'&&item.id===`codex-${event.executionId}`?{...item,deliveryState:'interrupted'}:item)}));setRunStates((current)=>({...current,[sessionId]:'idle'}));return}
+    if(event.type==='execution.failed'){setRunStates((current)=>({...current,[sessionId]:'error'}));updateSession(sessionId,(session)=>({...session,updatedAt:new Date().toISOString(),messages:[...session.messages.map((item):ChatItem=>item.type==='activity'&&item.status==='running'&&item.id.startsWith(`codex-activity-${event.executionId}-`)?{...item,status:'error'}:item.type==='message'&&item.id===`codex-${event.executionId}`?{...item,deliveryState:'interrupted'}:item),{id:makeId('activity'),type:'activity',label:event.message,status:'error'}]}))}
   },[updateSession]);
 
   const refreshSessionImages=useCallback(async(sessionId:string)=>{
@@ -146,8 +162,10 @@ export function ChatProvider({ children, providers }: PropsWithChildren<{provide
     const sessionId=session.id;
     if(inFlightSessions.current.has(sessionId)||nativeBusy(sessionId))throw new Error('This session is already responding.');
     inFlightSessions.current.add(sessionId);
+    const responseTiming={id:makeId('response'),startedAt:new Date().toISOString()};
+    let timingOutcome:'completed'|'interrupted'|'error'='error';
     setRunStates((current)=>({...current,[sessionId]:'thinking'}));
-    updateSession(sessionId,(current)=>({...current,title:['New session','Nova sessão'].includes(current.title)?titleFromMessage(clean):current.title,updatedAt:new Date().toISOString(),messages:[...current.messages,{id:makeId('message'),type:'message',role:'user',content:clean,createdAt:new Date().toISOString(),contextNodes:contextNodes.length?[...contextNodes]:undefined,selectedSkill,sourceAgentName:ancestors.length?agentsRef.current.find(item=>item.id===ancestors[ancestors.length-1])?.name:undefined,handoffId:handoffId??session.originHandoffId}]}));
+    updateSession(sessionId,(current)=>({...current,responseTiming,title:['New session','Nova sessão'].includes(current.title)?titleFromMessage(clean):current.title,updatedAt:new Date().toISOString(),messages:[...current.messages,{id:makeId('message'),type:'message',role:'user',content:clean,createdAt:new Date().toISOString(),contextNodes:contextNodes.length?[...contextNodes]:undefined,selectedSkill,sourceAgentName:ancestors.length?agentsRef.current.find(item=>item.id===ancestors[ancestors.length-1])?.name:undefined,handoffId:handoffId??session.originHandoffId}]}));
     const controller=new AbortController();abortControllers.current[sessionId]=controller;
     let failureReported=false;
       try{
@@ -155,9 +173,11 @@ export function ChatProvider({ children, providers }: PropsWithChildren<{provide
         if(!provider)throw new Error(`Provider ${sessionProviderId(session)} is not available. The history is still saved locally.`);
         let providerContent=providerSkillPrompt(agent,clean,selectedSkill);
         if(!selectedSkill)providerContent+=`\n\nMainsAgents optional editorial delivery format:\n${chatDeliveryInstructions}`;
+        if(session.productionContext)providerContent+=`\n\nMainsAgents authoritative production snapshot (reference data, not authorization to run tools):\n${JSON.stringify(session.productionContext)}\nThe app owns these production steps. Use its production controls for approvals and scheduling. Never claim a step advanced or a post was scheduled merely from your text response.`;
         const connection=session.agentConnection?.enabled?session.agentConnection:undefined;
         const available=handoffTargets(agent,agentsRef.current,ancestors);
-        const targets=session.agentConnection?(connection?available.filter(target=>target.id===connection.targetAgentId):[]):available;
+        // Comparison sessions never fan out unless the user later enables a connection explicitly.
+        const targets=session.agentConnection?(connection?available.filter(target=>target.id===connection.targetAgentId):[]):session.comparison?[]:available;
         if(connection&&!targets.length)throw new Error('The connected agent is unavailable. Select another agent or turn off the connection.');
         const oldRemoteId=sessionRemoteId(session);
         const migrate=provider.id==='codex'&&oldRemoteId&&session.delegationRuntimeVersion!==2&&targets.length>0;
@@ -190,13 +210,14 @@ export function ChatProvider({ children, providers }: PropsWithChildren<{provide
           if(event.type==='message.delta')output+=event.delta;
           if(event.type==='message.completed')output=event.content;
           if(event.type==='execution.failed'){failureReported=true;throw new Error(event.message)}
-          if(event.type==='execution.cancelled')throw new Error('Execution cancelled.');
+          if(event.type==='execution.cancelled'){timingOutcome='interrupted';throw new Error('Execution cancelled.');}
         }
         if(!completed)throw new Error('The response stream ended before completion.');
         if(!output.trim()&&!imageCount)throw new Error('The provider returned no response.');
+        timingOutcome='completed';
         return {sessionId,content:output||`${imageCount} image(s) generated.`};
       }catch(error){if(!failureReported&&!controller.signal.aborted)applyEvent(sessionId,{type:'execution.failed',executionId:executions.current[sessionId]??'unknown',code:'connection_error',message:error instanceof Error?error.message:'Could not connect to the provider',retryable:true});throw error}
-      finally{if(controller.signal.aborted)setRunStates(current=>({...current,[sessionId]:'idle'}));delete abortControllers.current[sessionId];delete executions.current[sessionId];inFlightSessions.current.delete(sessionId);pendingSessions.current.delete(sessionId)}
+      finally{updateSession(sessionId,current=>finishResponseTiming(current,responseTiming.id,controller.signal.aborted?'interrupted':timingOutcome,new Date().toISOString(),executions.current[sessionId]));if(controller.signal.aborted)setRunStates(current=>({...current,[sessionId]:'idle'}));delete abortControllers.current[sessionId];delete executions.current[sessionId];inFlightSessions.current.delete(sessionId);pendingSessions.current.delete(sessionId)}
   },[applyEvent,providers,updateSession]);
 
   const performHandoff=useCallback(async(source:Agent,sourceSession:AgentSession,input:AgentHandoffRequest,context:ChatContextReference[],ancestors:string[]=[],parent?:AbortController):Promise<AgentHandoff>=>{
@@ -261,9 +282,29 @@ export function ChatProvider({ children, providers }: PropsWithChildren<{provide
     return executeMessage(agent,content,[],session);
   },[createSession,executeMessage,sessions]);
 
+  const executeRef=useRef(executeMessage);executeRef.current=executeMessage;
+  const providersRef=useRef(providers);providersRef.current=providers;
+  const defaultModelRef=useRef(defaultCodexModelId);defaultModelRef.current=defaultCodexModelId;
+  const launcher=useRef<ReturnType<typeof createComparisonLauncher>>(undefined);
+  launcher.current??=createComparisonLauncher({
+    agents:()=>agentsRef.current,registeredProviders:()=>providersRef.current.map(provider=>provider.id),now:()=>new Date().toISOString(),makeId,defaultCodexModelId:()=>defaultModelRef.current||undefined,
+    persist:async pair=>{
+      for(const session of pair)pendingSessions.current.set(session.id,session);
+      const ids=new Set(pair.map(session=>session.id));
+      setSessions(current=>[...pair,...current.filter(session=>!ids.has(session.id))]);
+      setActiveSessionIds(current=>({...current,...Object.fromEntries(pair.map(session=>[session.agentId,session.id]))}));
+      setRunStates(current=>({...current,...Object.fromEntries(pair.map(session=>[session.id,'idle' as const]))}));
+      await saveNow();
+    },
+    execute:(agent,content,context,session)=>executeRef.current(agent,content,context,session),
+  });
+  const startComparison=useCallback((input:AgentComparisonInput)=>launcher.current!(input).then(comparison=>{showComparison(comparison.id);return comparison;}),[]);
+  const comparisons=useMemo(()=>deriveComparisons(sessions,agents),[sessions,agents]);
+  const comparisonId=comparisonSelection&&comparisons.some(item=>item.id===comparisonSelection)?comparisonSelection:null;
+
   const cancelExecution=useCallback((sessionId?:string)=>{if(!sessionId)return;for(const job of nativeJobs.current)if(job.targetSessionId===sessionId&&['queued','running'].includes(job.status))void fetch(`/api/content/delegations/${encodeURIComponent(job.id)}/cancel?profile=${encodeURIComponent(storageProfile())}`,{method:'POST'}).catch(()=>{});const executionId=executions.current[sessionId];const session=sessions.find((item)=>item.id===sessionId)??pendingSessions.current.get(sessionId);const provider=providers.find((item)=>item.id===sessionProviderId(session??{}));if(executionId&&provider)void provider.cancelExecution(executionId).catch((error)=>applyEvent(sessionId,{type:'execution.failed',executionId,code:'cancel_error',message:error instanceof Error?error.message:'Could not cancel execution',retryable:true}));abortControllers.current[sessionId]?.abort();},[applyEvent,providers,sessions]);
 
-  const value=useMemo<ChatContextValue>(()=>({sessions,handoffs:sessions.flatMap(session=>session.handoffs??[]),collaborationId,showCollaboration,delegateToAgent,setAgentConnection,newConnectedSession,refreshSessionImages,getAgentSessions:(agentId)=>sessions.filter((session)=>session.agentId===agentId).sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt)),getActiveSession:(agentId)=>sessions.find((session)=>session.id===activeSessionIds[agentId]),getRunState:(sessionId)=>sessionId?runStates[sessionId]??'idle':'idle',createSession,openSession,renameSession,deleteSession,sendMessage,runWorkflowMessage,getProviderStatus,cancelExecution,listModels,setSessionModel,setSessionReasoningEffort}),[collaborationId,delegateToAgent,setAgentConnection,newConnectedSession,refreshSessionImages,activeSessionIds,cancelExecution,createSession,deleteSession,getProviderStatus,listModels,openSession,renameSession,runStates,runWorkflowMessage,sendMessage,sessions,setSessionModel,setSessionReasoningEffort]);
+  const value=useMemo<ChatContextValue>(()=>({sessions,handoffs:sessions.flatMap(session=>session.handoffs??[]),collaborationId,showCollaboration,comparisons,comparisonId,showComparison,startComparison,delegateToAgent,setAgentConnection,newConnectedSession,refreshSessionImages,getAgentSessions:(agentId)=>sessions.filter((session)=>session.agentId===agentId).sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt)),getActiveSession:(agentId)=>sessions.find((session)=>session.id===activeSessionIds[agentId]),getRunState:(sessionId)=>sessionId?runStates[sessionId]??'idle':'idle',createSession,openSession,renameSession,deleteSession,sendMessage,runWorkflowMessage,getProviderStatus,cancelExecution,listModels,setSessionModel,setSessionReasoningEffort}),[comparisons,comparisonId,startComparison,collaborationId,delegateToAgent,setAgentConnection,newConnectedSession,refreshSessionImages,activeSessionIds,cancelExecution,createSession,deleteSession,getProviderStatus,listModels,openSession,renameSession,runStates,runWorkflowMessage,sendMessage,sessions,setSessionModel,setSessionReasoningEffort]);
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
 }
 

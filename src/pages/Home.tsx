@@ -135,8 +135,10 @@ export function Home({
           </button>
         ))}
       </section>
-      <EditorialInbox items={pendingEditorial} ready={ready} error={storageError || jobsError} onOpen={onOpenEditorial} onOpenStudio={() => onNavigate('content')} />
-      <ChatInbox items={chatInbox} onOpen={onOpenChatInbox}/>
+      <div className="overview-priorities" data-od-id="overview-priorities">
+        <EditorialInbox items={pendingEditorial} ready={ready} error={storageError || jobsError} onOpen={onOpenEditorial} onOpenStudio={() => onNavigate('content')} />
+        <ChatInbox items={chatInbox} onOpen={onOpenChatInbox}/>
+      </div>
       <div className="overview-grid">
         <section className="work-panel" data-od-id="workspace-tasks" aria-labelledby="tasks-heading">
           <div className="panel-heading">

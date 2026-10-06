@@ -1,13 +1,14 @@
-import {useState} from 'react';
+import {useEffect,useState} from 'react';
 import type {PublicationDelivery,Platform} from '../../features/content/model';
 import {useContentWorkflow} from '../../features/content/ContentWorkflowProvider';
 import {useLanguage} from '../../app/LanguageProvider';
 import {SelectMenu} from '../common/SelectMenu';
 type Settings=NonNullable<PublicationDelivery['networkSettings']>;
-export function PublicationNetworkSettings({platform,settings,onChange,disabled,mediaType}:{platform:Platform;settings:Settings;onChange:(s:Settings)=>void;disabled:boolean;mediaType:'video'|'photo'}){
+export function PublicationNetworkSettings({platform,settings,onChange,disabled,mediaType,accountId}:{platform:Platform;settings:Settings;onChange:(s:Settings)=>void;disabled:boolean;mediaType:'video'|'photo';accountId?:string}){
  const {publicationAccounts,publicationOptions}=useContentWorkflow(),{locale}=useLanguage(),pt=locale==='pt-BR';
  const [accounts,setAccounts]=useState<Array<{id:string;name:string}>>([]),[account,setAccount]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const [options,setOptions]=useState<Awaited<ReturnType<typeof publicationOptions>>|null>(null);
+ useEffect(()=>{if(accountId!==undefined){setAccount(accountId);setOptions(null)}},[accountId]);
  if(platform==='Instagram')return <fieldset className="publication-network"><legend>Instagram</legend><label>{pt?'Formato':'Format'}<SelectMenu ariaLabel={pt?'Formato Instagram':'Instagram format'} value={settings.contentType??'feed'} disabled={disabled} onChange={value=>onChange(value==='story'?{contentType:'story'}:{shareToFeed:settings.shareToFeed??true})} options={[{value:'feed',label:pt?'Feed / Reel (vídeo)':'Feed / Reel (video)'},{value:'story',label:'Story'}]}/></label>{settings.contentType!=='story'&&<label><input type="checkbox" checked={settings.shareToFeed??true} disabled={disabled} onChange={e=>onChange({shareToFeed:e.target.checked})}/>{pt?'Mostrar Reel também no feed':'Show Reel in feed too'}</label>}</fieldset>;
  if(platform!=='TikTok')return null;
  const t=settings.tiktokSettings??{privacy_level:'',commercialContentType:'none',allow_comment:false,allow_duet:false,allow_stitch:false,content_preview_confirmed:false,express_consent_given:false,video_made_with_ai:false};

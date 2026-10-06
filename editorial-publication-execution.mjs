@@ -52,6 +52,7 @@ export function createPublicationExecution(db,{getConnector,getCurrentProfile,cl
       const selected=input.provider??(delivery.platform==='LinkedIn'?'publora':'zernio');
       if(!['publora','zernio'].includes(selected)||selected==='publora'&&delivery.platform!=='LinkedIn'||!['LinkedIn','Instagram','TikTok'].includes(delivery.platform))throw Error('Choose Publora for LinkedIn or Zernio for Instagram, TikTok and LinkedIn.');
       const files=publicationFiles(value.state,delivery);validatePublicationFiles(files,delivery.platform,delivery.networkSettings);
+      if(delivery.cover&&selected==='publora')throw Error('Este conector Publora não envia capa de vídeo LinkedIn. Escolha Zernio ou revise uma entrega sem capa.');
       if(!delivery.text.trim()&&!files.length)throw Error('Add text or media.');
       if(delivery.platform==='TikTok'&&(!delivery.networkSettings?.tiktokSettings?.privacy_level||!delivery.networkSettings.tiktokSettings.content_preview_confirmed||!delivery.networkSettings.tiktokSettings.express_consent_given))throw Error('Save and approve TikTok privacy and both consent fields before preparing.');
       if(typeof input.accountId!=='string'||!(selected==='publora'?/^linkedin-[A-Za-z0-9_-]{1,200}$/:/^[A-Za-z0-9_-]{1,200}$/).test(input.accountId)||!['draft','schedule'].includes(input.mode))throw Error('Choose a LinkedIn account and an explicit destination mode.');

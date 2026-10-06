@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('mainsAgentsDesktop', {
     verify: (profile,contentId) => ipcRenderer.invoke('files:verify',profile,contentId),
     reveal: (profile,contentId,assetId) => ipcRenderer.invoke('files:reveal',profile,contentId,assetId),
     open: (profile,contentId,assetId) => ipcRenderer.invoke('files:open',profile,contentId,assetId),
+    preview: (profile,contentId,assetId) => ipcRenderer.invoke('files:preview',profile,contentId,assetId),
   },
   backup: {
     inspectFiles: paths => ipcRenderer.invoke('backup:files',paths),

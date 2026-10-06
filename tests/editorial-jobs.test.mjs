@@ -68,7 +68,7 @@ test('a persisted create checkpoint survives a process restart and resumes verif
 });
 
 function fakeNotion({loseCreate=false,indexed=true}={}){
-  let body='',creates=0,updates=0;
+  let body='',creates=0,updates=0,createdProperties;
   const schema={'Post Title':{type:'title'},Status:{type:'status',groups:{to_do:[{name:'Idea'}],in_progress:[{name:'Gravando'}]}},Channel:{type:'multi_select',options:[{name:'Instagram'},{name:'LinkedIn'}]}};
   const wrap=value=>({content:[{type:'text',text:JSON.stringify(value)}]});
   const mcp={thread:async()=> 'isolated-thread',call:async({tool,arguments:args})=>{
@@ -78,13 +78,17 @@ function fakeNotion({loseCreate=false,indexed=true}={}){
       return wrap({url:`https://www.notion.so/${pageId}`,text:`<data-source url="collection://${source}">${body}</data-source>`});
     }
     if(tool==='notion-search')return wrap({results:body&&indexed?[{id:pageId}]:[]});
-    if(tool==='notion-create-pages'){creates++;assert.equal(args.parent.data_source_id,source);body=args.pages[0].content;if(loseCreate)throw new Error('Response lost after write');return wrap({pages:[{id:pageId,url:`https://www.notion.so/${pageId}`}]})}
+    if(tool==='notion-create-pages'){creates++;assert.equal(args.parent.data_source_id,source);createdProperties=args.pages[0].properties;body=args.pages[0].content;if(loseCreate)throw new Error('Response lost after write');return wrap({pages:[{id:pageId,url:`https://www.notion.so/${pageId}`}]})}
     if(tool==='notion-update-page'){updates++;assert.deepEqual(args.position,{type:'end'});body+='\n'+args.content;return wrap({success:true})}
     throw new Error('Unexpected tool');
   }};
-  return {mcp,creates:()=>creates,updates:()=>updates,setIndexed:value=>{indexed=value},append:value=>{body+='\n'+value},replace:(from,to)=>{body=body.replace(from,to)},body:()=>body};
+  return {mcp,creates:()=>creates,updates:()=>updates,properties:()=>createdProperties,setIndexed:value=>{indexed=value},append:value=>{body+='\n'+value},replace:(from,to)=>{body=body.replace(from,to)},body:()=>body};
 }
 const payload=()=>({content:seed().contents[0],topic:seed().topics[0],artifact:{id:'approved-1',version:1,data:script()},dataSourceId:source});
+test('an authorized Idea-mode payload creates the real Notion card as Idea without fabricating a publish date',async()=>{
+ const fake=fakeNotion(),connector=createNotionEditorialConnector(()=>fake.mcp),input={...payload(),notionStatus:'Idea'},context={checkpoint:{},authorize:()=>{},saveCheckpoint:()=>{}};
+ await connector.upsert(input,context);assert.equal(fake.properties().Status,'Idea');assert.equal(fake.properties()['Publish Date'],undefined);assert.equal(fake.creates(),1);
+});
 test('Notion connector verifies actual card contents, appends later versions and preserves manual notes',async()=>{
   const fake=fakeNotion(),connector=createNotionEditorialConnector(()=>fake.mcp),input=payload();let checkpoint={};
   const context={checkpoint,authorize:()=>{},saveCheckpoint:value=>{checkpoint=value}};

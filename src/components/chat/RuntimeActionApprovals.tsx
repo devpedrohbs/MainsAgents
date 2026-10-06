@@ -19,6 +19,7 @@ export function RuntimeActionApprovals({sessionId,history=false}:{sessionId?:str
  }
  if(!visible.length&&!error)return null;
  return <section className="runtime-actions" aria-label={pt?'Aprovações de ferramentas':'Tool approvals'}>
+ {actions.some(action=>action.status==='pending')&&<p className="runtime-approval-notice" role="status">{pt?'A IA está aguardando sua aprovação para usar ferramentas. Confira as chamadas abaixo para continuar.':'The AI is waiting for your approval to use tools. Review the calls below to continue.'}</p>}
  {visible.map(action=><article className="runtime-action" key={action.id} data-action-status={action.status}>
   <header><strong>{action.server} / {action.tool}</strong><span>{action.agentName}</span></header>
   <p role="status">{(labels[action.status]??[action.status,action.status])[pt?0:1]}</p>

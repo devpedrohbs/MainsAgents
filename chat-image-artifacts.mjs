@@ -35,6 +35,7 @@ export function createChatImageArtifacts(directory){
     return path;
   }
   return {
+    pathForImage(image){const match=String(image?.url??'').match(/^\/api\/codex\/images\/([a-f0-9]{64}\.(?:png|jpg|webp))$/);if(!match)throw Error('Imagem gerada sem origem verificável.');const path=fileFor(match[1]);if(createHash('sha256').update(readFileSync(path)).digest('hex')!==match[1].split('.')[0])throw Error('A imagem gerada foi alterada no disco.');return path;},
     fromItem(item,executionId){
       if(!isImageGenerationItem(item))return null;
       if(item.status!=='completed'){

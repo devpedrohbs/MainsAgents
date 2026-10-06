@@ -6,6 +6,7 @@ import {SelectMenu} from '../common/SelectMenu';
 import {FlowDialog} from '../common/FlowDialog';
 import {zonedDateTime} from '../../../publication-time.mjs';
 import {storageProfile} from '../../data/IndexedDbStateStore';
+import {PublicationTile,imagePreviewUrl} from './PublicationTile';
 
 const statuses={draft:['Rascunho','Draft'],scheduled:['Agendado','Scheduled'],published:['Publicado','Published'],failed:['Falhou','Failed'],cancelled:['Cancelado','Cancelled'],publishing:['Publicando','Publishing'],partial:['Resultado parcial','Partial result']};
 export function ProviderCalendar({workspaceId,zone,month}:{workspaceId:string;zone:string;month:string}){
@@ -30,7 +31,7 @@ export function ProviderCalendar({workspaceId,zone,month}:{workspaceId:string;zo
  const date=(item:ProviderPost)=>item.status==='published'?item.publishedAt??item.scheduledAt:item.scheduledAt;
  const posts=all.filter(x=>date(x)&&zonedDateTime(date(x),zone).startsWith(month)).sort((a,b)=>date(a)!.localeCompare(date(b)!));
  const name=(item:ProviderPost)=>sources.find(x=>x.provider===item.provider)?.accounts?.find(x=>x.id===item.accountId)?.name??item.accountId;
- const tile=(item:ProviderPost)=><button className="calendar-delivery provider-post" key={item.key} onClick={()=>setPost(item)}><small>{item.provider==='publora'?'Publora':'Zernio'} · {item.platform} · {name(item)}</small><b>{item.text|| (pt?'Publicação com mídia':'Media post')}</b><span>{statuses[item.status][pt?0:1]}</span><small>{date(item)?zonedDateTime(date(item),zone).slice(0,16).replace('T',' '):(pt?'Sem horário':'No time')}</small>{sources.find(x=>x.provider===item.provider)?.error&&<small>{pt?'Dados anteriores':'Previous data'}</small>}</button>;
+ const tile=(item:ProviderPost)=><PublicationTile className="provider-post" key={item.key} id={`provider-${item.key}`} title={item.text|| (pt?'Publicação com mídia':'Media post')} platform={item.platform} status={item.status} statusLabel={statuses[item.status][pt?0:1]} time={date(item)?zonedDateTime(date(item),zone).slice(11,16):undefined} cover={imagePreviewUrl(item.thumbnailUrl)} pt={pt} onClick={()=>setPost(item)}/>;
  const [year,number]=month.split('-').map(Number),days=new Date(Date.UTC(year,number,0)).getUTCDate(),offset=(new Date(Date.UTC(year,number-1,1)).getUTCDay()+6)%7;
  return <section className="provider-calendar" aria-label={pt?'Posts dos provedores':'Provider posts'}>
   <div className="editorial-section-head"><div><h3>{pt?'Posts dos provedores':'Provider posts'}</h3><p className="editorial-hint">{pt?'Consulte seus MCPs para ver o que já existe no Publora e Zernio. Esta consulta não publica nem altera posts.':'Query your MCPs to see existing Publora and Zernio posts. This query does not publish or change posts.'}</p></div></div>

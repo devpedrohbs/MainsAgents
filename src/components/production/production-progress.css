@@ -1,0 +1,23 @@
+.production-progress{display:grid;gap:14px;padding:16px;border:1px solid var(--border);border-radius:10px;background:var(--surface);min-width:0}
+.production-progress-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px 12px;font-size:12px;color:var(--muted)}
+.production-progress-state{font-size:13px;font-weight:600;color:var(--fg)}
+.production-progress-steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:8px;margin:0;padding:0;list-style:none}
+.production-progress-steps li{display:flex;gap:8px;align-items:flex-start;min-width:0;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg)}
+.production-progress-mark{flex-shrink:0;display:grid;place-items:center;width:20px;height:20px;border:1px solid var(--line-strong);border-radius:50%;font-size:11px;line-height:1;color:var(--muted)}
+.production-progress-text{display:grid;gap:2px;min-width:0}
+.production-progress-text strong{font-size:12px;font-weight:600;color:var(--fg);overflow-wrap:anywhere}
+.production-progress-text small{font-size:11px;line-height:1.5;color:var(--muted);overflow-wrap:anywhere}
+.production-progress-steps li[data-status=completed] .production-progress-mark{border-color:var(--success);color:var(--success)}
+.production-progress-steps li[data-status=current]{border-color:var(--accent)}
+.production-progress-steps li[data-status=current] .production-progress-mark{border-color:var(--accent);color:var(--accent)}
+.production-progress-steps li[data-status=stopped]{border-color:var(--warn);border-style:dashed}
+.production-progress-steps li[data-status=stopped] .production-progress-mark{border-color:var(--warn);color:var(--warn)}
+.production-progress-steps li[data-status=upcoming] .production-progress-text strong{color:var(--muted);font-weight:500}
+.production-progress-steps li[data-status=unconfirmed]{border-style:dashed}
+.production-progress[data-state=blocked] .production-progress-steps li[data-status=stopped]{border-color:var(--danger)}
+.production-progress[data-state=blocked] .production-progress-steps li[data-status=stopped] .production-progress-mark{border-color:var(--danger);color:var(--danger)}
+.production-progress-next{display:grid;gap:6px;padding-top:12px;border-top:1px solid var(--border)}
+.production-progress-next p{margin:0;font-size:13px;line-height:1.6;color:var(--muted);overflow-wrap:anywhere}
+.production-progress-next strong{color:var(--fg)}
+.production-progress-sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+@media (max-width:520px){.production-progress-steps{grid-template-columns:1fr}}

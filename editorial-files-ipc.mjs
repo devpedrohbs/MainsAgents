@@ -1,4 +1,7 @@
 import {assetExtensions,inspectLocalAsset} from './editorial-local-files.mjs';
+import {readFile} from 'node:fs/promises';
+import {createHash} from 'node:crypto';
+import {extname} from 'node:path';
 
 /** Only the trusted application renderer can request read-only local file operations. */
 export function registerEditorialFilesIpc({ipcMain,dialog,shell,getWindow,getStore,inspect=inspectLocalAsset}) {
@@ -14,6 +17,7 @@ export function registerEditorialFilesIpc({ipcMain,dialog,shell,getWindow,getSto
     context(event,profile,contentId);if(busy)throw new Error('Wait for the current file verification to finish.');busy=true;
     try{const result=await fn(event,profile,contentId,...args);context(event,profile,contentId);return result;}finally{busy=false;}
   });
+  operation('preview',async(event,profile,contentId,assetId)=>{const asset=context(event,profile,contentId).assets?.find(a=>a.id===assetId&&a.contentId===contentId),v=asset?.versions.find(v=>v.id===asset.currentVersionId);if(asset?.kind!=='image'||!v||v.size>8*1024*1024)throw Error('Escolha uma imagem vinculada de até 8 MB.');const mime={'.jpg':'image/jpeg','.jpeg':'image/jpeg','.png':'image/png','.webp':'image/webp'}[extname(v.path).toLowerCase()];if(!mime)throw Error('Formato de prévia não suportado.');const inspected=await inspect(v.path);if(inspected.status!=='available'||inspected.sha256!==v.sha256)throw Error('A capa mudou. Confira a versão atual.');const bytes=await readFile(inspected.path);if(bytes.length>8*1024*1024||createHash('sha256').update(bytes).digest('hex')!==v.sha256||context(event,profile,contentId).assets.find(a=>a.id===assetId)?.currentVersionId!==v.id)throw Error('A capa mudou durante a leitura.');return `data:${mime};base64,${bytes.toString('base64')}`;});
   operation('select',async(event,profile,contentId,multiple)=>{
     const selection=await dialog.showOpenDialog(getWindow(),{title:'Content files',properties:multiple?['openFile','multiSelections']:['openFile'],filters:[{name:'Video, image, audio and documents',extensions:assetExtensions}]});
     context(event,profile,contentId);if(selection.canceled)return [];

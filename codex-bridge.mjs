@@ -12,6 +12,7 @@ import {chatApprovalPolicy,chatActionConfig} from './codex-action-policy.mjs';
 import {diagnoseCodex} from './runtime-capabilities.mjs';
 import { prepareCodexRuntimeHome, importLegacyCodexThread } from './codex-runtime-home.mjs';
 import { createChatImageArtifacts, isImageGenerationItem, imageGenerationInstructions } from './chat-image-artifacts.mjs';
+import {notionAutomationInstructions} from './notion-automation-policy.mjs';
 
 export function codexLaunch({platform=process.platform,cliPath=process.env.CODEX_CLI_PATH,nodePath=process.execPath,appData=process.env.APPDATA??''}={}) {
   const cli=cliPath??(platform==='win32'?join(appData,'npm','node_modules','@openai','codex','bin','codex.js'):'codex');
@@ -287,7 +288,7 @@ export async function startCodexBridge({ port = 8787, cwd = process.cwd(), runti
         const delegationPrompt=catalog.length?`\n\nMainsAgents agent catalog (current workspace): ${JSON.stringify(catalog)}. Use mainsagents_delegate when this requested workflow needs one of these specialists. Send a complete briefing, approved decisions, and absolute local file paths. The tool waits and returns the specialist result. Do not substitute a built-in temporary Codex subagent for these configured agents. Do not invent approval or publish. Respect scope and limit each response to at most 4 handoffs.`:'\n\nMainsAgents delegation is disabled for this turn. Do not call mainsagents_delegate.';
         const connected=catalog.find(agent=>agent.id===delegation?.connectedAgentId);
         const connectionPrompt=connected?`\n\nThe user enabled a persistent connection to ${connected.name} (${connected.id}). Delegate relevant parts of the user's requests to this agent with mainsagents_delegate; formulate useful instructions and include the relevant context. The application reuses the connected agent's existing session. Use sessionMode: "continue" by default. Only use sessionMode: "new" when the user explicitly asks to open another session for the connected agent. Its configured role, instructions and skills remain unchanged. Answer ordinary questions directly when they do not require that specialist. Wait for its actual result before reporting completion.`:'';
-        const text = `${input.content}${context?`\n\nWorkspace context:\n${context}`:''}${delegationPrompt}${connectionPrompt}\n\nMainsAgents image delivery policy: ${imageGenerationInstructions}`;
+        const text = `${input.content}${context?`\n\nWorkspace context:\n${context}`:''}${delegationPrompt}${connectionPrompt}${notionAutomationInstructions(binding?.agent)}\n\nMainsAgents image delivery policy: ${imageGenerationInstructions}`;
         const lockToken = `pending-${randomBytes(12).toString('hex')}`;
         activeThreadWriters.set(threadId, lockToken);
         try {
@@ -390,7 +391,7 @@ export async function startCodexBridge({ port = 8787, cwd = process.cwd(), runti
       try{while(true){if(signal?.aborted)throw new Error('Execution canceled.');while(queue.length){const event=queue.shift();yield event;if(['execution.completed','execution.cancelled','execution.failed'].includes(event.type))return;}if(record.done)return;await new Promise(resolve=>{wake=resolve;});wake=undefined;}}
       finally{record.listeners.delete(listener);signal?.removeEventListener('abort',abort);}
     };
-  const workflow=createCodexWorkflowRuntime({client:workflowClient,cwd,request:runtimeRequest,events:runtimeEvents});
+  const workflow=createCodexWorkflowRuntime({client:workflowClient,cwd,request:runtimeRequest,events:runtimeEvents,imageFile:image=>imageArtifacts.pathForImage(image),imageFromItem:(item,turnId)=>imageArtifacts.fromItem(item,turnId)});
   const chatRuntime={
     connect:async(session,agent)=>{const result=await runtimeRequest('/api/codex/sessions',{...(session.codexThreadId||session.remoteSessionId?{threadId:session.codexThreadId??session.remoteSessionId}:{}),config:{localSessionId:session.id,modelId:session.modelId??agent.modelId}});return result.threadId;},
     send:(threadId,content,agent)=>runtimeRequest('/api/codex/executions',{threadId,content,modelId:agent.modelId,reasoningEffort:agent.reasoningEffort??'medium'}),events:runtimeEvents,

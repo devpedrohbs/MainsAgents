@@ -4,7 +4,7 @@ export type AssetKind='video'|'image'|'audio'|'document';
 export type AssetStatus='available'|'unchecked'|'missing'|'changed'|'unstable'|'error';
 export interface LocalAssetInspection {path:string;checkedAt:string;status:'available'|'missing'|'unstable'|'error';name?:string;kind?:AssetKind;size?:number;sha256?:string;modifiedAt?:string;error?:string}
 export interface AssetVersion {id:string;path:string;name:string;size:number;sha256:string;modifiedAt:string;createdAt:string}
-export interface EditorialAsset {id:string;workspaceId:string;contentId:string;name:string;kind:AssetKind;role:AssetRole;sourceAssetId?:string;currentVersionId:string;versions:AssetVersion[];status:AssetStatus;checkedAt?:string;lastError?:string;createdAt:string;updatedAt:string}
+export interface EditorialAsset {id:string;workspaceId:string;contentId:string;name:string;kind:AssetKind;role:AssetRole;thumbnailUrl?:string;sourceAssetId?:string;currentVersionId:string;versions:AssetVersion[];status:AssetStatus;checkedAt?:string;lastError?:string;createdAt:string;updatedAt:string}
 export const currentAssetVersion=(asset:EditorialAsset)=>asset.versions.find(version=>version.id===asset.currentVersionId)!;
 function verifiedVersion(file:LocalAssetInspection):AssetVersion {
   if(file.status!=='available'||!file.name||!file.kind||!file.sha256||file.size===undefined||!file.modifiedAt)throw new Error(file.error||'Verify a stable, readable file before adding it.');

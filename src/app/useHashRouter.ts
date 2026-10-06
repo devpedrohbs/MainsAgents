@@ -9,14 +9,16 @@ export function useHashRouter() {
 
   const navigate = useCallback((nextPage: PageId) => {
     if (pageFromLocation() !== nextPage) {
-      window.history.pushState(null, '', `#${nextPage}`);
+      try { window.history.pushState(null, '', `#${nextPage}`); }
+      catch (error) { if (!(error instanceof DOMException) || error.name !== 'SecurityError') throw error; }
     }
     setPage(nextPage);
   }, []);
 
   useEffect(() => {
     if (!window.location.hash || pageFromLocation() !== window.location.hash.slice(1)) {
-      window.history.replaceState(null, '', '#home');
+      try { window.history.replaceState(null, '', '#home'); }
+      catch (error) { if (!(error instanceof DOMException) || error.name !== 'SecurityError') throw error; }
     }
 
     const syncRoute = () => setPage(pageFromLocation());

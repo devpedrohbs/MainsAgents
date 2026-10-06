@@ -10,6 +10,10 @@ O projeto foi pensado para pesquisa, notícias, criação de conteúdo, tendênc
 
 ## Recursos
 
+Na aba **Fluxo → Meus fluxos**, organize a produção em fluxos com nome: Agente de Conteúdo, gravação, Editor de Vídeo e preparação de publicação. As etapas menores continuam no chat, com sessões e materiais associados à mesma produção. Fluxos e posições ficam salvos e entram no backup. [Uso e limites da primeira versão](docs/named-production-flows-0.3.44.md).
+
+**Produção semiautomática:** “Iniciar produção” no Fluxo e “Ver produção” no chat usam o mesmo coordenador local. A ideia aprovada gera roteiro/card Notion, a gravação segue para plano e edição básica com FFmpeg, e as aprovações liberam capas/legendas e agendamento por rede. [Configuração, percurso e limites](docs/semi-automatic-production-0.3.45.md).
+
 - Workspaces independentes com agentes, tarefas, sessões e Canvas próprios.
 - Criação, edição e exclusão de agentes.
 - Chat com streaming pelo Codex App Server e Claude Code CLI.

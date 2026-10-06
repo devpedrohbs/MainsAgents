@@ -4,7 +4,7 @@
   "author": "devpedrohbs",
   "license": "MIT",
   "private": true,
-  "version": "0.3.42",
+  "version": "0.3.48",
   "type": "module",
   "scripts": {
     "dev": "node dev.mjs",
@@ -91,10 +91,16 @@
       "publication-model.mjs",
       "editorial-media.mjs",
       "runtime-tool-policy.mjs",
+      "notion-automation-policy.mjs",
       "editorial-file-deliveries.mjs",
       "runtime-read-probe.mjs",
       "publication-media-upload.mjs",
-      "zernio-publication-connector.mjs"
+      "zernio-publication-connector.mjs",
+      "production-coordinator.mjs",
+      "production-protocol.mjs",
+      "production-backup.mjs",
+      "production-budget.mjs",
+      "publication-time.mjs"
     ],
     "directories": {
       "output": "release"

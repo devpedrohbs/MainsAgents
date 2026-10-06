@@ -1,7 +1,8 @@
 import {validateStudioDrafts} from '../features/content/studioDraftModel.ts';
 import {validateEditorialAssets} from '../../editorial-assets-validation.mjs';
 import {validatePublications} from '../../publication-model.mjs';
-export const dataKeys = ['workspaces', 'current-workspace', 'agents', 'sessions', 'active-sessions', 'tasks', 'canvas-workspaces', 'language', 'focus-mode', 'text-scale', 'reduced-motion', 'welcome-dismissed', 'sidebar-width', 'inspector-width', 'default-codex-model', 'chat-presentation', 'chat-drafts', 'studio-drafts', 'chat-inbox'] as const;
+import {validateProductionFlows,mergeProductionFlows} from '../features/flows/flowModel.ts';
+export const dataKeys = ['workspaces', 'current-workspace', 'agents', 'sessions', 'active-sessions', 'tasks', 'canvas-workspaces', 'production-flows', 'language', 'focus-mode', 'text-scale', 'reduced-motion', 'welcome-dismissed', 'sidebar-width', 'inspector-width', 'default-codex-model', 'chat-presentation', 'chat-drafts', 'studio-drafts', 'chat-inbox', 'studio-view'] as const;
 const collectionKeys = new Set(['workspaces', 'agents', 'sessions', 'tasks']);
 export interface BackupFile { format:'mainsagents-backup'; version:1; exportedAt:string; data:Record<string, unknown>; editorial?:Record<string,unknown>; execution?:Record<string,unknown>; recovery?:boolean; fileManifest?:Array<{agentId:string;directory?:string;skills:unknown}> }
 export type ImportMode = 'replace' | 'merge';
@@ -40,6 +41,8 @@ export function parseBackup(text:string):BackupFile {
   }
   if('chat-inbox' in parsed.data){const inbox=parsed.data['chat-inbox'];if(!isObject(inbox)||typeof inbox.muted!=='boolean'||typeof inbox.initialized!=='boolean'||!isObject(inbox.seen)||Object.values(inbox.seen).some(ids=>!Array.isArray(ids)||ids.some(id=>typeof id!=='string'))||('notified' in inbox&&(!Array.isArray(inbox.notified)||inbox.notified.some(id=>typeof id!=='string'))))throw new Error('Invalid chat inbox in backup.');}
   if('language' in parsed.data&&!['en-US','pt-BR'].includes(String(parsed.data.language)))throw new Error('Invalid language in backup.');
+  if('studio-view' in parsed.data&&!['studio','calendar'].includes(String(parsed.data['studio-view'])))throw new Error('Invalid Studio view in backup.');
+  if('production-flows' in parsed.data&&!validateProductionFlows(parsed.data['production-flows']))throw new Error('Invalid production flows in backup.');
   if('editorial' in parsed){
     const editorial=parsed.editorial;
     if(!isObject(editorial)||editorial.schemaVersion!==1||['topics','contents','runs','artifacts','approvals'].some((key)=>!Array.isArray(editorial[key])||(editorial[key] as unknown[]).some((item)=>!isObject(item)||typeof item.id!=='string'||!item.id)))throw new Error('Invalid editorial data in backup.');
@@ -49,7 +52,7 @@ export function parseBackup(text:string):BackupFile {
   if('execution' in parsed){const execution=parsed.execution;if(!isObject(execution)||['jobs','events','connections'].some(key=>!Array.isArray(execution[key])))throw new Error('Invalid execution data in backup.');}
   if(isObject(parsed.execution)){
     const execution=parsed.execution;
-    for(const key of ['work','workSessions','workEvents','actions','delegations','delegationSessions','mediaJobs'])if(key in execution&&!Array.isArray(execution[key]))throw new Error('Invalid persistent work backup.');
+    for(const key of ['work','workSessions','workEvents','actions','delegations','delegationSessions','mediaJobs','productions'])if(key in execution&&!Array.isArray(execution[key]))throw new Error('Invalid persistent work backup.');
     for(const row of Array.isArray(execution.work)?execution.work:[]){
       if(!isObject(row)||['id','workspace_id','target_id','request_key','data_json','created_at','updated_at'].some(key=>typeof row[key]!=='string')||!['research','script','handoff'].includes(String(row.kind))||!['queued','running','succeeded','failed','interrupted','blocked','canceled'].includes(String(row.status)))throw new Error('Invalid work record in backup.');
       const job:unknown=JSON.parse(String(row.data_json));if(!isObject(job)||job.id!==row.id||job.workspaceId!==row.workspace_id||job.targetId!==row.target_id||job.kind!==row.kind||job.status!==row.status||!isObject(job.agent)||typeof job.agent.id!=='string'||!Number.isSafeInteger(job.attempt)||Number(job.attempt)<1||Number(job.attempt)>3||!Array.isArray(job.files)||typeof job.prompt!=='string'||typeof job.inputHash!=='string')throw new Error('Inconsistent work record in backup.');
@@ -87,7 +90,8 @@ export function composeImport(current:Record<string,unknown>,file:BackupFile,mod
   }
   const merged={...current};
   for(const [key,value] of Object.entries(incoming)) {
-    if(collectionKeys.has(key))merged[key]=mergeRows(current[key],value);
+    if(key==='production-flows'&&validateProductionFlows(current[key])&&validateProductionFlows(value))merged[key]=mergeProductionFlows(current[key],value);
+    else if(collectionKeys.has(key))merged[key]=mergeRows(current[key],value);
     else if(key==='canvas-workspaces')merged[key]=mergeCanvas(current[key],value);
     else if(key==='active-sessions'||key==='chat-drafts'||key==='studio-drafts')merged[key]={...(isObject(value)?value:{}),...(isObject(current[key])?current[key]:{})};
     else if(!(key in current))merged[key]=value;

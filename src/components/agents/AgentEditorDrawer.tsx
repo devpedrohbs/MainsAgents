@@ -78,6 +78,7 @@ export function AgentEditorDrawer({ agent, initialValues, onClose, onSave, onDel
       return;
     }
     if(providerId==='gemini'&&!values.modelId){setError(t('Choose a provider model after connecting it in Settings.'));return}
+    if(values.notionAutomation?.enabled&&!/^(?:collection:\/\/)?[a-f0-9]{8}-?[a-f0-9]{4}-?[a-f0-9]{4}-?[a-f0-9]{4}-?[a-f0-9]{12}$/i.test(values.notionAutomation.dataSourceId.trim())){setError(locale==='pt-BR'?'Informe o ID da coleção ou sua URL collection://, e não o link de uma página.':'Enter the data source ID or collection:// URL, not a page link.');return;}
     sessionStorage.removeItem(draftKey);
     onSave({ ...values, skillsInstallKey:values.skillsInstallKey||agent?.id||`agent-${Date.now().toString(36)}`, name: values.name.trim(), role: values.role.trim(), description: values.description.trim(), instructions: values.instructions.trim() });
   };
@@ -173,9 +174,13 @@ export function AgentEditorDrawer({ agent, initialValues, onClose, onSave, onDel
 
           {providerId==='codex'&&<section className="drawer-section" style={{padding:'0 24px 16px'}}><h3>{locale==='pt-BR'?'Permissões das ferramentas MCP':'MCP tool permissions'}</h3><p className="skill-status">{locale==='pt-BR'?'Cada chamada permitida ainda precisa da sua aprovação. Desmarque ações que este agente não deve realizar.':'Each permitted call still needs your approval. Uncheck actions this agent must not perform.'}</p>{(['read','write','schedule','publish','delete','unknown'] as const).map((kind,index)=><label className="delivery-notion-choice" key={kind}><input type="checkbox" checked={(values.mcpPermissions??['read','write','schedule','publish','delete','unknown']).includes(kind)} onChange={event=>setField('mcpPermissions',event.target.checked?[...(values.mcpPermissions??['read','write','schedule','publish','delete','unknown']),kind].filter((value,i,all)=>all.indexOf(value)===i):(values.mcpPermissions??['read','write','schedule','publish','delete','unknown']).filter(value=>value!==kind))}/>{(locale==='pt-BR'?['Consultar dados','Criar ou alterar dados','Agendar','Publicar ou enviar','Excluir ou cancelar','Ferramentas não classificadas']:['Read data','Create or change data','Schedule','Publish or send','Delete or cancel','Unclassified tools'])[index]}</label>)}</section>}
             {editing && onDelete && <section className="drawer-danger"><div><b>{t('Delete agent')}</b><span>{t('This permanently removes the local agent and its configuration.')}</span></div>{confirmDelete ? <div className="delete-confirm"><button className="soft-button" type="button" onClick={() => setConfirmDelete(false)}>{t('Cancel')}</button><button className="danger-button" type="button" onClick={()=>{sessionStorage.removeItem(draftKey);onDelete()}}>{t('Confirm delete')}</button></div> : <button className="danger-button" type="button" onClick={() => setConfirmDelete(true)}>{t('Delete')}</button>}</section>}
+          {providerId==='codex'&&<section className="drawer-section" style={{padding:'0 24px 16px'}}>
+            <div className="drawer-section-title"><b>{locale==='pt-BR'?'Notion sem confirmações repetidas':'Notion without repeated confirmations'}</b></div>
+            <label className="delivery-notion-choice"><input type="checkbox" checked={values.notionAutomation?.enabled??false} onChange={event=>setField('notionAutomation',{enabled:event.target.checked,dataSourceId:values.notionAutomation?.dataSourceId??''})}/>{locale==='pt-BR'?'Permitir consultas e criação de cards como Ideia':'Allow reads and creation of Idea cards'}</label>
+            {values.notionAutomation?.enabled&&<label className="field"><span>{locale==='pt-BR'?'Coleção Notion autorizada':'Authorized Notion data source'}</span><input value={values.notionAutomation.dataSourceId} onChange={event=>setField('notionAutomation',{enabled:true,dataSourceId:event.target.value})} placeholder="collection://…"/></label>}
+            <p className="skill-status">{locale==='pt-BR'?'Revise os novos cards no Notion. Esta autorização vale para consultas e novos cards com Status = Idea na coleção escolhida. Atualizações, exclusões, agendamentos e publicações continuam exigindo confirmação. As permissões MCP acima também se aplicam.':'Review new cards in Notion. This permission covers reads and new cards with Status = Idea in the selected data source. Updates, deletion, scheduling and publishing still require confirmation. The MCP permissions above also apply.'}</p>
+          </section>}
           </div>
-
-
           <footer className="drawer-footer">
             <span className="form-error" role="alert">{error}</span>
             <button className="soft-button" type="button" onClick={close}>{t('Cancel')}</button>
@@ -197,6 +202,7 @@ function pickValues(agent: Agent): AgentEditorValues {
     tools: [...agent.tools],
     providerId:agent.providerId??'codex',
     mcpPermissions:agent.mcpPermissions,
+    notionAutomation:agent.notionAutomation,
     modelId:agent.modelId??'',
     skillsDirectory: agent.skillsDirectory ?? '',
     skillFiles: agent.skillFiles ?? {},

@@ -12,6 +12,7 @@ import {createEditorialMedia} from './editorial-media.mjs';
 import {createPublicationExecution} from './editorial-publication-execution.mjs';
 import {createPublicationCalendar} from './editorial-publication-calendar.mjs';
 import {createCalendarCredentials} from './publication-calendar-credentials.mjs';
+import {createProductionCoordinator} from './production-coordinator.mjs';
 
 const emptyState = () => ({ schemaVersion: 1, topics: [], contents: [], runs: [], artifacts: [], approvals: [] });
 const profilePattern = /^[a-zA-Z0-9_-]{1,120}$/;
@@ -32,14 +33,15 @@ async function readBody(request) {
   return JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
 }
 
-export function createContentWorkflowBridge({ dbPath, getConnector, getPublicationConnector, getCalendarConnector, secureStorage, suggestConnection = () => '',getRuntime,getChatRuntime,getAgents,getSessions,getCurrentProfile,inspect,timeoutMs,mediaOptions }) {
+export function createContentWorkflowBridge({ dbPath, getConnector, getPublicationConnector, getCalendarConnector, secureStorage, suggestConnection = () => '',getRuntime,getChatRuntime,getAgents,getFlows,getSessions,getCurrentProfile,inspect,timeoutMs,mediaOptions }) {
   mkdirSync(dirname(dbPath), { recursive: true });
   const db = new DatabaseSync(dbPath);
   db.exec('PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000; CREATE TABLE IF NOT EXISTS editorial_state (profile_id TEXT PRIMARY KEY, revision INTEGER NOT NULL, state_json TEXT NOT NULL, updated_at TEXT NOT NULL)');
   const read = db.prepare('SELECT revision, state_json FROM editorial_state WHERE profile_id = ?');
   const insert = db.prepare('INSERT INTO editorial_state (profile_id, revision, state_json, updated_at) VALUES (?, ?, ?, ?)');
   const update = db.prepare('UPDATE editorial_state SET revision = ?, state_json = ?, updated_at = ? WHERE profile_id = ? AND revision = ?');
-  const jobs=createEditorialJobs(db,{getConnector});
+  let production;
+  const jobs=createEditorialJobs(db,{getConnector,authorizeDraft:row=>production?.authorizeDraft(row)===true});
   const work=createEditorialWorkflowQueue(db,{getRuntime,getAgents,getCurrentProfile,inspect,timeoutMs});
   const deliveries=createChatDeliveries(db,{getSessions,getAgents,getCurrentProfile,inspect});
   const publications=createEditorialPublications(db);
@@ -47,6 +49,7 @@ export function createContentWorkflowBridge({ dbPath, getConnector, getPublicati
   const calendar=createPublicationCalendar(db,{getConnector:getCalendarConnector,getCurrentProfile});
   const calendarCredentials=createCalendarCredentials(db,secureStorage);
   const media=createEditorialMedia(db,{directory:join(dirname(dbPath),'media'),getCurrentProfile,...mediaOptions});
+  production=createProductionCoordinator(db,{getRuntime,getAgents,getFlows,getSessions,getCurrentProfile,getNotion:getConnector,jobs,media,publications,publishing,directory:join(dirname(dbPath),'production-media'),inspect,...mediaOptions});
   const binding=(threadId,sessionId)=>{
     if(!getAgents||!getSessions||!getCurrentProfile)return null;
     const profileId=getCurrentProfile(),session=[...(getSessions(profileId)??[]),...delegations.shadows(profileId)].find(item=>sessionId?item.id===sessionId:item.codexThreadId===threadId||item.remoteSessionId===threadId);
@@ -64,6 +67,9 @@ export function createContentWorkflowBridge({ dbPath, getConnector, getPublicati
     if (!profilePattern.test(profileId)) { send(response, 400, { error: 'Invalid local profile.' }); return true; }
     try {
       if(getCurrentProfile&&getCurrentProfile()!==profileId){send(response,409,{error:'The active profile changed. Reopen the workspace.'});return true;}
+      if(url.pathname==='/api/content/productions'){if(request.method==='GET'){send(response,200,{productions:production.list(profileId)});return true;}if(request.method==='POST'){send(response,200,{production:production.start(profileId,await readBody(request))});return true;}}
+      const productionRoute=url.pathname.match(/^\/api\/content\/productions\/([^/]+)$/);
+      if(productionRoute&&request.method==='POST'){send(response,200,{production:await production.command(profileId,{...await readBody(request),id:decodeURIComponent(productionRoute[1])})});return true;}
       if(url.pathname==='/api/content/calendar'&&request.method==='GET'){send(response,200,calendar.snapshot(profileId,url.searchParams.get('workspace')));return true;}
       if(url.pathname==='/api/content/calendar/refresh'&&request.method==='POST'){send(response,200,calendar.configureRefresh(profileId,await readBody(request)));return true;}
       if(url.pathname==='/api/content/calendar/accounts'&&request.method==='POST'){const input=await readBody(request);send(response,200,await calendar.accounts(profileId,input.workspaceId,input.provider));return true;}
@@ -147,5 +153,5 @@ export function createContentWorkflowBridge({ dbPath, getConnector, getPublicati
     }
   }
 
-  return { handle, jobs, work, deliveries, publications,publishing,calendar,calendarCredentials,media,actions,binding,delegations,agents:()=>getAgents?.(getCurrentProfile?.())??[], close: async () => {actions.close();await calendar.close();await publishing.close();await media.close();await delegations.close();await work.close();await jobs.close();db.close();} };
+  return { handle, production,jobs, work, deliveries, publications,publishing,calendar,calendarCredentials,media,actions,binding,delegations,agents:()=>getAgents?.(getCurrentProfile?.())??[], close: async () => {await production.close();actions.close();await calendar.close();await publishing.close();await media.close();await delegations.close();await work.close();await jobs.close();db.close();} };
 }

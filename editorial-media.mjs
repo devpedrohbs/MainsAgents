@@ -82,7 +82,10 @@ export function createEditorialMedia(db,{directory,getCurrentProfile,inspect=ins
         // Every attempt has a new file name; -n refuses any existing target.
         const part=join(job.outputDirectory,`attempt-${job.attempt}.partial.mp4`);job.outputPath=join(job.outputDirectory,`export-${job.attempt}.mp4`);job.phase='encoding';put(job);
         let lastUpdate=0;
-        await run(ffmpeg,['-nostdin','-hide_banner','-v','error','-n','-protocol_whitelist','file,pipe','-ss',String(job.start),'-i',job.inputPath,'-t',String(job.duration),'-map','0:v:0','-map','0:a:0?','-vf','scale=trunc(iw/2)*2:trunc(ih/2)*2','-c:v','libx264','-preset','veryfast','-crf','22','-c:a','aac','-movflags','+faststart','-progress','pipe:1','-nostats',part],{signal:controller.signal,timeoutMs:1800000,onProgress:output=>{
+        const filters=[job.edit?.format==='portrait'?'scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920':'scale=trunc(iw/2)*2:trunc(ih/2)*2'];
+        if(job.edit?.fadeSeconds)filters.push(`fade=t=in:st=0:d=${job.edit.fadeSeconds}`,`fade=t=out:st=${Math.max(0,job.duration-job.edit.fadeSeconds)}:d=${job.edit.fadeSeconds}`);
+        const audio=job.edit?.normalizeAudio&&job.inputMetadata.hasAudio?['-af','loudnorm=I=-16:TP=-1.5:LRA=11']:[];
+        await run(ffmpeg,['-nostdin','-hide_banner','-v','error','-n','-protocol_whitelist','file,pipe','-ss',String(job.start),'-i',job.inputPath,'-t',String(job.duration),'-map','0:v:0','-map','0:a:0?','-vf',filters.join(','),...audio,'-c:v','libx264','-preset','veryfast','-crf','22','-c:a','aac','-movflags','+faststart','-progress','pipe:1','-nostats',part],{signal:controller.signal,timeoutMs:1800000,onProgress:output=>{
           if(closed||controller.signal.aborted||Date.now()-lastUpdate<500)return;const matches=[...output.matchAll(/out_time_us=(\d+)/g)];if(matches.length){job.progress=Math.min(99,Number(matches.at(-1)[1])/1000000/job.duration*100);lastUpdate=Date.now();put(job);}
         }});
         if(controller.signal.aborted||closed||read(job.profileId,job.id)?.status!=='running')throw new Error('Export was interrupted.');
@@ -100,13 +103,15 @@ export function createEditorialMedia(db,{directory,getCurrentProfile,inspect=ins
     enqueue(profile,input){
       if(closed)throw new Error('Media executor is stopping.');
       if(typeof input.requestKey!=='string'||!input.requestKey||input.requestKey.length>120||!Number.isFinite(input.start)||input.start<0||!Number.isFinite(input.duration)||input.duration<0.1||input.duration>3600)throw new Error('Choose an interval between 0.1 seconds and one hour.');
-      const hash=artifactHash({contentId:input.contentId,assetId:input.assetId,versionId:input.versionId,sha256:input.sha256,start:input.start,duration:input.duration});
+      if(input.edit&&(!['original','portrait'].includes(input.edit.format)||typeof input.edit.normalizeAudio!=='boolean'||!Number.isFinite(input.edit.fadeSeconds)||input.edit.fadeSeconds<0||input.edit.fadeSeconds>.8||input.edit.fadeSeconds*2>input.duration))throw new Error('Invalid basic editing options.');
+      const hash=artifactHash({contentId:input.contentId,assetId:input.assetId,versionId:input.versionId,sha256:input.sha256,start:input.start,duration:input.duration,...(input.edit?{edit:input.edit}:{})});
       const prior=db.prepare('SELECT data_json FROM editorial_media_jobs WHERE profile_id=?').all(profile).map(row=>JSON.parse(row.data_json)).find(job=>job.requestKey===input.requestKey);
       if(prior){if(prior.requestHash!==hash)throw new Error('This request was already used for a different export.');return {...state(profile),job:prior};}
       if(db.prepare("SELECT id FROM editorial_media_jobs WHERE status IN ('queued','running')").get())throw new Error('Wait for the current video export or cancel it first.');
       const current=state(profile),asset=current?.state.assets?.find(item=>item.id===input.assetId&&item.contentId===input.contentId),version=asset?.versions.find(item=>item.id===asset.currentVersionId);
       if(current?.revision!==input.revision||!asset||version?.id!==input.versionId||version.sha256!==input.sha256)throw new Error('The reviewed source version changed. Inspect it again.');
       const id=`media-${randomUUID()}`,at=stamp(),job={id,profileId:profile,workspaceId:asset.workspaceId,contentId:asset.contentId,assetId:asset.id,versionId:version.id,sha256:version.sha256,inputPath:version.path,start:input.start,duration:input.duration,requestKey:input.requestKey,requestHash:hash,status:'queued',phase:'queued',progress:0,attempt:1,outputDirectory:join(directory,profile,id),createdAt:at,updatedAt:at,ownerPid:process.pid};
+      if(input.edit)job.edit=structuredClone(input.edit);
       authorize(job);db.prepare('INSERT INTO editorial_media_jobs VALUES (?,?,?,?,?)').run(id,profile,job.status,JSON.stringify(job),at);launch(job);return {...current,job};
     },
     list(profile){return db.prepare('SELECT data_json FROM editorial_media_jobs WHERE profile_id=? ORDER BY updated_at DESC').all(profile).map(row=>JSON.parse(row.data_json));},

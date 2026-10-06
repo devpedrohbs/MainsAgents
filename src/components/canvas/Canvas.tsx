@@ -24,7 +24,7 @@ const nodeLabels:Record<CanvasNodeKind,string>={note:'Note',research:'Research',
 
 const nodeIcons:Record<CanvasNodeKind,IconName>={note:'note',research:'search',image:'image',contentIdea:'spark',hook:'link',script:'script',terminal:'terminal',browser:'globe',chat:'message'};
 
-const quickTools:CanvasNodeKind[]=['note','browser','chat','terminal'];
+const quickTools:CanvasNodeKind[]=['note','research','chat'];
 
 const nodeDefaults:Record<CanvasNodeKind,Partial<Omit<CanvasNodeData,'label'>>>={
 
@@ -100,6 +100,12 @@ export function Canvas({onToast,onAskAgent,onSendToAgent}:CanvasProps) {
 
   const selectedNodes=nodes.filter((node)=>node.selected);
 
+  const [tool,setTool]=useState<'pan'|'select'>('pan');
+  const [undoStack,setUndoStack]=useState<Array<{nodes:CanvasFlowNode[];edges:Edge[]}>>([]);
+  const remember=()=>setUndoStack(current=>[...current.slice(-19),{nodes:nodes.map(node=>({...node,position:{...node.position},data:{...node.data}})),edges:edges.map(edge=>({...edge}))}]);
+  const undo=()=>{const previous=undoStack.at(-1);if(!previous)return;setNodes(previous.nodes);setEdges(previous.edges);setUndoStack(current=>current.slice(0,-1));setDetailsOpen(false);onToast(locale==='pt-BR'?'Ação desfeita':'Action undone')};
+  useEffect(()=>{setUndoStack([]);setDetailsOpen(false)},[currentWorkspaceId]);
+
   const [detailsOpen,setDetailsOpen]=useState(false);
 
   const detail=detailsOpen&&selectedNodes.length===1?selectedNodes[0]:undefined;
@@ -142,25 +148,37 @@ export function Canvas({onToast,onAskAgent,onSendToAgent}:CanvasProps) {
 
 
 
-  const createNode=(kind:CanvasNodeKind,position?:{x:number;y:number})=>{insertNode(kind,position);setAddMenuOpen(false);onToast(`${nodeLabels[kind]} added`)};
+  const createNode=(kind:CanvasNodeKind,position?:{x:number;y:number})=>{remember();insertNode(kind,position);setAddMenuOpen(false);onToast(`${t(nodeLabels[kind])} ${locale==='pt-BR'?'adicionado':'added'}`)};
 
-  const onConnect=useCallback((connection:Connection)=>{setEdges((current)=>addEdge({...connection,type:'smoothstep',markerEnd:arrowMarker},current));onToast('Nodes connected')},[onToast,setEdges]);
+  const onConnect=useCallback((connection:Connection)=>{remember();setEdges((current)=>addEdge({...connection,type:'smoothstep',markerEnd:arrowMarker},current));onToast(locale==='pt-BR'?'Objetos conectados':'Nodes connected')},[onToast,setEdges,nodes,edges,locale]);
 
-  const deleteNodes=(ids:Set<string>)=>{setNodes((current)=>current.filter((node)=>!ids.has(node.id)));setEdges((current)=>current.filter((edge)=>!ids.has(edge.source)&&!ids.has(edge.target)));setContextMenu(null);onToast(`${ids.size} node${ids.size===1?'':'s'} deleted`)};
+  const deleteNodes=(ids:Set<string>)=>{remember();setNodes((current)=>current.filter((node)=>!ids.has(node.id)));setEdges((current)=>current.filter((edge)=>!ids.has(edge.source)&&!ids.has(edge.target)));setContextMenu(null);onToast(`${ids.size} ${locale==='pt-BR'?'objeto(s) removido(s)':'object(s) deleted'}`)};
 
   const openContextMenu=(event:ReactMouseEvent,node:CanvasFlowNode)=>{event.preventDefault();setNodes((current)=>current.map((item)=>({...item,selected:item.id===node.id})));setContextMenu({nodeId:node.id,x:Math.min(event.clientX,window.innerWidth-198),y:Math.min(event.clientY,window.innerHeight-190)});setAddMenuOpen(false)};
 
-  const duplicateNode=(nodeId:string)=>{const source=nodes.find((node)=>node.id===nodeId);if(!source)return;const clone:CanvasFlowNode={...source,id:`${source.id}-copy-${Date.now()}`,position:{x:source.position.x+34,y:source.position.y+34},selected:true,data:{...source.data}};setNodes((current)=>[...current.map((node)=>({...node,selected:false})),clone]);setContextMenu(null);onToast(`${source.data.label} duplicated`)};
+  const duplicateNode=(nodeId:string)=>{const source=nodes.find((node)=>node.id===nodeId);if(!source)return;remember();const clone:CanvasFlowNode={...source,id:`${source.id}-copy-${Date.now()}`,position:{x:source.position.x+34,y:source.position.y+34},selected:true,data:{...source.data}};setNodes((current)=>[...current.map((node)=>({...node,selected:false})),clone]);setContextMenu(null);onToast(`${source.data.label} ${locale==='pt-BR'?'duplicado':'duplicated'}`)};
 
   const beginConnection=(nodeId:string)=>{setConnectFromId(nodeId);setContextMenu(null);onToast('Select another node to connect')};
 
-  const handleNodeClick=(_:ReactMouseEvent,node:CanvasFlowNode)=>{setContextMenu(null);setDetailsOpen(true);if(!connectFromId||connectFromId===node.id)return;setEdges((current)=>addEdge({id:`edge-${connectFromId}-${node.id}-${Date.now()}`,source:connectFromId,target:node.id,type:'smoothstep',markerEnd:arrowMarker},current));setConnectFromId(null);onToast('Nodes connected')};
+  const handleNodeClick=(_:ReactMouseEvent,node:CanvasFlowNode)=>{setContextMenu(null);if(!connectFromId||connectFromId===node.id)return;remember();setEdges((current)=>addEdge({id:`edge-${connectFromId}-${node.id}-${Date.now()}`,source:connectFromId,target:node.id,type:'smoothstep',markerEnd:arrowMarker},current));setConnectFromId(null);onToast(locale==='pt-BR'?'Objetos conectados':'Nodes connected')};
 
   const askAgent=()=>{if(!contextMenu)return;const nodeId=contextMenu.nodeId;setContextMenu(null);onAskAgent([nodeId])};
 
   const sendToAgent=()=>{if(!contextMenu)return;const nodeId=contextMenu.nodeId;setContextMenu(null);onSendToAgent([nodeId])};
 
-  const groupSelected=()=>{const ids=selectedNodes.map((node)=>node.id);if(ids.length<2)return;groupNodes(ids);onToast(`${ids.length} nodes grouped`)};
+  const groupSelected=()=>{const ids=selectedNodes.map((node)=>node.id);if(ids.length<2)return;remember();groupNodes(ids);onToast(`${ids.length} ${locale==='pt-BR'?'objetos agrupados':'nodes grouped'}`)};
+
+  useEffect(()=>{
+    const shortcuts=(event:KeyboardEvent)=>{
+      if((event.target as HTMLElement)?.closest('input,textarea,select,[contenteditable=true],[role=dialog]'))return;
+      if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='z'){event.preventDefault();undo();return}
+      if(event.ctrlKey||event.metaKey||event.altKey)return;
+      if(event.key.toLowerCase()==='n'){event.preventDefault();createNode('note')}
+      if(event.key.toLowerCase()==='h')setTool('pan');
+      if(event.key.toLowerCase()==='v')setTool('select');
+    };
+    window.addEventListener('keydown',shortcuts);return()=>window.removeEventListener('keydown',shortcuts);
+  });
 
   const nodeFromDrag=(event:DragEvent<HTMLElement>)=>{
 
@@ -175,6 +193,8 @@ export function Canvas({onToast,onAskAgent,onSendToAgent}:CanvasProps) {
     const raw=(event.dataTransfer.getData('text/uri-list').split('\n').find((line)=>line&&!line.startsWith('#'))??event.dataTransfer.getData('text/plain')).trim();
 
     if(!raw)return;
+
+    remember();
 
     const position=flowPosition??undefined;
 
@@ -210,10 +230,14 @@ export function Canvas({onToast,onAskAgent,onSendToAgent}:CanvasProps) {
 
 
 
-  return <section className="canvas-layout" ref={layoutRef} onDragOver={handleDragOver} onDrop={(event)=>{if(event.target instanceof HTMLElement&&event.target.closest('.canvas-toolbar'))return;event.preventDefault();nodeFromDrag(event)}}>
+  return <section className="canvas-layout" data-od-id="creative-canvas" ref={layoutRef} onDragOver={handleDragOver} onDrop={(event)=>{if(event.target instanceof HTMLElement&&event.target.closest('.canvas-toolbar'))return;event.preventDefault();nodeFromDrag(event)}}>
 
     <div className="studio-canvas-heading"><strong>{locale==='pt-BR'?'Espaço de criação':'Creative space'}</strong><span>{locale==='pt-BR'?'Arraste para organizar. Conecte para relacionar.':'Drag to organize. Connect to relate.'}</span></div>
     <div className="canvas-toolbar"><div className="canvas-title"><Icon name="canvas"/><strong>{currentWorkspace.name} canvas</strong><span>· {nodes.length} {t(nodes.length===1?'object':'objects')}</span></div><div className="canvas-tools" role="toolbar" aria-label={t('Canvas tools')}>
+
+      <button className="canvas-tool" data-od-id="canvas-select-tool" aria-pressed={tool==='select'} aria-label={locale==='pt-BR'?'Selecionar objetos':'Select objects'} title={locale==='pt-BR'?'Selecionar · V':'Select · V'} onClick={()=>setTool('select')}><Icon name="cursor"/></button>
+      <button className="canvas-tool" data-od-id="canvas-pan-tool" aria-pressed={tool==='pan'} aria-label={locale==='pt-BR'?'Mover canvas':'Pan canvas'} title={locale==='pt-BR'?'Mover · H':'Pan · H'} onClick={()=>setTool('pan')}><Icon name="hand"/></button>
+      <span className="canvas-tools-divider" aria-hidden="true"/>
 
       {quickTools.map((kind)=><button className={`canvas-tool canvas-tool-${kind}`} key={kind} draggable onDragStart={(event)=>startNodeDrag(event,kind)} onClick={()=>createNode(kind)} title={t(nodeLabels[kind])} aria-label={t(nodeLabels[kind])}><Icon name={nodeIcons[kind]}/><span>{t(nodeLabels[kind])}</span></button>)}
 
@@ -245,6 +269,10 @@ export function Canvas({onToast,onAskAgent,onSendToAgent}:CanvasProps) {
 
       onNodeClick={handleNodeClick}
 
+      onNodeDoubleClick={()=>setDetailsOpen(true)}
+      onNodeDragStart={()=>remember()}
+      onBeforeDelete={()=>{remember();return Promise.resolve(true)}}
+
       onNodeContextMenu={openContextMenu}
 
       onPaneClick={()=>{setAddMenuOpen(false);setContextMenu(null);setDetailsOpen(false)}}
@@ -267,7 +295,8 @@ export function Canvas({onToast,onAskAgent,onSendToAgent}:CanvasProps) {
 
       selectionKeyCode={['Control','Meta']}
 
-      panOnDrag
+      panOnDrag={tool==='pan'?[0,1,2]:[1,2]}
+      selectionOnDrag={tool==='select'}
 
       zoomOnDoubleClick={false}
 
@@ -285,7 +314,7 @@ export function Canvas({onToast,onAskAgent,onSendToAgent}:CanvasProps) {
 
 
     </ReactFlow>
-    <div className="studio-canvas-footer"><span><i/>{currentWorkspace.name}<small>{nodes.length} {t(nodes.length===1?'object':'objects')} · {areas.length} {locale==='pt-BR'?'áreas':'areas'}</small></span><div className="studio-zoom-controls"><button aria-label={locale==='pt-BR'?'Reduzir zoom':'Zoom out'} onClick={()=>flowRef.current?.zoomOut({duration:200})}>−</button><button title={locale==='pt-BR'?'Restaurar zoom 100%':'Reset zoom to 100%'} onClick={()=>flowRef.current?.zoomTo(1,{duration:200})}>{Math.round(view.viewport.zoom*100)}%</button><button aria-label={locale==='pt-BR'?'Ampliar zoom':'Zoom in'} onClick={()=>flowRef.current?.zoomIn({duration:200})}>+</button><button aria-label={locale==='pt-BR'?'Ajustar à tela':'Fit view'} onClick={()=>flowRef.current?.fitView({padding:.18,duration:250})}><Icon name="panel"/></button></div></div>
+    <div className="studio-canvas-footer"><span><i/>{currentWorkspace.name}<small>{nodes.length} {t(nodes.length===1?'object':'objects')}</small></span><div className="studio-zoom-controls"><button disabled={!undoStack.length} aria-label={locale==='pt-BR'?'Desfazer ação':'Undo action'} title="Ctrl Z" onClick={undo}><Icon name="undo"/></button><button aria-label={locale==='pt-BR'?'Reduzir zoom':'Zoom out'} onClick={()=>flowRef.current?.zoomOut({duration:reducedMotion?0:200})}>−</button><button title={locale==='pt-BR'?'Restaurar zoom 100%':'Reset zoom to 100%'} onClick={()=>flowRef.current?.zoomTo(1,{duration:reducedMotion?0:200})}>{Math.round(view.viewport.zoom*100)}%</button><button aria-label={locale==='pt-BR'?'Ampliar zoom':'Zoom in'} onClick={()=>flowRef.current?.zoomIn({duration:reducedMotion?0:200})}>+</button><button aria-label={locale==='pt-BR'?'Ajustar à tela':'Fit view'} onClick={()=>flowRef.current?.fitView({padding:.18,duration:reducedMotion?0:250})}><Icon name="panel"/></button></div></div>
 
     {nodes.length===0&&<div className="canvas-empty-state"><span className="first-use-mark"><Icon name="canvas"/></span><b>{t('A visual space for ideas and research')}</b><p>{t('Add a note, collect research, or turn an agent response into a Canvas object.')}</p><div><button className="soft-button" onClick={()=>createNode('note')}><Icon name="note"/>{t('Add a note')}</button><button className="soft-button" onClick={()=>createNode('chat')}><Icon name="message"/>{t('Add a chat')}</button><button className="soft-button" onClick={()=>createNode('terminal')}><Icon name="terminal"/>{t('Add a terminal')}</button></div></div>}
 
@@ -341,7 +370,7 @@ export function Canvas({onToast,onAskAgent,onSendToAgent}:CanvasProps) {
 
     </div>}
 
-    {selectedNodes.length>0&&<div className="selection-bar show"><span className="selection-label">{selectedNodes.length} {t('selected')}</span><button className="soft-button" onClick={()=>onAskAgent(selectedNodes.map((node)=>node.id))}><Icon name="message"/>{t('Ask Agent')}</button><button className="soft-button" onClick={()=>onSendToAgent(selectedNodes.map((node)=>node.id))}><Icon name="users"/>{t('Send to Agent')}</button><button className="soft-button" disabled={selectedNodes.length<2} onClick={groupSelected}><Icon name="folder"/>{t('Group')}</button></div>}
+    {selectedNodes.length>0&&<div className="selection-bar show"><span className="selection-label">{selectedNodes.length} {t('selected')}</span>{selectedNodes.length===1&&<button className="soft-button" aria-label={locale==='pt-BR'?'Editar objeto':'Edit object'} onClick={()=>setDetailsOpen(true)}><Icon name="edit"/>{locale==='pt-BR'?'Editar':'Edit'}</button>}<button className="soft-button" aria-label={t('Ask Agent')} onClick={()=>onAskAgent(selectedNodes.map((node)=>node.id))}><Icon name="message"/>{t('Ask Agent')}</button><button className="soft-button" aria-label={t('Send to Agent')} onClick={()=>onSendToAgent(selectedNodes.map((node)=>node.id))}><Icon name="users"/>{t('Send to Agent')}</button><button className="soft-button" aria-label={t('Group')} disabled={selectedNodes.length<2} onClick={groupSelected}><Icon name="folder"/>{t('Group')}</button></div>}
 
   </section>;
 

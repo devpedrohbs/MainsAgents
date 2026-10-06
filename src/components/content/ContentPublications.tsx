@@ -9,7 +9,7 @@ import {localTimeToInstant,zonedDateTime} from '../../../publication-time.mjs';
 import {SelectMenu} from '../common/SelectMenu';
 import {FlowDialog} from '../common/FlowDialog';
 import './content-publications.css';
-import {ProviderCalendar} from './ProviderCalendar';
+
 
 const labels:Record<PublicationStatus,[string,string]>={draft:['Rascunho','Draft'],'in-review':['Em revisão','In review'],approved:['Aprovado para envio','Approved to send'],sending:['Envio pendente','Sending'],scheduled:['Agendamento confirmado','Schedule confirmed'],published:['Publicado','Published'],failed:['Falha','Failed']};
 export const publicationLabel=(status:PublicationStatus,pt:boolean)=>labels[status][pt?0:1];
@@ -37,14 +37,15 @@ export function PublicationEditor({delivery,onClose}:{delivery:PublicationDelive
   const [text,setText]=useStudioDraftField<string>(scope,'text',snapshot.text),[timeZone,setTimeZone]=useStudioDraftField<string>(scope,'zone',snapshot.timeZone);
   const [planned,setPlanned]=useStudioDraftField<string>(scope,'planned',zonedDateTime(snapshot.plannedAt,snapshot.timeZone)),[selected,setSelected]=useStudioDraftField<string[]>(scope,'files',snapshot.media.map(item=>item.assetId));
   const [networkSettings,setNetworkSettings]=useStudioDraftField<NonNullable<PublicationDelivery['networkSettings']>>(scope,'network-settings',snapshot.networkSettings??{});
+  const [coverAssetId,setCoverAssetId]=useStudioDraftField<string>(scope,'cover-asset',snapshot.cover?.assetId??'');
   const [notes,setNotes]=useStudioDraftField<string>(scope,'notes',''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[saved,setSaved]=useState(false);
   const live=(state.publications??[]).find(item=>item.id===delivery.id);
   const stale=JSON.stringify(live)!==JSON.stringify(snapshot);
   const assets=(state.assets??[]).filter(item=>item.contentId===delivery.contentId&&item.workspaceId===delivery.workspaceId);
-  const changed=JSON.stringify(networkSettings)!==JSON.stringify(snapshot.networkSettings??{})||text!==snapshot.text||timeZone!==snapshot.timeZone||planned!==zonedDateTime(snapshot.plannedAt,snapshot.timeZone)||JSON.stringify(selected)!==JSON.stringify(snapshot.media.map(item=>item.assetId));
+  const changed=coverAssetId!==(snapshot.cover?.assetId??'')||JSON.stringify(networkSettings)!==JSON.stringify(snapshot.networkSettings??{})||text!==snapshot.text||timeZone!==snapshot.timeZone||planned!==zonedDateTime(snapshot.plannedAt,snapshot.timeZone)||JSON.stringify(selected)!==JSON.stringify(snapshot.media.map(item=>item.assetId));
   const locked=['sending','scheduled','published'].includes(snapshot.status)||Boolean(snapshot.operation&&snapshot.operation.phase!=='preview');
   const command=async(action:string)=>{setBusy(true);setSaved(false);setError('');try{
-    await publicationCommand({action,id:snapshot.id,contentId:snapshot.contentId,expectedDelivery:snapshot,notes,draft:{text,timeZone,...(Object.keys(networkSettings).length?{networkSettings}:{}),plannedAt:localTimeToInstant(planned,timeZone),assetIds:selected}});
+    await publicationCommand({action,id:snapshot.id,contentId:snapshot.contentId,expectedDelivery:snapshot,notes,draft:{text,timeZone,coverAssetId,...(Object.keys(networkSettings).length?{networkSettings}:{}),plannedAt:localTimeToInstant(planned,timeZone),assetIds:selected}});
     // State arrives through the provider. Close after a decision to prevent stale double submission.
     if(action!=='edit')onClose();else setSaved(true);
   }catch(failure){setError(String((failure as Error).message))}finally{setBusy(false)}};
@@ -55,6 +56,7 @@ export function PublicationEditor({delivery,onClose}:{delivery:PublicationDelive
     <label>{pt?'Texto da publicação':'Post text'}<textarea aria-label={pt?'Texto da publicação':'Post text'} value={text} disabled={locked||busy} onChange={event=>setText(event.target.value)}/></label>
     <fieldset className="publication-files"><legend>{pt?'Arquivos desta entrega':'Delivery files'}</legend>{assets.length?assets.map(asset=><label key={asset.id}><input type="checkbox" disabled={locked||busy||asset.status!=='available'} checked={selected.includes(asset.id)} onChange={()=>setSelected(items=>items.includes(asset.id)?items.filter(id=>id!==asset.id):[...items,asset.id])}/>{asset.name}<small>{asset.status}</small></label>):<p className="editorial-hint">{pt?'Adicione arquivos na biblioteca do conteúdo para selecioná-los aqui.':'Add files to the content library to select them here.'}</p>}{selected.some(id=>!assets.some(asset=>asset.id===id))&&<p role="alert">{pt?'Um arquivo foi removido.':'A file was removed.'}<button className="text-link" onClick={()=>setSelected(items=>items.filter(id=>assets.some(asset=>asset.id===id)))}>{pt?'Remover vínculo ausente':'Remove missing link'}</button></p>}</fieldset>
     <PublicationNetworkSettings platform={snapshot.platform} settings={networkSettings} onChange={setNetworkSettings} disabled={locked||busy} mediaType={selected.every(id=>assets.find(a=>a.id===id)?.kind==='image')?'photo':'video'}/>
+    <label>{pt?'Capa do vídeo':'Video cover'}<SelectMenu ariaLabel={pt?'Capa do vídeo':'Video cover'} value={coverAssetId} disabled={locked||busy} onChange={setCoverAssetId} options={[{value:'',label:pt?'Sem capa personalizada':'No custom cover'},...assets.filter(asset=>asset.kind==='image').map(asset=>({value:asset.id,label:asset.name,disabled:asset.status!=='available'}))]}/><small>{pt?'Para capas de vídeo, utilize Zernio. A capa é enviada separadamente do vídeo.':'Use Zernio for video covers. The cover is uploaded separately from the video.'}</small></label>
     <label>{pt?'Fuso do horário planejado':'Planned time zone'}<SelectMenu ariaLabel={pt?'Fuso horário':'Time zone'} value={timeZone} disabled={locked||busy} onChange={zone=>{if(planned){try{const instant=localTimeToInstant(planned,timeZone);setPlanned(zonedDateTime(instant,zone));}catch{setPlanned('');}}setTimeZone(zone)}} options={[...new Set([timeZone,...zones])].map(value=>({value,label:value}))}/></label>
     <label>{pt?'Data e hora planejadas':'Planned date and time'}<input type="datetime-local" aria-label={pt?'Data e hora planejadas':'Planned date and time'} value={planned} disabled={locked||busy} onChange={event=>setPlanned(event.target.value)}/></label>
     <p className="editorial-hint">{pt?'Salvar ou aprovar organiza esta entrega localmente. O envio ao provedor terá uma autorização separada.':'Saving or approving organizes this delivery locally. Sending to the provider will require separate authorization.'}</p>
@@ -107,22 +109,4 @@ function PublicationChange({delivery,disabled,onChanged,onBusy}:{delivery:Public
     <button className={preview?'primary-button':'soft-button'} disabled={disabled||busy||!text.trim()||mode==='schedule'&&!planned} onClick={()=>void act()}>{preview?(pt?`Autorizar alteração no ${delivery.operation?.provider==='zernio'?'Zernio':'Publora'}`:`Authorize change in ${delivery.operation?.provider==='zernio'?'Zernio':'Publora'}`):(pt?'Conferir alteração':'Review change')}</button>{preview&&<button className="text-link" disabled={disabled||busy} onClick={()=>setPreview(null)}>{pt?'Voltar para editar':'Back to edit'}</button>}
     {error&&<p role="alert" className="delivery-error">{error}</p>}
   </div>}</div>;
-}
-
-export function PublicationCalendar({workspaceId}:{workspaceId:string}){
-  const {state}=useContentWorkflow(),{locale}=useLanguage(),pt=locale==='pt-BR';
-  const [zone,setZone]=useState(defaultZone),[month,setMonth]=useState(()=>zonedDateTime(new Date().toISOString(),defaultZone()).slice(0,7)),[editing,setEditing]=useState<PublicationDelivery|null>(null);
-  const deliveries=(state.publications??[]).filter(item=>item.workspaceId===workspaceId);
-  const [year,number]=month.split('-').map(Number),days=new Date(Date.UTC(year,number,0)).getUTCDate(),offset=(new Date(Date.UTC(year,number-1,1)).getUTCDay()+6)%7;
-  const dateOf=(item:PublicationDelivery)=>zonedDateTime(item.plannedAt,zone).slice(0,10);
-  const move=(delta:number)=>{const value=new Date(Date.UTC(year,number-1+delta,1));setMonth(value.toISOString().slice(0,7))};
-  const tile=(item:PublicationDelivery)=><button type="button" className="calendar-delivery" key={item.id} onClick={()=>setEditing(structuredClone(item))}><b>{state.contents.find(content=>content.id===item.contentId)?.title}</b><span>{item.platform} · {publicationLabel(item.status,pt)}</span><small>{item.plannedAt?`${['scheduled','published'].includes(item.status)?(pt?'Confirmado':'Confirmed'):(pt?'Planejado':'Planned')} ${zonedDateTime(item.plannedAt,zone).slice(11)}`:(pt?'Sem horário':'No time')}</small></button>;
-  return <section className="editorial-card publication-calendar" aria-label={pt?'Calendário de entregas':'Delivery calendar'}><div className="editorial-section-head"><div><h2>{pt?'Calendário de entregas':'Delivery calendar'}</h2><p className="editorial-hint">{pt?'Os horários abaixo são planejamento local. Confirmações externas aparecem somente com recibo do provedor.':'Times below are local plans. External confirmations require a provider receipt.'}</p></div><SelectMenu ariaLabel={pt?'Fuso do calendário':'Calendar time zone'} value={zone} onChange={setZone} options={[...new Set([zone,...zones])].map(value=>({value,label:value}))}/></div><nav className="calendar-month" aria-label={pt?'Navegar meses':'Browse months'}><button className="soft-button" aria-label={pt?'Mês anterior':'Previous month'} onClick={()=>move(-1)}>‹</button><strong>{new Date(Date.UTC(year,number-1,15)).toLocaleDateString(locale,{month:'long',year:'numeric',timeZone:'UTC'})}</strong><button className="soft-button" aria-label={pt?'Próximo mês':'Next month'} onClick={()=>move(1)}>›</button></nav>
-    <div className="calendar-grid">{(pt?['Seg','Ter','Qua','Qui','Sex','Sáb','Dom']:['Mon','Tue','Wed','Thu','Fri','Sat','Sun']).map(day=><span className="calendar-weekday" key={day}>{day}</span>)}{Array.from({length:offset},(_,index)=><div className="calendar-spacer" key={`empty-${index}`}/>)}{Array.from({length:days},(_,index)=>{const day=String(index+1).padStart(2,'0'),date=`${month}-${day}`;return <div className="calendar-day" key={date} aria-label={date}><time dateTime={date}>{index+1}</time>{deliveries.filter(item=>dateOf(item)===date).sort((a,b)=>a.plannedAt!.localeCompare(b.plannedAt!)).map(tile)}</div>})}</div>
-    <div className="calendar-agenda"><h3>{pt?'Agenda do mês':'Monthly agenda'}</h3>{deliveries.filter(item=>dateOf(item).startsWith(month)).sort((a,b)=>a.plannedAt!.localeCompare(b.plannedAt!)).map(item=><div key={item.id}><time>{new Date(item.plannedAt!).toLocaleDateString(locale,{timeZone:zone})}</time>{tile(item)}</div>)}</div>
-    <details className="calendar-unscheduled" open><summary>{pt?'Sem horário planejado':'No planned time'} ({deliveries.filter(item=>!item.plannedAt).length})</summary><div>{deliveries.filter(item=>!item.plannedAt).map(tile)}</div></details>
-    {!deliveries.length&&<p className="editorial-hint">{pt?'Abra um conteúdo e adicione uma entrega por rede para começar.':'Open content and add a network delivery to begin.'}</p>}
-    <ProviderCalendar key={workspaceId} workspaceId={workspaceId} zone={zone} month={month}/>
-    {editing&&<PublicationEditor delivery={editing} onClose={()=>setEditing(null)}/>}
-  </section>;
 }

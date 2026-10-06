@@ -4,12 +4,16 @@ import {uploadDestination,uploadPublicationFile} from './publication-media-uploa
 const identity=value=>typeof value==='string'&&/^[A-Za-z0-9_-]{1,200}$/.test(value);
 const stable=value=>JSON.stringify(value&&typeof value==='object'?Array.isArray(value)?value.map(v=>JSON.parse(stable(v))):Object.fromEntries(Object.keys(value).sort().map(k=>[k,JSON.parse(stable(value[k]))])):value??null);
 export function zernioBody(op){
- return {content:op.arguments.content,mediaItems:(op.uploads??[]).map(f=>({type:f.type,url:f.url})),platforms:[{platform:op.platform,accountId:op.accountId,...(op.networkSettings?{platformSpecificData:op.networkSettings}:{})}],timezone:op.timeZone,isDraft:op.mode==='draft',publishNow:false,...(op.mode==='schedule'?{scheduledFor:op.arguments.scheduledTime}:{})};
+ const cover=op.uploads?.find(f=>f.purpose==='cover'),settings=structuredClone(op.networkSettings??{});
+ if(cover&&op.platform==='instagram')settings.instagramThumbnail=cover.url;
+ if(cover&&op.platform==='tiktok')settings.tiktokSettings={...settings.tiktokSettings,video_cover_image_url:cover.url};
+ return {content:op.arguments.content,mediaItems:(op.uploads??[]).filter(f=>f.purpose!=='cover').map(f=>({type:f.type,url:f.url,...(cover&&op.platform==='linkedin'?{thumbnail:cover.url}:{})})),platforms:[{platform:op.platform,accountId:op.accountId,...(Object.keys(settings).length?{platformSpecificData:settings}:{})}],timezone:op.timeZone,isDraft:op.mode==='draft',publishNow:false,...(op.mode==='schedule'?{scheduledFor:op.arguments.scheduledTime}:{})};
 }
 export function verifiedZernioPublication(data,op){
  const p=data?.post,target=p?.platforms?.[0],body=zernioBody(op),account=typeof target?.accountId==='string'?target.accountId:target?.accountId?._id;
  if((op.uploads??[]).length!==(op.files??[]).length||(op.uploads??[]).some(f=>f.status!=='uploaded')||p?._id!==op.externalId||p.content!==body.content||p.platforms?.length!==1||account!==op.accountId||target.platform!==op.platform||target.customContent!=null&&target.customContent!==body.content||target.customMedia?.length||p.mediaItems?.length!==body.mediaItems.length||!body.mediaItems.every((f,i)=>p.mediaItems[i]?.url===f.url&&p.mediaItems[i]?.type===f.type))throw Error('The Zernio post differs from the approved account, text or files.');
- for(const [key,value] of Object.entries(op.networkSettings??{}))if(stable(target.platformSpecificData?.[key])!==stable(value))throw Error('The Zernio network settings differ from the approval.');
+ for(const [key,value] of Object.entries(body.platforms[0].platformSpecificData??{}))if(stable(target.platformSpecificData?.[key])!==stable(value))throw Error('The Zernio network settings differ from the approval.');
+ const cover=op.uploads?.find(f=>f.purpose==='cover');if(cover&&(op.platform==='instagram'?target.platformSpecificData?.instagramThumbnail!==cover.url:op.platform==='tiktok'?target.platformSpecificData?.tiktokSettings?.video_cover_image_url!==cover.url:p.mediaItems?.[0]?.thumbnail!==cover.url))throw Error('O provedor não confirmou a capa aprovada.');
  const status=target.status==='pending'?p.status:target.status;
  if(p.status==='draft'&&['draft','pending',undefined].includes(target.status))return {status:'draft'};
  if(p.status==='scheduled'&&status==='scheduled'&&op.arguments.scheduledTime&&Date.parse(target.scheduledFor??p.scheduledFor)===Date.parse(op.arguments.scheduledTime))return {status:'scheduled',scheduledAt:target.scheduledFor??p.scheduledFor};
@@ -44,7 +48,7 @@ export function createZernioPublicationConnector(getKey,{fetchImpl=fetch}={}){
     await guard();const slot=await request('media/presign','POST',{filename:file.name,contentType:file.contentType,size:file.size});uploadDestination(slot.uploadUrl);
     const publicUrl=new URL(slot.publicUrl);if(publicUrl.protocol!=='https:'||publicUrl.hostname!=='media.zernio.com'||publicUrl.search||publicUrl.username||publicUrl.password)throw Error('Unverifiable Zernio media URL.');
     await uploadPublicationFile(file,slot.uploadUrl,{fetchImpl});await guard();
-    op.uploads??=[];op.uploads.push({assetId:file.assetId,versionId:file.versionId,sha256:file.sha256,name:file.name,type:file.type,url:publicUrl.href,status:'uploaded'});await checkpoint(op);
+    op.uploads??=[];op.uploads.push({assetId:file.assetId,versionId:file.versionId,sha256:file.sha256,name:file.name,type:file.type,...(file.purpose?{purpose:file.purpose}:{}),url:publicUrl.href,status:'uploaded'});await checkpoint(op);
    }
   },
   async create(op){const data=await request('posts','POST',zernioBody(op),op.arguments.idempotencyKey);if(!identity(data.post?._id))throw Error('Zernio returned no post ID. Do not create another post.');return data.post._id;},

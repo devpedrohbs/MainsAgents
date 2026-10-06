@@ -21,7 +21,7 @@ import { Settings } from '../pages/Settings';
 import { useCanvas } from '../components/canvas/CanvasProvider';
 import { useWorkspaces } from './WorkspaceProvider';
 import { useChat } from '../features/chat/ChatProvider';
-import { usePersistentState } from '../data/localPersistence';
+import { usePersistentState, updatePersistentValue } from '../data/localPersistence';
 import { useLanguage } from './LanguageProvider';
 import { TaskEditorDialog, type TaskDraft } from '../components/tasks/TaskEditorDialog';
 import { WelcomeGuide } from '../components/onboarding/WelcomeGuide';
@@ -29,6 +29,7 @@ import { agentTemplates, localizeTemplate } from '../features/agents/agentTempla
 import { useContentWorkflow } from '../features/content/ContentWorkflowProvider';
 import { editorialInbox, type EditorialInboxItem } from '../features/content/editorialInbox';
 import {useChatInbox} from '../features/chat/useChatInbox';
+import {AgentComparisonView} from '../components/chat/AgentComparisonView';
 
 export function App() {
   const { page, navigate } = useHashRouter();
@@ -61,15 +62,15 @@ export function App() {
     if (!current) { notify(locale === 'pt-BR' ? 'Esta pendência já mudou. Confira a lista atualizada.' : 'This item has changed. Check the updated list.'); return; }
     setSelectedContentId(current.contentId ?? null);
     setSelectedEditorialTopicId(current.topicId);
-    navigate('content');
+    updatePersistentValue('studio-view','studio','studio');navigate('content');
   };
   useEffect(()=>{
     const open=(event:Event)=>{
       const detail=(event as CustomEvent<{contentId?:string;topicId?:string}>).detail;
       const id=detail?.contentId;
       const item=editorialState.contents.find(content=>content.id===id);
-      if(!item){const topic=editorialState.topics.find(topic=>topic.id===detail?.topicId);if(topic){setCurrentWorkspaceId(topic.workspaceId);setSelectedContentId(topic.contentId??null);setSelectedEditorialTopicId(topic.id);navigate('content');}return;}
-      setCurrentWorkspaceId(item.workspaceId);setSelectedContentId(item.id);setSelectedEditorialTopicId(item.topicId);navigate('content');
+      if(!item){const topic=editorialState.topics.find(topic=>topic.id===detail?.topicId);if(topic){setCurrentWorkspaceId(topic.workspaceId);setSelectedContentId(topic.contentId??null);setSelectedEditorialTopicId(topic.id);updatePersistentValue('studio-view','studio','studio');navigate('content');}return;}
+      setCurrentWorkspaceId(item.workspaceId);setSelectedContentId(item.id);setSelectedEditorialTopicId(item.topicId);updatePersistentValue('studio-view','studio','studio');navigate('content');
     };
     window.addEventListener('mainsagents:open-content',open);return()=>window.removeEventListener('mainsagents:open-content',open);
   },[editorialState.contents,editorialState.topics,setCurrentWorkspaceId,navigate]);
@@ -178,7 +179,7 @@ export function App() {
     if (task.contentId) {
       setSelectedContentId(task.contentId);
       setSelectedEditorialTopicId(null);
-      navigate('content');
+      updatePersistentValue('studio-view','studio','studio');navigate('content');
       return;
     }
     setActiveAgentId(task.agentId);
@@ -422,7 +423,7 @@ export function App() {
     ) : page === 'canvas' ? (
       <Canvas onToast={notify} onAskAgent={sendCanvasContext} onSendToAgent={sendCanvasContext} />
     ) : page === 'flow' ? (
-      <Flow onOpenCanvas={() => navigate('canvas')} onSelectAgent={selectAgent} />
+      <Flow onOpenCanvas={() => navigate('canvas')} onSelectAgent={selectAgent} onOpenStudio={()=>{updatePersistentValue('studio-view','studio','studio');navigate('content')}} />
     ) : page === 'agents' ? (
       <Agents
         key={currentWorkspaceId}
@@ -507,6 +508,7 @@ export function App() {
       >
         {content}
       </AppShell>
+      <AgentComparisonView onNavigate={navigate} onEditAgent={editAgent} onProviderSettings={()=>{setSettingsSection('providers');setPanelOpen(false);navigate('settings')}} onToast={notify}/>
       <CommandPalette
         agents={allAgents}
         tasks={allTasks}

@@ -11,10 +11,12 @@ import { HttpApiProvider } from './features/chat/HttpApiProvider';
 import { ClaudeCliProvider } from './features/chat/ClaudeCliProvider';
 import { LanguageProvider } from './app/LanguageProvider';
 import { ContentWorkflowProvider } from './features/content/ContentWorkflowProvider';
+import { ProductionProvider } from './features/production/ProductionProvider';
 import { restoreLocalPersistence, saveNow } from './data/localPersistence';
 import { storageProfile } from './data/IndexedDbStateStore';
 import { recoverPendingBackup } from './data/backup';
 import '@xyflow/react/dist/style.css';
+import './styles/refined-workspace.css';
 
 const root=document.getElementById('root');
 if(!root)throw new Error('Missing #root element');
@@ -38,7 +40,7 @@ async function openWorkspace() {
     }
     const codexService = new HttpCodexService();
     const providers = [new CodexAiProvider(codexService), new ClaudeCliProvider(), new HttpApiProvider('gemini')];
-    reactRoot.render(<StrictMode><LanguageProvider><WorkspaceProvider><AgentsProvider><CanvasProvider><ChatProvider providers={providers}><ContentWorkflowProvider><App/></ContentWorkflowProvider></ChatProvider></CanvasProvider></AgentsProvider></WorkspaceProvider></LanguageProvider></StrictMode>);
+    reactRoot.render(<StrictMode><LanguageProvider><WorkspaceProvider><AgentsProvider><CanvasProvider><ChatProvider providers={providers}><ContentWorkflowProvider><ProductionProvider><App/></ProductionProvider></ContentWorkflowProvider></ChatProvider></CanvasProvider></AgentsProvider></WorkspaceProvider></LanguageProvider></StrictMode>);
   } catch (error) {
     console.error('[MainsAgents] Could not open saved workspace', error);
     reactRoot.render(<div role="alert" style={{ padding: '48px', fontFamily: 'system-ui', maxWidth: '640px', color: 'GrayText' }}>

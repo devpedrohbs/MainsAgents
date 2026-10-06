@@ -35,16 +35,19 @@ export function createEditorialPublications(db){
           if(!asset||!version||asset.status!=='available')throw new Error('Check the linked file before selecting it.');
           return {assetId:asset.id,versionId:version.id,sha256:version.sha256};
         });
-        const next={...delivery,networkSettings:draft.networkSettings,text:draft.text.trim(),media,timeZone:draft.timeZone,plannedAt:draft.plannedAt?new Date(draft.plannedAt).toISOString():undefined};
+        let cover;
+        if(draft.coverAssetId){const asset=state.assets?.find(item=>item.id===draft.coverAssetId&&item.contentId===content.id&&item.workspaceId===content.workspaceId),v=asset?.versions.find(item=>item.id===asset.currentVersionId);if(asset?.kind!=='image'||asset.status!=='available'||!v)throw Error('Verifique a imagem de capa antes de selecionar.');cover={assetId:asset.id,versionId:v.id,sha256:v.sha256};}
+        const next={...delivery,cover,networkSettings:draft.networkSettings,text:draft.text.trim(),media,timeZone:draft.timeZone,plannedAt:draft.plannedAt?new Date(draft.plannedAt).toISOString():undefined};
         const changed=artifactHash(publicationPayload(delivery))!==artifactHash(publicationPayload(next));
         if(input.action==='edit'&&changed)delivery.version++;
         Object.assign(delivery,publicationPayload(next));
+        if(!cover)delete delivery.cover;
         if(changed){delivery.status='draft';delete delivery.receipt;delete delivery.operation;}
       }else{
         if(!text(input.notes??'',5000))throw new Error('Keep review notes under 5000 characters.');
         if(input.action==='approve'&&delivery.status!=='in-review')throw new Error('Submit this version for review before approving.');
         if(['approve','submit'].includes(input.action)&&!delivery.text.trim()&&!delivery.media.length)throw new Error('Add text or a file before reviewing.');
-        if(input.action==='approve')for(const ref of delivery.media){
+        if(input.action==='approve')for(const ref of [...delivery.media,...(delivery.cover?[delivery.cover]:[])]){
           const asset=state.assets?.find(item=>item.id===ref.assetId&&item.contentId===content.id&&item.workspaceId===content.workspaceId);
           const version=asset?.versions.find(item=>item.id===asset.currentVersionId);
           if(asset?.status!=='available'||version?.id!==ref.versionId||version.sha256!==ref.sha256)throw new Error('A selected file changed. Edit and review the delivery again.');

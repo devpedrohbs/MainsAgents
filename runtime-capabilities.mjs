@@ -19,6 +19,8 @@ export function diagnoseSkills(agent){
   try{if(!path||statSync(path).size>1_000_000)return {name,path,status:path?'too-large':'missing'};
    const text=readFileSync(path,'utf8');if(!text.trim())return {name,path,status:'empty'};
    const mentions=['notion','apify','publora','zernio','ffmpeg'].filter(value=>new RegExp(`\\b${value}\\b`,'i').test(text));
+   // "paper" alone is a common word; only product-specific references count.
+   if(/\bpaper(?:\.design|[\s-]+(?:desktop|mcp))\b|\bmcp__paper__/i.test(text))mentions.push('paper');
    return {name,path,status:'readable',mentions,requirements:declaredSkillRequirements(text)};
   }catch{return {name,path,status:'unreadable'};}
  });

@@ -1,6 +1,7 @@
 import {createHash} from 'node:crypto';
 import {workflowExecutionSnapshot,restoreWorkflowExecution} from './workflow-execution-backup.mjs';
 import {actionHash} from './runtime-action-approvals.mjs';
+import {productionSnapshot,restoreProductions} from './production-backup.mjs';
 
 const tables=['editorial_jobs','editorial_job_events','editorial_connections'];
 const exists=(db,name)=>Boolean(db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(name));
@@ -12,7 +13,7 @@ export function executionSnapshot(db,profile){
   const delegations=exists(db,'agent_delegation_jobs')?db.prepare('SELECT * FROM agent_delegation_jobs WHERE profile_id=? ORDER BY id').all(profile):[];
   const delegationSessions=exists(db,'agent_delegation_sessions')?db.prepare('SELECT * FROM agent_delegation_sessions WHERE profile_id=? ORDER BY id').all(profile):[];
   const mediaJobs=exists(db,'editorial_media_jobs')?db.prepare('SELECT * FROM editorial_media_jobs WHERE profile_id=? ORDER BY id').all(profile):[];
-  return {jobs,events,connections,actions,delegations,delegationSessions,mediaJobs,...workflowExecutionSnapshot(db,profile)};
+  return {jobs,events,connections,actions,delegations,delegationSessions,mediaJobs,productions:productionSnapshot(db,profile),...workflowExecutionSnapshot(db,profile)};
 }
 export const executionRevision=value=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
 
@@ -47,6 +48,7 @@ export function restoreExecution(db,profile,incoming,mode='replace'){
     db.prepare('INSERT OR IGNORE INTO editorial_connections VALUES (?,?,?)').run(profile,row.workspace_id,JSON.stringify({...config,autoSync:false}));
   }
   restoreWorkflowExecution(db,profile,incoming,mode);
+  restoreProductions(db,profile,incoming.productions,mode);
   if(exists(db,'editorial_media_jobs')){
     if(mode==='replace')db.prepare('DELETE FROM editorial_media_jobs WHERE profile_id=?').run(profile);
     for(const row of incoming.mediaJobs??[]){

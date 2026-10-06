@@ -13,6 +13,7 @@ interface Window {
       verify(profile:string,contentId:string):Promise<Array<{id:string;versionId:string;inspection:import('../features/content/assetModel').LocalAssetInspection}>>;
       reveal(profile:string,contentId:string,assetId:string):Promise<boolean>;
       open(profile:string,contentId:string,assetId:string):Promise<boolean>;
+      preview?(profile:string,contentId:string,assetId:string):Promise<string>;
     };
     backup?: {
       inspectFiles(paths:string[]):Promise<Array<{path:string;available:boolean}>>;

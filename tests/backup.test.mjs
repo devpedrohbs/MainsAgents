@@ -18,6 +18,11 @@ test('backup allowlist excludes credentials and unknown internal keys',()=>{
   assert.deepEqual(safeData({agents:[],language:'pt-BR',secret:'should-not-export','api-key':'private'}),{agents:[],language:'pt-BR'});
 });
 
+test('Studio calendar preference survives export/import and malformed views are rejected',()=>{
+  assert.equal(composeImport({},file(safeData({'studio-view':'calendar'})),'replace')['studio-view'],'calendar');
+  assert.throws(()=>file({'studio-view':'unexpected'}),/Invalid Studio view/);
+});
+
 test('export and restore preserve connected sessions and remote specialist history',()=>{
   const data={sessions:[
     {id:'source',agentId:'a1',title:'Source',messages:[],agentConnection:{enabled:true,targetAgentId:'a2',targetSessionId:'target'}},

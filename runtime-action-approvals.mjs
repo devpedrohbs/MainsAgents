@@ -1,5 +1,6 @@
 import {createHash,randomUUID} from 'node:crypto';
 import {classifyMcpAction,permittedMcpAction} from './runtime-tool-policy.mjs';
+import {notionAutomaticDecision} from './notion-automation-policy.mjs';
 
 const canonical=value=>value&&typeof value==='object'?Array.isArray(value)?value.map(canonical):Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])])):value;
 export const actionHash=value=>createHash('sha256').update(JSON.stringify(canonical(value))).digest('hex');
@@ -20,11 +21,18 @@ export function createRuntimeActionApprovals(db,{getCurrentProfile,getBinding,ti
   if(message.method!=='mcpServer/elicitation/request'||p.mode!=='form'||meta.codex_approval_kind!=='mcp_tool_call'||!tool||!p.serverName||!p.threadId||!p.turnId||!binding||!meta.tool_params||sensitive(meta.tool_params)||JSON.stringify(meta.tool_params).length>64000){reply({action:'decline',content:null});return null;}
   if(getCurrentProfile&&getCurrentProfile()!==binding.profileId){reply({action:'decline',content:null});return null;}
   const old=[...live.entries()].find(([,entry])=>entry.requestId===message.id&&entry.threadId===p.threadId);if(old)return old[0];
-  const category=classifyMcpAction(tool,meta.tool_params);
+  const category=classifyMcpAction(tool,meta.tool_params,p.serverName);
   const payload={threadId:p.threadId,executionId:p.turnId,sessionId:binding.sessionId,agentId:binding.agentId,agentName:binding.agentName,workspaceId:binding.workspaceId,server:p.serverName,tool,category,arguments:meta.tool_params,bindingHash:binding.hash};
   const id=randomUUID(),hash=actionHash(payload),now=new Date().toISOString();
   db.prepare('INSERT INTO runtime_actions VALUES (?,?,?,?,?,?,?,?)').run(id,binding.profileId,hash,'pending',JSON.stringify(payload),null,now,now);
   if(!permittedMcpAction(binding.agent,category)){update(id,'denied',`This agent does not permit ${category} MCP actions. Review its permissions before preparing a new call.`);reply({action:'decline',content:null});return id;}
+  const automaticReason=notionAutomaticDecision(binding.agent,p.serverName,tool,meta.tool_params);
+  if(automaticReason){
+   const current=resolveBinding?resolveBinding():getBinding?.(p.threadId);
+   if((resolveBinding||getBinding)&&(!current||current.profileId!==binding.profileId||current.hash!==binding.hash||!permittedMcpAction(current.agent,category)||!notionAutomaticDecision(current.agent,p.serverName,tool,meta.tool_params))){update(id,'interrupted','The Notion preference or agent changed. Prepare a new call.');reply({action:'decline',content:null});return id;}
+   db.prepare('UPDATE runtime_actions SET payload_json=? WHERE id=?').run(JSON.stringify({...payload,approvalSource:'notion-preference',automaticReason}),id);
+   update(id,'approved');reply({action:'accept',content:{}});return id;
+  }
   const timer=setTimeout(()=>cancel(id,'Approval expired. Ask the agent to prepare the action again.'),timeoutMs);timer.unref?.();
   live.set(id,{reply,timer,requestId:message.id,threadId:p.threadId,executionId:p.turnId,binding,resolveBinding});return id;
  }

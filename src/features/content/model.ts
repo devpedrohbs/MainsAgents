@@ -18,6 +18,8 @@ export interface ResearchProposal {
   factualQuestions:string[];
 }
 export interface ScriptPath { title:string; outline:string }
+export interface CarouselSlide {order:number;title:string;text:string;imageBrief:string;sourceUrls:string[]}
+export interface CarouselDraft {slides:CarouselSlide[];caption:string;sources:SourceReference[]}
 export interface ScriptOptions {
   hooks:string[];
   ctas:string[];
@@ -25,6 +27,7 @@ export interface ScriptOptions {
   improvisationTopics:string[];
   thumbnailDirection:string;
   draftScript:string;
+  carousel?:CarouselDraft;
 }
 export interface EditorialTopic extends ResearchProposal {
   id:string; workspaceId:string; requestId:string; inputKind:'text'|'url'|'ideas'; input:string;
@@ -47,12 +50,13 @@ export interface WorkflowRun {
 }
 export interface EditorialArtifact {
   id:string; workspaceId:string; topicId:string; contentId?:string; runId?:string;
-  type:'research'|'script-options'|'script'|'specialist-result'|'file-delivery'; version:number;
+  type:'research'|'script-options'|'script'|'script-draft'|'specialist-result'|'file-delivery'; version:number;
   data:ResearchProposal|ScriptOptions|ApprovedScript|SpecialistResult|FileDelivery; createdAt:string;
   source?:{sessionId:string;messageId:string;messageHash:string;agentId:string};
 }
 export interface ApprovedScript {
   hook:string; cta:string; path:ScriptPath; text:string; improvisationTopics:string[]; thumbnailDirection:string;
+  carousel?:CarouselDraft;
 }
 export interface EditorialApproval {
   id:string; workspaceId:string; topicId:string; contentId?:string; artifactId:string; artifactVersion:number;
@@ -67,7 +71,7 @@ export interface EditorialState {
 }
 export type PublicationStatus='draft'|'in-review'|'approved'|'sending'|'scheduled'|'published'|'failed';
 export interface PublicationMedia {assetId:string;versionId:string;sha256:string}
-export interface PublicationPayload {platform:Platform;text:string;media:PublicationMedia[];plannedAt?:string;timeZone:string;networkSettings?:{contentType?:'story';shareToFeed?:boolean;tiktokSettings?:{privacy_level:string;commercialContentType:string;allow_comment:boolean;allow_duet:boolean;allow_stitch:boolean;content_preview_confirmed:boolean;express_consent_given:boolean;video_made_with_ai:boolean}}}
+export interface PublicationPayload {platform:Platform;text:string;media:PublicationMedia[];cover?:PublicationMedia;plannedAt?:string;timeZone:string;networkSettings?:{contentType?:'story';shareToFeed?:boolean;tiktokSettings?:{privacy_level:string;commercialContentType:string;allow_comment:boolean;allow_duet:boolean;allow_stitch:boolean;content_preview_confirmed:boolean;express_consent_given:boolean;video_made_with_ai:boolean}}}
 export interface PublicationDelivery extends PublicationPayload {
   id:string;contentId:string;workspaceId:string;version:number;status:PublicationStatus;createdAt:string;updatedAt:string;
   receipt?:{id:string;checkedAt:string;version:number;provider?:string;status?:string;scheduledAt?:string;platformPostId?:string};

@@ -38,15 +38,6 @@ export function Topbar({
         <Icon name="menu" />
       </button>
       <div className="studio-project"><WorkspaceSwitcher /><Breadcrumbs page={page} onNavigate={onNavigate} /></div>
-      <nav className="studio-view-switch" aria-label={locale === 'pt-BR' ? 'Visualizações do workspace' : 'Workspace views'}>
-        {(['canvas', 'flow', 'agents'] as const).map((destination) => (
-          <a key={destination} href={`#${destination}`} aria-current={page === destination || (destination === 'agents' && page === 'agent-settings') ? 'page' : undefined}
-            onClick={(event) => { event.preventDefault(); onNavigate(destination); }}>
-            <Icon name={destination === 'canvas' ? 'canvas' : destination === 'flow' ? 'link' : 'users'} />
-            {destination === 'canvas' ? 'Canvas' : destination === 'flow' ? locale === 'pt-BR' ? 'Fluxo' : 'Flow' : t('Agents')}
-          </a>
-        ))}
-      </nav>
       <div className="top-actions">
         <SaveIndicator />
         <CodexUsagePopover />

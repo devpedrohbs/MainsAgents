@@ -332,6 +332,7 @@ async function createWindow() {
     getRuntime:()=>codexBridge?.isAlive()?codexBridge.workflow:null,
     getChatRuntime:provider=>provider==='claude'?claudeCodeBridge.runtime:codexBridge?.isAlive()?codexBridge.chatRuntime:null,
     getAgents:profile=>desktopStateStore.read(profile,'agents')??[],
+    getFlows:profile=>desktopStateStore.read(profile,'production-flows'),
     getSessions:profile=>desktopStateStore.read(profile,'sessions')??[],
     getCurrentProfile:()=>desktopStateStore.currentProfile(),
     getConnector:()=>codexBridge?.isAlive()?createNotionEditorialConnector(()=>codexBridge.notionMcp):null,

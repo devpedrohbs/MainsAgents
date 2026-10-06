@@ -44,6 +44,16 @@ jobs:
           "MAINSAGENTS_TEST_ASAR=$asar" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
       - name: Validate review and calendar interface
         run: npx electron scripts/test-publications-ui.mjs
+      - name: Validate refined workspace and responsive calendar
+        run: npx electron scripts/test-refined-workspace-ui.mjs --disable-gpu
+      - name: Validate persistent named production flows
+        run: npx electron scripts/test-production-flows-ui.mjs --disable-gpu
+      - name: Validate shared chat and Flow production coordinator
+        run: npx electron scripts/test-semi-production-ui.mjs --disable-gpu
+      - name: Validate elapsed response time and visible tool approvals
+        run: npx electron scripts/test-chat-timing-ui.mjs --disable-gpu
+      - name: Validate per-agent Notion automation preference
+        run: npx electron scripts/test-notion-automation-ui.mjs --disable-gpu
       - name: Validate real media export interface
         run: npx electron scripts/test-editorial-media-ui.mjs
       - name: Validate unread chats, real files and durable manual handoff

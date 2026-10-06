@@ -1,4 +1,7 @@
 import {useStudioDraftField,studioDraftKey,clearStudioDraft} from '../features/content/studioDrafts';
+import {CarouselReview} from '../components/content/CarouselReview';
+import {carouselScript} from '../../editorial-protocol.mjs';
+import type {CarouselDraft} from '../features/content/model';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useWorkspaces } from '../app/WorkspaceProvider';
 import { useLanguage } from '../app/LanguageProvider';
@@ -17,7 +20,9 @@ import { Icon } from '../components/common/Icon';
 import {useCanvas} from '../components/canvas/CanvasProvider';
 import {ContentAssetLibrary} from '../components/content/ContentAssetLibrary';
 import {EditorialWorkPanel} from '../components/content/EditorialWorkPanel';
-import {ContentPublications,PublicationCalendar} from '../components/content/ContentPublications';
+import {ContentPublications} from '../components/content/ContentPublications';
+import {PublicationCalendar} from '../components/content/PublicationCalendar';
+import {usePersistentState} from '../data/localPersistence';
 import {ContentMediaEditor} from '../components/content/ContentMediaEditor';
 import {ScriptDeliveryReview} from '../components/chat/ChatDeliveryCard';
 import type {EditorialArtifact} from '../features/content/model';
@@ -54,7 +59,7 @@ export function ContentStudio({
   const { currentWorkspaceId, currentWorkspace } = useWorkspaces();
   const { locale } = useLanguage();
   const pt = locale === 'pt-BR';
-  const [view,setView]=useState<'studio'|'calendar'>('studio');
+  const [view,setView]=usePersistentState<'studio'|'calendar'>('studio-view','studio');
   const [reviewArtifact,setReviewArtifact]=useState<EditorialArtifact|null>(null);
   useEffect(()=>{const open=()=>setView('calendar');window.addEventListener('mainsagents:publication-calendar',open);return()=>window.removeEventListener('mainsagents:publication-calendar',open)},[]);
   useEffect(()=>{if(selectedContentId||requestedTopicId)setView('studio')},[selectedContentId,requestedTopicId]);
@@ -131,6 +136,15 @@ export function ContentStudio({
   const [scriptText,setScriptText]=useStudioDraftField<string>(scriptScope,'text',approvedScript?.text??options?.draftScript??'');
   const [thumbnail,setThumbnail]=useStudioDraftField<string>(scriptScope,'thumbnail',approvedScript?.thumbnailDirection??options?.thumbnailDirection??'');
   const [improv,setImprov]=useStudioDraftField<string>(scriptScope,'improv',(approvedScript?.improvisationTopics??options?.improvisationTopics??[]).join('\n'));
+  const initialCarousel=content?.status==='script-approved'?approvedScript?.carousel??options?.carousel:options?.carousel??approvedScript?.carousel;
+  const structuredCarousel=content?.format==='carousel'&&!!initialCarousel;
+  const [carouselJson,setCarouselJson]=useStudioDraftField<string>(scriptScope,'carousel',JSON.stringify(initialCarousel??null));
+  let carouselDraft:CarouselDraft|undefined,carouselError='';
+  if(structuredCarousel)try{
+    const parsed=JSON.parse(carouselJson);
+    if(!parsed||!Array.isArray(parsed.slides)||parsed.slides.length>20||!parsed.slides.every((slide:CarouselDraft['slides'][number])=>slide&&['title','text','imageBrief'].every(key=>typeof slide[key as keyof typeof slide]==='string')&&Array.isArray(slide.sourceUrls)&&slide.sourceUrls.every(url=>typeof url==='string'))||typeof parsed.caption!=='string')throw new Error('Invalid saved carousel draft. Restore the generated draft to review it.');
+    carouselDraft=parsed;carouselScript(parsed,topic?.sources);
+  }catch(error){carouselError=(error as Error).message;}
   const runs = state.runs
     .filter(
       (item) =>
@@ -241,7 +255,7 @@ useEffect(() => {
     void action(async () => {
       await configureNotion(currentWorkspaceId,{dataSourceId:notionId.trim().replace(/^collection:\/\//,''),autoSync:syncNotion});
       const destination=notionId.trim().replace(/^collection:\/\//,'').replaceAll('-','').toLowerCase().replace(/^(\w{8})(\w{4})(\w{4})(\w{4})(\w{12})$/,'$1-$2-$3-$4-$5');
-      await approveScript(content.id, script, decisionNotes,syncNotion,optionsArtifact?{artifact:optionsArtifact,destination}:undefined);
+      await approveScript(content.id, structuredCarousel?carouselScript(carouselDraft,topic?.sources):script, decisionNotes,syncNotion,optionsArtifact?{artifact:optionsArtifact,destination}:undefined);
       setFeedback(
         pt
           ? syncNotion?'Roteiro aprovado. A criação do card está na fila; acompanhe a confirmação abaixo.':'Esta versão do roteiro foi aprovada e guardada.'
@@ -255,9 +269,9 @@ useEffect(() => {
       <header className="page-head">
         <div>
           <p className="eyebrow">{currentWorkspace.name}</p>
-          <h1>{pt ? 'Estúdio de conteúdo' : 'Content Studio'}</h1>
+          <h1 data-od-id="studio-heading">{view==='calendar'?(pt?'Calendário de postagens':'Publishing calendar'):(pt ? 'Estúdio de conteúdo' : 'Content Studio')}</h1>
           <p>
-            {pt
+            {view==='calendar'?(pt?'Conteúdo, canais e horários. Tudo no mesmo lugar.':'Content, channels and timing. All in one place.'):pt
               ? 'Da pauta ao roteiro aprovado, com fontes, versões e decisões no mesmo lugar.'
               : 'Take a topic to an approved script with sources, versions and decisions together.'}
           </p>
@@ -707,6 +721,11 @@ useEffect(() => {
                   {options && (
                     <div className="editorial-review">
                       {optionsArtifact&&<button className="soft-button" type="button" disabled={busy||content.status==='generating'} onClick={()=>setReviewArtifact(structuredClone(optionsArtifact))}>{pt?'Pedir ajuste ou rejeitar':'Request changes or reject'}</button>}
+                      {structuredCarousel?<>
+                        {carouselDraft&&<CarouselReview value={carouselDraft} pt={pt} onChange={value=>setCarouselJson(JSON.stringify(value))}/>}
+                        {carouselError&&<p className="delivery-error" role="alert">{carouselError}</p>}
+                        {!carouselDraft&&<button className="soft-button" onClick={()=>setCarouselJson(JSON.stringify(initialCarousel))}>{pt?'Restaurar rascunho gerado':'Restore generated draft'}</button>}
+                      </>:<>
                       <h3>{pt ? 'Compare e escolha' : 'Compare and choose'}</h3>
                       <p className="editorial-hint">
                         {syncNotion?(pt?'Aprovar e criar card no Notion':'Approve and create Notion card'):pt
@@ -807,6 +826,7 @@ useEffect(() => {
                           onChange={(event) => setScriptText(event.target.value)}
                         />
                       </label>
+                      </>}
                       <label className="editorial-field">
                         <span>{pt ? 'Observação de aprovação' : 'Approval note'}</span>
                         <textarea
@@ -824,12 +844,12 @@ useEffect(() => {
                       </div>
                       <button
                         className="primary-button"
-                        disabled={busy || !connectionReady || content.status === 'generating' || scriptText.trim().length < 80}
+                        disabled={busy || !connectionReady || content.status === 'generating' || (structuredCarousel?!!carouselError:scriptText.trim().length < 80)}
                         onClick={approveCurrentScript}
                       >
                         {pt
-                          ? syncNotion?'Aprovar roteiro e enviar ao Notion':'Aprovar roteiro'
-                          : syncNotion?'Approve script and send to Notion':'Approve script'}
+                          ? structuredCarousel?(syncNotion?'Aprovar carrossel e enviar ao Notion':'Aprovar carrossel'):syncNotion?'Aprovar roteiro e enviar ao Notion':'Aprovar roteiro'
+                          : structuredCarousel?(syncNotion?'Approve carousel and send to Notion':'Approve carousel'):syncNotion?'Approve script and send to Notion':'Approve script'}
                       </button>
                     </div>
                   )}
@@ -840,7 +860,7 @@ useEffect(() => {
                           ? `Roteiro aprovado · versão ${approvedArtifact?.version}`
                           : `Approved script · version ${approvedArtifact?.version}`}
                       </h3>
-                      <p>{approvedScript.text}</p>
+                      {approvedScript.carousel?<CarouselReview value={approvedScript.carousel} pt={pt} readOnly/>:<p>{approvedScript.text}</p>}
                       <small>
                         {pt ? 'Hook' : 'Hook'}: {approvedScript.hook} · CTA: {approvedScript.cta}
                       </small>
@@ -883,7 +903,7 @@ useEffect(() => {
                               ? '✓'
                               : ''}
                           </summary>
-                          <pre>{(artifact.data as ApprovedScript).text}</pre>
+                          {(artifact.data as ApprovedScript).carousel?<CarouselReview value={(artifact.data as ApprovedScript).carousel!} pt={pt} readOnly/>:<pre>{(artifact.data as ApprovedScript).text}</pre>}
                         </details>
                       ))}
                     </div>

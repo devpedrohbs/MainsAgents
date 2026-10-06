@@ -68,6 +68,7 @@ export function createDesktopStateStore(directory, version) {
         if(execution.actions?.some(action=>['pending','approved','running'].includes(action.status)))throw new Error('Finish or deny active tool actions before restoring a backup.');
         if(execution.delegations?.some(job=>['queued','running'].includes(job.status)))throw new Error('Finish or cancel agent collaboration before restoring a backup.');
         if(execution.mediaJobs?.some(job=>['queued','running'].includes(job.status)))throw new Error('Finish or cancel video exports before restoring a backup.');
+        if(execution.productions?.some(row=>['writing','notion','planning-edit','editing','preparing-package','generating-cover','scheduling'].includes(JSON.parse(row.data_json).stage)))throw new Error('Pause or finish productions before restoring a backup.');
         for(const delivery of editorial(profile).state?.publications??[]){
           if(delivery.operation?.phase==='requesting')throw new Error('Wait for the provider operation to finish before restoring a backup.');
           if(delivery.operation?.phase==='uncertain'&&JSON.stringify(delivery.operation)!==JSON.stringify(nextEditorial.publications?.find(item=>item.id===delivery.id)?.operation))throw new Error('Reconcile unresolved provider operations before replacing their history with a backup.');

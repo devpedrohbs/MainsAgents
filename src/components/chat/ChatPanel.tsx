@@ -21,11 +21,17 @@ import {ChatDeliveryCard,ScriptDeliveryReview} from './ChatDeliveryCard';
 import {useContentWorkflow} from '../../features/content/ContentWorkflowProvider';
 import type {EditorialArtifact} from '../../features/content/model';
 import {editorialReviewCommand} from '../../features/content/reviewCommands';
+import {useProduction} from '../../features/production/ProductionProvider';
+import {productionStageLabel} from '../../features/production/model';
+import {productionChatIntent} from '../../../production-protocol.mjs';
+import {ProductionDialog} from '../production/ProductionDialog';
 import {FlowDialog} from '../common/FlowDialog';
 import {RuntimeActionApprovals} from './RuntimeActionApprovals';
 import {NativeDelegationWork} from './NativeDelegationWork';
 import {markChatSessionSeen} from '../../features/chat/chatInboxState';
 import {FileDeliveryReview} from './FileDeliveryReview';
+import {ResponseTimer} from './ResponseTimer';
+import {ComparisonLauncher} from './ComparisonLauncher';
 
 type ChatTab = 'chat' | 'sessions' | 'context';
 const stateLabels: Record<ChatRunState, string> = {
@@ -50,6 +56,7 @@ interface ChatPanelProps {
   onTogglePresentation: () => void;
   onClose: () => void;
   sessionId?: string;
+  comparisonMode?:boolean;
 }
 
 export function ChatPanel({
@@ -64,11 +71,14 @@ export function ChatPanel({
   onTogglePresentation,
   onClose,
   sessionId,
+  comparisonMode=false,
 }: ChatPanelProps) {
   const { getWorkspaceById } = useWorkspaces();
   const { agents } = useAgents();
   const { locale, t, reducedMotion } = useLanguage();
   const {state:editorialState}=useContentWorkflow();
+  const production=useProduction();
+  const [productionOpen,setProductionOpen]=useState(false),[productionText,setProductionText]=useState<string>();
   const [reviewRequest,setReviewRequest]=useState<{artifacts:EditorialArtifact[];selectedId:string;decision:'approve'|'rejected'|'revision-requested';notes:string;confirmedTarget:boolean}|null>(null);
   const [composerSelection, setComposerSelection] = useState({ start:0, end:0 });
   const [dismissedSlash, setDismissedSlash] = useState<string|null>(null);
@@ -78,6 +88,7 @@ export function ChatPanel({
   const [tab, setTab] = useState<ChatTab>('chat');
   const [composerOptionsOpen, setComposerOptionsOpen] = useState(false);
   const [handoffBrief, setHandoffBrief] = useState<{text:string;sessionId:string}|null>(null);
+  const [comparisonBrief,setComparisonBrief]=useState<string|null>(null);
   const composerOptionsRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     setComposerOptionsOpen(false);
@@ -118,11 +129,15 @@ export function ChatPanel({
     handoffs,
     showCollaboration,
     refreshSessionImages,
+    comparisons,
+    showComparison,
   } = useChat();
   const { addAgentResponse, hasMessageNode, getAgentContext, clearAgentContext, allNodes } =
     useCanvas();
   const agentSessions = getAgentSessions(agent.id);
   const activeSession = sessionId?sessions.find(item=>item.id===sessionId&&item.agentId===agent.id):getActiveSession(agent.id);
+  const pairedComparison=activeSession?.comparison,comparisonAvailable=comparisons.some(pair=>pair.id===pairedComparison?.id);
+  const linkedProduction=production.runs.find(run=>run.workspaceId===agent.workspaceId&&(run.sourceSession.id===activeSession?.id||run.editorSession.id===activeSession?.id||run.publisherSession?.id===activeSession?.id));
   useEffect(()=>{if(activeSession&&tab==='chat'&&document.visibilityState==='visible')markChatSessionSeen(activeSession);},[activeSession,tab]);
   const linkedHandoffs=handoffs.filter(item=>item.sourceSessionId===activeSession?.id||item.targetSessionId===activeSession?.id);
   const lastMessage = activeSession?.messages[activeSession.messages.length - 1];
@@ -278,8 +293,10 @@ export function ChatPanel({
   };
 
   const send = () => {
+    const productionIntent=!comparisonMode&&!selectedSkill&&!contextNodes.length?productionChatIntent(message):null;
+    if(productionIntent&&(linkedProduction||productionIntent.type==='idea')){setProductionText(productionIntent.text);setProductionOpen(true);return;}
     if (busy || connection !== 'connected') return;
-    const decision=!selectedSkill&&!contextNodes.length?editorialReviewCommand(message):null;
+    const decision=!comparisonMode&&!selectedSkill&&!contextNodes.length?editorialReviewCommand(message):null;
     const targets=decision?editorialState.artifacts.filter(artifact=>artifact.type===(decision.target==='files'?'file-delivery':'script-options')&&artifact.source?.sessionId===activeSession?.id&&editorialState.contents.some(content=>content.id===artifact.contentId&&content.workspaceId===agent.workspaceId&&(decision.target==='files'?content.fileDeliveryArtifactId:content.scriptOptionsArtifactId)===artifact.id)):[];
     if(decision&&targets.length){
       setReviewRequest({artifacts:structuredClone(targets),selectedId:targets[0].id,...decision,confirmedTarget:targets.length===1});
@@ -349,6 +366,8 @@ export function ChatPanel({
           {sessionId?<strong className="collaboration-agent-name">{agent.name}</strong>:<SelectMenu className="conversation-agent-picker" value={agent.id} onChange={onSelectAgent} ariaLabel={locale==='pt-BR'?'Conversar com':'Chat with'} options={agents.filter(item=>item.workspaceId===agent.workspaceId).map(item=>({value:item.id,label:item.name}))}/>}
           <div className="chat-head-actions">
             <details className="conversation-options" onClick={event=>{if((event.target as HTMLElement).closest('button'))event.currentTarget.open=false;}} onKeyDown={event=>{if(event.key==='Escape'&&event.currentTarget.open){event.preventDefault();event.currentTarget.open=false;event.currentTarget.querySelector('summary')?.focus();}}}><summary aria-label={locale==='pt-BR'?'Opções da conversa':'Conversation options'} title={locale==='pt-BR'?'Opções da conversa':'Conversation options'}><Icon name="more"/></summary><div>
+            {!comparisonMode&&<button className="soft-button" onClick={()=>setComparisonBrief(message)}>{locale==='pt-BR'?'Consultar dois agentes':'Consult two agents'}</button>}
+            {!comparisonMode&&pairedComparison&&<button className="soft-button" disabled={!comparisonAvailable} onClick={()=>showComparison(pairedComparison.id)}>{locale==='pt-BR'?'Reabrir comparação':'Reopen comparison'}</button>}
             <button
               className="icon-button"
               aria-label={t('New session')}
@@ -418,6 +437,8 @@ export function ChatPanel({
         </nav>
       </div>
 
+      {tab === 'chat' && activeSession && <ResponseTimer timing={activeSession.responseTiming}/>}
+      {tab === 'chat' && activeSession && <div className="chat-approval-dock"><RuntimeActionApprovals sessionId={activeSession.id}/></div>}
       {tab === 'chat' && (
         <div
           className="chat-body"
@@ -435,7 +456,7 @@ export function ChatPanel({
               {!sessionId&&<button onClick={() => setTab('sessions')}>{t('All sessions')}</button>}
             </div>
           )}
-          {activeSession&&<RuntimeActionApprovals sessionId={activeSession.id}/>}
+          <div className="production-summary"><span>{linkedProduction?productionStageLabel(linkedProduction.stage,locale==='pt-BR'):(locale==='pt-BR'?'Ideia → vídeo → publicação':'Idea → video → publication')}</span><button className="text-link" onClick={()=>{setProductionText(undefined);setProductionOpen(true)}}>{locale==='pt-BR'?'Ver produção':'View production'}</button></div>
           {activeSession&&<NativeDelegationWork sessionId={activeSession.id}/>}
           {(!activeSession || activeSession.messages.length === 0) && (
             <div className="chat-empty">
@@ -510,7 +531,8 @@ export function ChatPanel({
                     >
                       {t('Copy')}
                     </button>
-                    {agent.tools.includes('subagents')&&agents.some(candidate=>candidate.workspaceId===agent.workspaceId&&candidate.id!==agent.id)&&<button disabled={busy} onClick={()=>setHandoffBrief({text:item.content,sessionId:ensureSession().id})}>{locale==='pt-BR'?'Enviar a outro agente':'Send to another agent'}</button>}
+                    {!comparisonMode&&<button onClick={()=>setComparisonBrief(item.content)}>{locale==='pt-BR'?'Consultar dois agentes':'Consult two agents'}</button>}
+                    {!comparisonMode&&agent.tools.includes('subagents')&&agents.some(candidate=>candidate.workspaceId===agent.workspaceId&&candidate.id!==agent.id)&&<button disabled={busy} onClick={()=>setHandoffBrief({text:item.content,sessionId:ensureSession().id})}>{locale==='pt-BR'?'Enviar a outro agente':'Send to another agent'}</button>}
                   </div>
                 )}
               </article>
@@ -908,6 +930,9 @@ export function ChatPanel({
         </footer>
       )}
       {handoffBrief!==null&&<AgentHandoffDialog agent={agent} sessionId={handoffBrief.sessionId} initialBriefing={handoffBrief.text} context={contextNodes} onClose={()=>setHandoffBrief(null)}/>}
+      {!comparisonMode&&pairedComparison&&!comparisonAvailable&&<p className="comparison-unavailable" role="status">{locale==='pt-BR'?'Não é possível reabrir: um agente ou uma sessão do par foi excluído ou está indisponível. Esta conversa continua disponível.':'Cannot reopen: an agent or paired session was deleted or is unavailable. This chat remains available.'}</p>}
+      {comparisonBrief!==null&&<ComparisonLauncher workspaceId={agent.workspaceId} agentId={agent.id} briefing={comparisonBrief} context={contextNodes} onClose={()=>{setComparisonBrief(null);requestAnimationFrame(()=>composerRef.current?.focus())}}/>}
+      {productionOpen&&<ProductionDialog workspaceId={agent.workspaceId} sessionId={activeSession?.id} agentId={agent.id} initialText={productionText} onSelectAgent={onSelectAgent} onClose={()=>setProductionOpen(false)}/>}
       {reviewRequest&&(reviewRequest.confirmedTarget?(reviewRequest.artifacts.find(item=>item.id===reviewRequest.selectedId)?.type==='file-delivery'?<FileDeliveryReview artifact={reviewRequest.artifacts.find(item=>item.id===reviewRequest.selectedId)!} initialDecision={reviewRequest.decision} initialNotes={reviewRequest.notes} onClose={()=>setReviewRequest(null)}/>:<ScriptDeliveryReview artifact={reviewRequest.artifacts.find(item=>item.id===reviewRequest.selectedId)!} initialDecision={reviewRequest.decision} initialNotes={reviewRequest.notes} onClose={()=>setReviewRequest(null)}/>):<FlowDialog title={locale==='pt-BR'?'Qual roteiro você quer revisar?':'Which script do you want to review?'} onClose={()=>setReviewRequest(null)}><div className="delivery-review-fields"><SelectMenu ariaLabel={locale==='pt-BR'?'Roteiro para revisar':'Script to review'} value={reviewRequest.selectedId} onChange={selectedId=>setReviewRequest({...reviewRequest,selectedId})} options={reviewRequest.artifacts.map(item=>({value:item.id,label:`${editorialState.contents.find(content=>content.id===item.contentId)?.title} · v${item.version}`}))}/><button className="primary-button" onClick={()=>setReviewRequest({...reviewRequest,confirmedTarget:true})}>{locale==='pt-BR'?'Revisar esta versão':'Review this version'}</button></div></FlowDialog>)}
     </div>
   );

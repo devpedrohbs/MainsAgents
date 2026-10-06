@@ -1,5 +1,5 @@
 /** Host-only adapter. It never writes account config or starts inference while reconciling. */
-export function createCodexWorkflowRuntime({client,cwd,request,events}) {
+export function createCodexWorkflowRuntime({client,cwd,request,events,imageFile,imageFromItem}) {
   const omitNulls=value=>Array.isArray(value)?value.filter(item=>item!=null).map(omitNulls):value&&typeof value==='object'?Object.fromEntries(Object.entries(value).filter(([,item])=>item!=null).map(([key,item])=>[key,omitNulls(item)])):value;
   async function policy(agent){
     const {config}=await client.request('config/read',{includeLayers:false});
@@ -19,6 +19,7 @@ export function createCodexWorkflowRuntime({client,cwd,request,events}) {
     }while(cursor);
   }
   return {
+    imageFile,imageFromItem,
     async createSession(agent){
       const enabled=(agent.skills??[]).filter(name=>!agent.disabledSkills?.includes(name));
       const skills=enabled.map(name=>`${name}: ${agent.skillFiles?.[name]??agent.skillsDirectory??'path not configured'}`).join('\n');

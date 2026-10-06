@@ -1,6 +1,7 @@
 import type { AgentId } from '../../agents/model/Agent';
 import type { ProviderAuthMode, ProviderId } from '../AiProvider';
 import type { AgentHandoff } from '../agentHandoff';
+import type { SessionComparison } from '../agentComparison';
 
 export type ChatRunState = 'idle' | 'thinking' | 'searching' | 'using-tool' | 'finished' | 'error';
 export type ChatRole = 'user' | 'agent';
@@ -26,6 +27,7 @@ export interface ChatMessageItem {
   images?: ChatImageAttachment[];
   /** Only a successfully completed turn can be saved as an editorial delivery. */
   deliveryState?: 'streaming' | 'completed' | 'interrupted';
+  responseDurationMs?: number;
 }
 
 export interface ChatImageAttachment {
@@ -50,7 +52,9 @@ export type ChatItem = ChatMessageItem | ChatActivityItem;
 
 export interface AgentSession {
   id: string;
+  responseTiming?: {id:string;startedAt:string;endedAt?:string;outcome?:'completed'|'interrupted'|'error'};
   contentId?:string;
+  productionContext?:{id:string;stage:string;notionUrl?:string;recentResults:string[];deliveries?:Array<{platform:string;text:string;version:number;status:string}>};
   topicId?:string;
   agentId: AgentId;
   providerId?: ProviderId;
@@ -66,6 +70,8 @@ export interface AgentSession {
   pendingManualHandoff?:{id:string;fingerprint:string};
   originHandoffId?: string;
   agentConnection?: { enabled: boolean; targetAgentId: AgentId; targetSessionId?: string };
+  /** Saved on both sides of a Codex/Claude comparison; never replayed automatically. */
+  comparison?: SessionComparison;
   title: string;
   messages: ChatItem[];
   createdAt: string;

@@ -7,15 +7,17 @@ import {localAssetPath,inspectLocalAsset} from './editorial-local-files.mjs';
 
 const formats={'.jpg':['image','image/jpeg'],'.jpeg':['image','image/jpeg'],'.png':['image','image/png'],'.webp':['image','image/webp'],'.mp4':['video','video/mp4'],'.mov':['video','video/quicktime'],'.webm':['video','video/webm']};
 export function publicationFiles(state,delivery){
- return delivery.media.map(ref=>{
+ return [...delivery.media,...(delivery.cover?[delivery.cover]:[])].map(ref=>{
   const asset=state.assets?.find(a=>a.id===ref.assetId&&a.workspaceId===delivery.workspaceId&&a.contentId===delivery.contentId),v=asset?.versions.find(v=>v.id===asset.currentVersionId);
   if(asset?.status!=='available'||v?.id!==ref.versionId||v.sha256!==ref.sha256)throw Error('A linked file changed. Review the delivery again.');
   const format=formats[extname(v.path).toLowerCase()];
   if(!format||!v.size)throw Error('Use a nonempty JPEG, PNG, WebP, MP4, MOV or WebM file.');
-  return {...ref,name:v.name,size:v.size,type:format[0],contentType:format[1],path:localAssetPath(v.path)};
+  return {...ref,...(ref.assetId===delivery.cover?.assetId?{purpose:'cover'}:{}),name:v.name,size:v.size,type:format[0],contentType:format[1],path:localAssetPath(v.path)};
  });
 }
 export function validatePublicationFiles(files,platform,settings={}){
+ const covers=files.filter(f=>f.purpose==='cover');files=files.filter(f=>f.purpose!=='cover');
+ if(covers.length&&(covers.length!==1||files.length!==1||files[0].type!=='video'||settings.contentType==='story'||!['image/png','image/jpeg'].includes(covers[0].contentType)||covers[0].size>8*1024*1024))throw Error('A capa deve ser PNG/JPEG até 8 MB, para uma publicação com um vídeo.');
  if(platform==='Instagram'){
   if(!files.length||files.length>10||files.some(f=>!['image/jpeg','image/png','video/mp4','video/quicktime'].includes(f.contentType)||f.size>(f.type==='image'?8:300)*1024*1024))throw Error('Instagram requires 1–10 JPEG/PNG images (8 MB each) or MP4/MOV videos (300 MB each).');
   if(settings.contentType==='story'&&(files.length!==1||files[0].size>100*1024*1024))throw Error('An Instagram Story requires one file, at most 100 MB.');

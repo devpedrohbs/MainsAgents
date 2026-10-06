@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
+import {carouselScript} from './editorial-protocol.mjs';
 
 const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])])):value;
 export const artifactHash = value => createHash('sha256').update(JSON.stringify(canonical(value))).digest('hex');
@@ -6,7 +7,7 @@ const stamp = () => new Date().toISOString();
 const scriptFields = ['hook','cta','text','thumbnailDirection'];
 
 /** A local outbox: approval, immutable input and job commit together. */
-export function createEditorialJobs(db, {getConnector = () => null} = {}) {
+export function createEditorialJobs(db, {getConnector = () => null,authorizeDraft=()=>false} = {}) {
   db.exec(`CREATE TABLE IF NOT EXISTS editorial_jobs (
     id TEXT PRIMARY KEY,profile_id TEXT NOT NULL,content_id TEXT NOT NULL,artifact_id TEXT NOT NULL,
     artifact_hash TEXT NOT NULL,destination TEXT NOT NULL,status TEXT NOT NULL,payload_json TEXT NOT NULL,checkpoint_json TEXT NOT NULL,
@@ -31,6 +32,7 @@ export function createEditorialJobs(db, {getConnector = () => null} = {}) {
     const content=current?.contents.find(item=>item.id===row.content_id);
     const config=content&&connection(row.profile_id,content.workspaceId);
     if(!config?.autoSync||config.dataSourceId!==row.destination)throw new Error('The Notion destination was changed or paused. Review it before retrying.');
+    if(artifact?.type==='script-draft'){if(artifactHash(artifact.data)!==row.artifact_hash||!authorizeDraft(row))throw Error('A autorização da produção para o card não é mais válida.');return;}
     if(!artifact||artifactHash(artifact.data)!==row.artifact_hash||content?.approvedScriptArtifactId!==artifact.id||!current.approvals.some(item=>item.artifactId===artifact.id&&item.artifactVersion===artifact.version&&item.decision==='approved'&&item.action==='notion-upsert'&&item.destination===row.destination))throw new Error('The approved version changed. Approve the current version before sending it to Notion.');
   };
   async function drain() {
@@ -54,6 +56,7 @@ export function createEditorialJobs(db, {getConnector = () => null} = {}) {
   const kick=()=>{if(closed||active)return;active=drain().finally(()=>{active=undefined;if(!closed&&db.prepare("SELECT id FROM editorial_jobs WHERE status='queued' LIMIT 1").get())queueMicrotask(kick);});};
   return {
     connection,
+    queueDraft(profile,{contentId,artifactId,dataSourceId,productionId,notionStatus}){const current=readState(profile),content=current?.state.contents.find(item=>item.id===contentId),artifact=current?.state.artifacts.find(item=>item.id===artifactId&&item.contentId===contentId&&item.type==='script-draft');if(!content||!artifact||connection(profile,content.workspaceId).dataSourceId!==dataSourceId||notionStatus!==undefined&&notionStatus!=='Idea')throw Error('Confira o conteúdo e o destino Notion.');const id=`job-${randomUUID()}`,at=stamp(),payload={productionId,content:structuredClone(content),topic:current.state.topics.find(item=>item.id===content.topicId),artifact:structuredClone(artifact),dataSourceId,...(notionStatus?{notionStatus}:{})};db.prepare('INSERT OR IGNORE INTO editorial_jobs VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)').run(id,profile,content.id,artifact.id,artifactHash(artifact.data),dataSourceId,'queued',JSON.stringify(payload),'{}',null,null,0,at,at);const row=db.prepare('SELECT id FROM editorial_jobs WHERE profile_id=? AND artifact_id=? AND artifact_hash=? AND destination=?').get(profile,artifact.id,artifactHash(artifact.data),dataSourceId);kick();return row.id;},
     configure(profile,workspaceId,config){
       if(typeof workspaceId!=='string'||!workspaceId||typeof config?.autoSync!=='boolean'||typeof config.dataSourceId!=='string'||!/^$|^[a-f0-9]{32}$|^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(config.dataSourceId))throw new Error('Provide a valid Notion data source ID.');
       const id=config.dataSourceId.replaceAll('-','').toLowerCase();
@@ -62,7 +65,7 @@ export function createEditorialJobs(db, {getConnector = () => null} = {}) {
       return normalized;
     },
     approve(profile,{revision,contentId,scriptOptionsArtifactId,script,notes='',syncNotion=false,expectedArtifact,expectedDestination}){
-      if(typeof syncNotion!=='boolean'||!script||!scriptFields.every(field=>typeof script[field]==='string'&&script[field].length<=100_000)||!script.hook.trim()||!script.cta.trim()||script.text.trim().length<80||typeof script.path?.title!=='string'||!script.path.title.trim()||typeof script.path?.outline!=='string'||!Array.isArray(script.improvisationTopics)||!script.improvisationTopics.every(item=>typeof item==='string')||typeof notes!=='string')throw new Error('Complete the hook, CTA, path and script before approving.');
+      if(typeof syncNotion!=='boolean'||!script||typeof notes!=='string')throw new Error('Complete the hook, CTA, path and script before approving.');
       let receipt;
       db.exec('BEGIN IMMEDIATE');
       try{
@@ -72,6 +75,10 @@ export function createEditorialJobs(db, {getConnector = () => null} = {}) {
         const content=state.contents.find(item=>item.id===contentId);
         if(!content||!scriptOptionsArtifactId||content.scriptOptionsArtifactId!==scriptOptionsArtifactId)throw new Error('The script options changed. Review the current version.');
         const options=state.artifacts.find(item=>item.id===scriptOptionsArtifactId);
+        if(script.carousel||options?.data?.carousel){
+          if(content.format!=='carousel'||!script.carousel)throw new Error('Review the structured carousel slides before approving.');
+          script=carouselScript(script.carousel,state.topics.find(item=>item.id===content.topicId)?.sources);
+        }else if(!scriptFields.every(field=>typeof script[field]==='string'&&script[field].length<=100_000)||!script.hook.trim()||!script.cta.trim()||script.text.trim().length<80||typeof script.path?.title!=='string'||!script.path.title.trim()||typeof script.path?.outline!=='string'||!Array.isArray(script.improvisationTopics)||!script.improvisationTopics.every(item=>typeof item==='string'))throw new Error('Complete the hook, CTA, path and script before approving.');
         if(expectedArtifact&&(!options||expectedArtifact.id!==options.id||expectedArtifact.version!==options.version||artifactHash(expectedArtifact.data)!==artifactHash(options.data)))throw new Error('The reviewed script version changed. Reopen the review before approving.');
         const config=connection(profile,content.workspaceId);
         if(syncNotion&&expectedDestination!==undefined&&expectedDestination!==config.dataSourceId)throw new Error('The reviewed Notion destination changed. Reopen the review before sending.');
@@ -82,7 +89,7 @@ export function createEditorialJobs(db, {getConnector = () => null} = {}) {
         if(!identical)state.artifacts.unshift(artifact);
         const authorization=state.approvals.find(item=>item.artifactId===artifact.id&&item.action===(syncNotion?'notion-upsert':'script-approve')&&item.destination===config.dataSourceId);
         if(!authorization)state.approvals.unshift({id:`approval-${randomUUID()}`,workspaceId:content.workspaceId,topicId:content.topicId,contentId,artifactId:artifact.id,artifactVersion:artifact.version,decision:'approved',notes,decidedAt:stamp(),action:syncNotion?'notion-upsert':'script-approve',destination:config.dataSourceId});
-        Object.assign(content,{status:'script-approved',approvedScriptArtifactId:artifact.id,productionStage:!content.productionStage||content.productionStage==='planning'?'ready-to-record':content.productionStage,updatedAt:stamp()});
+        Object.assign(content,{status:'script-approved',approvedScriptArtifactId:artifact.id,productionStage:!content.productionStage||content.productionStage==='planning'?content.format==='carousel'?'planning':'ready-to-record':content.productionStage,updatedAt:stamp()});
         if(syncNotion){
           const id=`job-${randomUUID()}`,at=stamp();
           const payload={content:structuredClone(content),topic:state.topics.find(item=>item.id===content.topicId),artifact:structuredClone(artifact),dataSourceId:config.dataSourceId};

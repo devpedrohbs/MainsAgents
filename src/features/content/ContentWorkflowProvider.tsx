@@ -12,6 +12,7 @@ import {attachAssetFiles,reviseAssetFile,verifyAssetFiles,changeAssetMetadata,re
 import { emptyEditorialState, newEditorialId, type ApprovedScript, type ContentFormat, type EditorialArtifact, type EditorialContent, type EditorialState, type EditorialTopic, type Platform, type Priority, type ResearchProposal, type WorkflowRun, type WorkflowJob, type EditorialJob, type NotionConnection, type ProductionStage } from './model';
 import type {MediaJob,VideoMetadata} from './model';
 import type {CalendarAccount,CalendarProvider,CalendarSource} from './publicationCalendar';
+import {createRecordingContent as buildRecordingContent} from './recordingContent';
 
 type TopicInput = {workspaceId:string;inputKind:'text'|'url'|'ideas';input:string;category:string;priority:Priority};
 interface ContentContextValue {
@@ -32,6 +33,7 @@ interface ContentContextValue {
   changeFile:(assetId:string,role:AssetRole,sourceAssetId?:string)=>Promise<void>;
   removeFile:(assetId:string)=>Promise<void>;
   createTopic:(input:TopicInput)=>Promise<EditorialTopic>;
+  createRecordingContent:(workspaceId:string,title:string)=>Promise<EditorialContent>;
   runResearch:(topicId:string,agentId:string)=>Promise<void>;
   reviseTopic:(topicId:string,changes:Pick<ResearchProposal,'title'|'summary'|'whyItMatters'|'angles'>)=>Promise<void>;
   decideTopic:(topicId:string,decision:'approved'|'rejected',notes:string,format?:ContentFormat,platforms?:Platform[],plannedAt?:string)=>Promise<EditorialContent|undefined>;
@@ -140,6 +142,11 @@ export function ContentWorkflowProvider({children}:PropsWithChildren){
     await commit((current)=>({...current,topics:[topic,...current.topics]}));
     return topic;
   },[commit]);
+  const createRecordingContent=useCallback(async(workspaceId:string,title:string)=>{
+    let content:EditorialContent|undefined;
+    await commit(current=>{const created=buildRecordingContent(current,workspaceId,title);content=created.content;return created.state;});
+    return content!;
+  },[commit]);
 
 
   const enqueueWork=useCallback(async(kind:'research'|'script'|'handoff',targetId:string,agentId:string,extra:Record<string,unknown>={})=>{
@@ -204,7 +211,7 @@ export function ContentWorkflowProvider({children}:PropsWithChildren){
   const approveScript=useCallback(async(contentId:string,script:ApprovedScript,notes:string,syncNotion=false,review?:{artifact:EditorialArtifact;destination?:string})=>{
     const content=stateRef.current.contents.find((item)=>item.id===contentId);
     if(!content?.scriptOptionsArtifactId)throw new Error('Generate script options first.');
-    if(!script.hook.trim()||!script.cta.trim()||!script.path.title.trim()||script.text.trim().length<80)throw new Error('Choose a hook, CTA, path and complete the script before approving.');
+    if(!script.carousel&&(!script.hook.trim()||!script.cta.trim()||!script.path.title.trim()||script.text.trim().length<80))throw new Error('Choose a hook, CTA, path and complete the script before approving.');
     const artifact=review?.artifact??stateRef.current.artifacts.find(item=>item.id===content.scriptOptionsArtifactId);
     if(!artifact)throw new Error('The reviewed script version is unavailable.');
     await storage.command(`/api/content/approve?profile=${encodeURIComponent(profile())}`,{contentId,scriptOptionsArtifactId:artifact.id,expectedArtifact:{id:artifact.id,version:artifact.version,data:artifact.data},expectedDestination:review?.destination,script:{...script,hook:script.hook.trim(),cta:script.cta.trim(),text:script.text.trim()},notes:notes.trim(),syncNotion});
@@ -221,6 +228,6 @@ export function ContentWorkflowProvider({children}:PropsWithChildren){
   const changeFile=useCallback((assetId:string,role:AssetRole,sourceAssetId?:string)=>commit(current=>changeAssetMetadata(current,assetId,role,sourceAssetId)),[commit]);
   const removeFile=useCallback((assetId:string)=>commit(current=>removeAsset(current,assetId)),[commit]);
   const transferWork=useCallback((contentId:string,sourceAgentId:string,targetAgentId:string,instructions:string,assetIds:string[],newSession:boolean,expectedArtifactId?:string)=>enqueueWork('handoff',contentId,targetAgentId,{sourceAgentId,instructions,assetIds,newSession,expectedArtifactId}),[enqueueWork]);
-  return <Context.Provider value={{state,ready,storageError,jobs,jobsError,workJobs,workError,mediaJobs,mediaCapabilities,inspectVideo,exportVideo,mediaAction,transferWork,retryWork,cancelWork,workDetail,getNotionConnection,configureNotion,retryJob,setProductionStage,createTopic,runResearch,reviseTopic,decideTopic,runScript,approveScript,reviewScript,reviewFiles,publicationCommand,publicationAccounts,publicationOptions,preparePublicationChange,publicationTransport,configureCalendarRefresh,publicationCalendar,calendarAccounts,syncCalendar,captureChatDelivery,attachFiles,reviseFile,verifyFiles,changeFile,removeFile}}>{children}</Context.Provider>;
+  return <Context.Provider value={{state,ready,storageError,jobs,jobsError,workJobs,workError,mediaJobs,mediaCapabilities,inspectVideo,exportVideo,mediaAction,transferWork,retryWork,cancelWork,workDetail,getNotionConnection,configureNotion,retryJob,setProductionStage,createTopic,createRecordingContent,runResearch,reviseTopic,decideTopic,runScript,approveScript,reviewScript,reviewFiles,publicationCommand,publicationAccounts,publicationOptions,preparePublicationChange,publicationTransport,configureCalendarRefresh,publicationCalendar,calendarAccounts,syncCalendar,captureChatDelivery,attachFiles,reviseFile,verifyFiles,changeFile,removeFile}}>{children}</Context.Provider>;
 }
 export function useContentWorkflow(){const context=useContext(Context);if(!context)throw new Error('useContentWorkflow requires ContentWorkflowProvider');return context}

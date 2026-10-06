@@ -71,7 +71,7 @@ export function createEditorialWorkflowQueue(db,{getRuntime=()=>null,getAgents,g
     if(!output.trim())fail('The runtime returned no response.');
     let result;
     if(job.kind==='research')result=validateResearch(output,job.topic.inputKind==='ideas'?3:1);
-    if(job.kind==='script')result=validateScriptOptions(output);
+    if(job.kind==='script')result=validateScriptOptions(output,{format:job.outputFormat,sources:job.topic.sources});
     if(job.kind==='handoff'){
       const value=parseProviderJson(output);
       if(typeof value.summary!=='string'||!value.summary.trim()||!Array.isArray(value.outputFiles)||value.outputFiles.length>20||!value.outputFiles.every(path=>typeof path==='string')||!Array.isArray(value.blockers)||!value.blockers.every(item=>typeof item==='string'))fail('The specialist did not return a structured result with summary, outputFiles and blockers.');
@@ -214,7 +214,7 @@ export function createEditorialWorkflowQueue(db,{getRuntime=()=>null,getAgents,g
         const previousOptions=state.artifacts.find(item=>item.id===content?.scriptOptionsArtifactId);
         const feedback=review?.decision==='revision-requested'?`\nUser requested changes to options version ${previousOptions?.version}: ${JSON.stringify(review.notes)}\nPrevious options, for revision only: ${JSON.stringify(previousOptions?.data)}\nCreate a new version. Do not claim the user approved it.`:'';
         const prompt=kind==='research'?researchPrompt(topic,language):kind==='script'?scriptPrompt(topic,content,language)+feedback:`Task from ${sourceAgent.name} (${sourceAgent.role}) for ${agent.name}: ${content.title}\nUser-approved briefing: ${instructions.trim()}\nApproved script version ${artifact.version}: ${JSON.stringify(artifact.data)}\nLocal file references, not uploads: ${JSON.stringify(files)}\nUse only your configured skills. Report unavailable files or editing tools honestly. Do not publish, schedule or change external services. Return ONLY JSON: {"summary":"your actual result","outputFiles":["absolute paths to actual new output files, or empty"],"blockers":["missing tools or inputs, or empty"]}. Language: ${language}.`;
-        const job={id,requestSignature:signature,profileId:profile,workspaceId,targetId,topicId:topic.id,contentId:content?.id,kind,agent,sourceAgent,files,prompt,newSession,inputHash:inputFingerprint(kind,topic,content,artifact),topic:structuredClone(topic),status:'queued',phase:'queued',attempt:1,output:'',history:[],createdAt:at,updatedAt:at};
+        const job={id,requestSignature:signature,profileId:profile,workspaceId,targetId,topicId:topic.id,contentId:content?.id,kind,outputFormat:kind==='script'?content.format:undefined,agent,sourceAgent,files,prompt,newSession,inputHash:inputFingerprint(kind,topic,content,artifact),topic:structuredClone(topic),status:'queued',phase:'queued',attempt:1,output:'',history:[],createdAt:at,updatedAt:at};
         db.prepare('INSERT INTO workflow_work VALUES (?,?,?,?,?,?,?,?,?,?)').run(id,profile,workspaceId,targetId,kind,'queued',requestKey,JSON.stringify(job),at,at);
         state.runs.unshift({id,jobId:id,workspaceId,topicId:topic.id,contentId:content?.id,stage:kind,agentId:agent.id,providerId:'codex',modelId:agent.modelId,input:prompt,outputArtifactIds:[],state:'running',startedAt:at});
         if(kind==='research')Object.assign(topic,{status:'researching',lastError:undefined,updatedAt:at});if(kind==='script')Object.assign(content,{status:'generating',lastError:undefined,updatedAt:at});

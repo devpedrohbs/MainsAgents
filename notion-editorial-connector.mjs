@@ -27,12 +27,13 @@ export function notionEditorialBody(payload){
   const {content,topic,artifact}=payload,script=artifact.data;
   const identity=`MainsAgents content: ${content.id}`;
   const version=`MainsAgents version: ${artifact.id}`;
-  return `${identity}\n${version}\n\n## Roteiro aprovado · versão ${artifact.version}\n\n### Objetivo\n${escape(topic?.summary??content.title)}\n\n### Hook\n${escape(script.hook)}\n\n### Estrutura\n${escape(script.path.title)}\n${escape(script.path.outline)}\n\n### Roteiro\n${escape(script.text)}\n\n### CTA\n${escape(script.cta)}\n\n### Tópicos de improvisação\n${script.improvisationTopics.map(item=>`- ${escape(item)}`).join('\n')}\n\n### Direção de thumbnail\n${escape(script.thumbnailDirection)}\n\n### Checklist de gravação\n- [ ] Conferir roteiro e fatos pendentes\n- [ ] Preparar referências e materiais\n- [ ] Gravar o vídeo\n- [ ] Associar o arquivo no MainsAgents\n- [ ] Encaminhar ao Editor de Vídeo\n\n### Fontes\n${(topic?.sources??[]).map(item=>`- ${escape(item.title)}: ${item.url}`).join('\n')}\n\nMainsAgents end: ${artifact.id}`;
+  return `${identity}\n${version}\n\n## ${artifact.type==='script-draft'?'Roteiro gerado para gravação':'Roteiro aprovado'} · versão ${artifact.version}\n\n### Objetivo\n${escape(topic?.summary??content.title)}\n\n### Hook\n${escape(script.hook)}\n\n### Estrutura\n${escape(script.path.title)}\n${escape(script.path.outline)}\n\n### Roteiro\n${escape(script.text)}\n\n### CTA\n${escape(script.cta)}\n\n### Tópicos de improvisação\n${script.improvisationTopics.map(item=>`- ${escape(item)}`).join('\n')}\n\n### Direção de thumbnail\n${escape(script.thumbnailDirection)}\n\n### Checklist de gravação\n- [ ] Conferir roteiro e fatos pendentes\n- [ ] Preparar referências e materiais\n- [ ] Gravar o vídeo\n- [ ] Associar o arquivo no MainsAgents\n- [ ] Encaminhar ao Editor de Vídeo\n\n### Fontes\n${(topic?.sources??[]).map(item=>`- ${escape(item.title)}: ${item.url}`).join('\n')}\n\nMainsAgents end: ${artifact.id}`;
 }
 
 /** Uses the user's existing Codex MCP login. No LLM turn or token extraction. */
 export function createNotionEditorialConnector(getMcp){
   return {
+    async readCard(pageId,dataSourceId,contentId){const mcp=getMcp();if(!mcp)throw Error('Reconecte Notion pelo Codex.');const threadId=await mcp.thread(),data=unpackNotion(await mcp.call({threadId,tool:'notion-fetch',arguments:{id:pageId}})),text=documentText(data),ids=[...text.matchAll(new RegExp(uuid.source,'ig'))].map(match=>normalizeId(match[0]));if(text.length>1000000||!ids.includes(normalizeId(dataSourceId))||!ids.includes(normalizeId(pageId)))throw Error('Não foi possível verificar o card e a base atuais.');return {pageId,contentId,text:text.slice(0,64000),hash:normalizeId(pageId),fetchedAt:new Date().toISOString()};},
     async upsert(payload,{checkpoint,previous,saveCheckpoint,authorize}){
       const mcp=getMcp();
       if(!mcp)throw new Error('Reconnect Codex CLI to access the Notion MCP.');
@@ -41,7 +42,7 @@ export function createNotionEditorialConnector(getMcp){
       await invoke('notion-fetch',{id:'notion://docs/enhanced-markdown-spec'});
       const schema=schemaFrom(await invoke('notion-fetch',{id:`collection://${payload.dataSourceId}`}));
       if(schema['Post Title']?.type!=='title'||schema.Status?.type!=='status'||schema.Channel?.type!=='multi_select')throw new Error('This Notion base does not match the editorial mapping. Check Post Title, Status and Channel.');
-      const status=payload.content.format==='carousel'?'Idea':'Gravando';
+      const status=payload.notionStatus==='Idea'||payload.content.format==='carousel'?'Idea':'Gravando';
       const statusOptions=Object.values(schema.Status.groups??{}).flat().map(item=>item.name);
       if(!statusOptions.includes(status)||!payload.content.platforms.every(platform=>schema.Channel.options.some(item=>item.name===platform)))throw new Error('The Notion base is missing the required stage or channel.');
       const identity=`MainsAgents content: ${payload.content.id}`;

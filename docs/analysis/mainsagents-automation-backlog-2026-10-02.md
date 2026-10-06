@@ -2,6 +2,20 @@
 
 Data: 02/10/2026. Base: [auditoria](C:/Users/pacas/Documents/ChatGPT/MainsAgents/docs/analysis/mainsagents-audit-2026-10-02.md). A execução começou na versão 0.3.31; o estado abaixo distingue o que foi entregue das partes ainda pendentes.
 
+## Produção semiautomática — 0.3.45
+
+- Implementado coordenador compartilhado pelo chat/Fluxo: produção por ideia, roteiro/card Notion autorizado, leitura atual do card, plano do especialista com exportação básica local, revisão do vídeo, pacote de capas/legendas por rede, confirmação de conta/data/fuso e envio com recibos.
+- AUTO-04/06/08/11/13/14/15/18 avançam no percurso conhecido. Permanecem os limites de ferramentas/conta, equivalência de runtimes, edição avançada e executor genérico de workflows. Backup inclui o histórico de produção sem importar concessões de execução.
+- Validação utiliza provedores/CLI simulados e FFmpeg real; teste pessoal autorizado de Notion/publicação continua pendente. [Uso, dependências e evidências](../semi-automatic-production-0.3.45.md).
+- AUTO-16/17/19/20 continuam pendentes. Este incremento não implementa bandeja/rotinas, memória editorial, radar ou benchmark.
+
+## Fluxos com nome — 0.3.44
+
+- AUTO-18 iniciado: fluxos por workspace com nome, quatro caixas agrupadas, agentes/sessões associados, conteúdo vinculado, vídeos locais, briefing ao especialista, entregas de publicação e conexões editáveis. Salvamento e backup preservam a organização; a visualização anterior das relações do Canvas continua acessível.
+- As conversas concentram ideias, roteiro, decisões e Notion, conforme a direção aprovada pelo usuário. Não existe uma caixa obrigatória para cada microetapa.
+- Ainda parcial: coordenador de progressão automática, sincronização do Notion após aprovação de ideia, edição automática pelo especialista, pacote de capa/legenda e agendamento automático a partir da aprovação. [Uso e limites desta primeira versão](../named-production-flows-0.3.44.md).
+- AUTO-16, AUTO-17, AUTO-19 e AUTO-20 continuam pendentes. Os limites dos runtimes e a validação pessoal real permanecem conforme os incrementos anteriores.
+
 ## Fechamento de mídia e Zernio — 0.3.42
 
 - AUTO-14/15: implementados upload verificado, seleção de conta/provedor, opções básicas Instagram/TikTok, rascunho/agendamento Zernio, edição/reagendamento do mesmo ID, cancelamento e recuperação sem recriação. Upload Publora fica no rascunho até a mídia ser validada; horários expirados não viram publicação imediata.
