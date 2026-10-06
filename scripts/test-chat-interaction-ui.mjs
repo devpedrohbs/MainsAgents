@@ -57,7 +57,7 @@ async function focusShape(appearance){
  await evaluate(`document.documentElement.dataset.appearance=${JSON.stringify(appearance)}`);
  await pointer('.composer textarea');await new Promise(r=>setTimeout(r,200));
  const style=await evaluate(`(()=>{const input=getComputedStyle(document.querySelector('.composer textarea')),composer=getComputedStyle(document.querySelector('.composer'));return {outline:input.outlineWidth,shadow:input.boxShadow,glow:composer.boxShadow,radius:composer.borderRadius}})()`);
- assert.equal(style.outline,'0px');assert.equal(style.shadow,'none');assert.notEqual(style.glow,'none');assert.equal(style.radius,'22px');
+ assert.equal(style.outline,'0px');assert.equal(style.shadow,'none');assert.notEqual(style.glow,'none');assert.equal(style.radius,'16px');
 }
 async function pointer(selector){
  const point=await evaluate(`(()=>{const element=document.querySelector(${JSON.stringify(selector)});if(!element)throw new Error('Missing ${selector}');const rect=element.getBoundingClientRect();const x=rect.left+rect.width/2,y=rect.top+rect.height/2;const top=document.elementFromPoint(x,y);return {x,y,blocked:!(top===element||element.contains(top)),top:top?.className,rect:{left:rect.left,top:rect.top,width:rect.width,height:rect.height},disabled:element.disabled}})()`);

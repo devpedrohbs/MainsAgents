@@ -41,6 +41,13 @@ export function Sessions({
           .includes(query.trim().toLocaleLowerCase(locale)),
     )
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  const projectSessions = sessions.filter((session) => agentIds.has(session.agentId));
+  const runningCount = projectSessions.filter((session) => ['thinking', 'searching', 'using-tool'].includes(getRunState(session.id))).length;
+  const weekAgo = Date.now() - 7 * 24 * 3600 * 1000;
+  const weekMessages = projectSessions.reduce(
+    (total, session) => total + session.messages.filter((item) => item.type === 'message' && new Date(item.createdAt ?? session.updatedAt).getTime() >= weekAgo).length,
+    0,
+  );
   const saveTitle = () => {
     if (editingId && title.trim()) {
       renameSession(editingId, title.trim());
@@ -64,6 +71,18 @@ export function Sessions({
           <Icon name="plus" />
           {t('New session')}
         </button>
+      </div>
+      <div className="sessions-stats">
+        {[
+          { label: pt ? 'Conversas no projeto' : 'Project conversations', value: projectSessions.length, icon: 'message' as const },
+          { label: pt ? 'Em execução agora' : 'Running now', value: runningCount, icon: 'history' as const },
+          { label: pt ? 'Mensagens esta semana' : 'Messages this week', value: weekMessages, icon: 'edit' as const },
+        ].map((stat) => (
+          <div className="sessions-stat" key={stat.label}>
+            <span className="sessions-stat-icon"><Icon name={stat.icon} /></span>
+            <div><strong>{stat.value}</strong><span>{stat.label}</span></div>
+          </div>
+        ))}
       </div>
       <div className="collection-toolbar">
         <label className="search-field">
@@ -123,6 +142,17 @@ export function Sessions({
           )}
         </section>
       )}
+      {!!ordered.length && (
+        <div className="conversation-table-head" aria-hidden="true">
+          <span>{pt ? 'Conversa' : 'Conversation'}</span>
+          <span>{pt ? 'Agente' : 'Agent'}</span>
+          <span>{pt ? 'Provedor' : 'Provider'}</span>
+          <span>Msgs</span>
+          <span>{pt ? 'Atualizada' : 'Updated'}</span>
+          <span>Status</span>
+          <span />
+        </div>
+      )}
       <div className="conversation-list">
         {ordered.map((session) => {
           const agent = getAgentById(session.agentId);
@@ -131,7 +161,6 @@ export function Sessions({
           const busy = ['thinking', 'searching', 'using-tool'].includes(getRunState(session.id));
           return (
             <article className="conversation-row" key={session.id}>
-              <AgentAvatar name={agent?.name ?? t('Deleted agent')} image={agent?.avatarImage} />
               <div className="conversation-main">
                 {editingId === session.id ? (
                   <form
@@ -184,6 +213,20 @@ export function Sessions({
                   </button>
                 )}
               </div>
+              <div className="conversation-agent">
+                <AgentAvatar name={agent?.name ?? t('Deleted agent')} image={agent?.avatarImage} />
+                <span>{agent?.name ?? t('Deleted agent')}</span>
+              </div>
+              <span className="conversation-provider">
+                {agent?.providerId === 'claude' ? 'Claude' : agent?.providerId === 'gemini' ? 'Gemini' : 'Codex'}
+              </span>
+              <span className="conversation-count">{messages.length}</span>
+              <span className="conversation-date">
+                {new Date(session.updatedAt).toLocaleDateString(locale, { month: 'short', day: 'numeric' })}
+              </span>
+              <span className={`conversation-status${busy ? ' running' : ''}`}>
+                {busy ? t('Running') : pt ? 'Ociosa' : 'Idle'}
+              </span>
               <div className="conversation-actions">
                 {deletingId === session.id ? (
                   <>

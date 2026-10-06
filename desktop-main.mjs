@@ -80,7 +80,7 @@ function readProviderKeys(){try{return JSON.parse(readFileSync(providerKeysPath(
 function writeProviderKeys(keys){mkdirSync(app.getPath('userData'),{recursive:true});writeFileSync(providerKeysPath(),JSON.stringify(keys),{mode:0o600})}
 function getProviderKey(provider){const encrypted=readProviderKeys()[provider];if(!encrypted)return '';if(!safeStorage.isEncryptionAvailable())throw new Error('Secure credential storage is unavailable');return safeStorage.decryptString(Buffer.from(encrypted,'base64'))}
 const externalProviders=createExternalProviderBridge({getKey:getProviderKey});
-const claudeCodeBridge=createClaudeCodeBridge({cwdRoot:join(app.getPath('documents'),'MainsAgents Workspace','Claude')});
+const claudeCodeBridge=createClaudeCodeBridge({cwdRoot:join(app.getPath('documents'),'MainsAgents Workspace','Claude'),getApprovals:()=>contentWorkflowBridge?{actions:contentWorkflowBridge.actions,claudeBinding:contentWorkflowBridge.claudeBinding}:null});
 const canvasRuntimeBridge=createCanvasRuntimeBridge({cwdRoot:join(app.getPath('documents'),'MainsAgents Workspace','Canvas')});
 ipcMain.handle('provider:save-key',(event,provider,key)=>{assertTrustedSender(event);if(provider!=='gemini'||typeof key!=='string'||key.length<12||key.length>512)throw new Error('Invalid provider key');if(!safeStorage.isEncryptionAvailable())throw new Error('Secure credential storage is unavailable');writeProviderKeys({...readProviderKeys(),[provider]:safeStorage.encryptString(key).toString('base64')});return {saved:true}});
 ipcMain.handle('provider:remove-key',(event,provider)=>{assertTrustedSender(event);if(provider!=='gemini')throw new Error('Unknown provider');const keys=readProviderKeys();delete keys[provider];writeProviderKeys(keys);return {saved:false}});
@@ -371,7 +371,7 @@ async function createWindow() {
     height: 940,
     minWidth: 1080,
     minHeight: 700,
-    backgroundColor: '#0a0a0a',
+    backgroundColor: '#0c0d10',
     icon: join(app.getAppPath(), 'dist', 'images', 'brand', 'mainsagents-icon-black.ico'),
     show: false,
     title: 'MainsAgents',

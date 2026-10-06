@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import { BrandMark } from '../common/BrandMark';
 import { useLanguage } from '../../app/LanguageProvider';
 
 type AccountMode = 'login' | 'register';
@@ -68,7 +69,7 @@ export function AccountGate({ onSignedIn }: { onSignedIn: () => void }) {
   return (
     <main className="account-gate">
       <section className="account-gate-card" aria-labelledby="account-title">
-        <div className="account-brand"><span className="account-brand-mark" aria-hidden="true"><img src="/images/brand/mainsagents-appicon-black.png" alt=""/></span><span>MAINSAGENTS</span></div>
+        <div className="account-brand"><span className="account-brand-mark" aria-hidden="true"><BrandMark body="#f3f4f6" eye="#121317"/></span><span>Mains<span className="brand-light">Agents</span></span></div>
         <header className="account-intro">
           <h1 id="account-title">{t(mode === 'login' ? 'Welcome back' : 'Create your account')}</h1>
           <p>{t('Sign in to use MainsAgents. Your agents, sessions and history stay on this computer and are never synced to other devices.')}</p>

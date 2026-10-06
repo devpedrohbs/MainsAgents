@@ -17,6 +17,8 @@ import { storageProfile } from './data/IndexedDbStateStore';
 import { recoverPendingBackup } from './data/backup';
 import '@xyflow/react/dist/style.css';
 import './styles/refined-workspace.css';
+import './styles/precision.css';
+import './styles/chat-precision.css';
 
 const root=document.getElementById('root');
 if(!root)throw new Error('Missing #root element');
@@ -41,8 +43,10 @@ async function openWorkspace() {
     const codexService = new HttpCodexService();
     const providers = [new CodexAiProvider(codexService), new ClaudeCliProvider(), new HttpApiProvider('gemini')];
     reactRoot.render(<StrictMode><LanguageProvider><WorkspaceProvider><AgentsProvider><CanvasProvider><ChatProvider providers={providers}><ContentWorkflowProvider><ProductionProvider><App/></ProductionProvider></ContentWorkflowProvider></ChatProvider></CanvasProvider></AgentsProvider></WorkspaceProvider></LanguageProvider></StrictMode>);
+    requestAnimationFrame(()=>window.mainsAgentsHideSplash?.());
   } catch (error) {
     console.error('[MainsAgents] Could not open saved workspace', error);
+    window.mainsAgentsHideSplash?.();
     reactRoot.render(<div role="alert" style={{ padding: '48px', fontFamily: 'system-ui', maxWidth: '640px', color: 'GrayText' }}>
       <h1>{pt ? 'Não foi possível abrir seus dados' : 'Could not open your saved data'}</h1>
       <p>{pt ? 'Os dados salvos foram preservados. Tente novamente; o app não criará um workspace vazio por cima deles.' : 'Your saved data has been preserved. Retry opening it; the app will not replace it with an empty workspace.'}</p>

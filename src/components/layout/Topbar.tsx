@@ -26,7 +26,7 @@ export function Topbar({
   panelOpen,
   hasAgent,
 }: TopbarProps) {
-  const { locale, t } = useLanguage();
+  const { locale, t, appearance, setAppearance } = useLanguage();
   return (
     <header className="topbar" data-od-id="topbar">
       <button
@@ -39,6 +39,7 @@ export function Topbar({
       </button>
       <div className="studio-project"><WorkspaceSwitcher /><Breadcrumbs page={page} onNavigate={onNavigate} /></div>
       <div className="top-actions">
+        <div className="precision-theme-picker" role="group" aria-label={locale==='pt-BR'?'Aparência':'Appearance'}><button type="button" aria-pressed={appearance==='light'} onClick={()=>setAppearance('light')}>{locale==='pt-BR'?'Claro':'Light'}</button><button type="button" aria-pressed={appearance==='dark'} onClick={()=>setAppearance('dark')}>{locale==='pt-BR'?'Escuro':'Dark'}</button></div>
         <SaveIndicator />
         <CodexUsagePopover />
         <button

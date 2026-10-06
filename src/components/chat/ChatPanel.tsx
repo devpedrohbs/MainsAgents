@@ -32,6 +32,7 @@ import {markChatSessionSeen} from '../../features/chat/chatInboxState';
 import {FileDeliveryReview} from './FileDeliveryReview';
 import {ResponseTimer} from './ResponseTimer';
 import {ComparisonLauncher} from './ComparisonLauncher';
+import {MessageMarkdown} from './MessageMarkdown';
 
 type ChatTab = 'chat' | 'sessions' | 'context';
 const stateLabels: Record<ChatRunState, string> = {
@@ -362,8 +363,11 @@ export function ChatPanel({
     <div className="chat-panel editorial-chat">
       <div className="chat-top">
         <header className="chat-head">
-          <span className="conversation-avatar" title={`${agent.role} · ${t(agentStatusLabels[agent.status])}`}><AgentAvatar name={agent.name} image={agent.avatarImage} /></span>
+          <span className={`conversation-avatar status-${agent.status}`} title={`${agent.role} · ${t(agentStatusLabels[agent.status])}`}><AgentAvatar name={agent.name} image={agent.avatarImage} /><i aria-hidden="true"/></span>
+          <div className="chat-head-identity">
           {sessionId?<strong className="collaboration-agent-name">{agent.name}</strong>:<SelectMenu className="conversation-agent-picker" value={agent.id} onChange={onSelectAgent} ariaLabel={locale==='pt-BR'?'Conversar com':'Chat with'} options={agents.filter(item=>item.workspaceId===agent.workspaceId).map(item=>({value:item.id,label:item.name}))}/>}
+          {activeSession&&<span className="chat-head-subtitle">{activeSession.title} · {countMessages(activeSession.messages.filter(item=>item.type==='message').length, locale)}</span>}
+          </div>
           <div className="chat-head-actions">
             <details className="conversation-options" onClick={event=>{if((event.target as HTMLElement).closest('button'))event.currentTarget.open=false;}} onKeyDown={event=>{if(event.key==='Escape'&&event.currentTarget.open){event.preventDefault();event.currentTarget.open=false;event.currentTarget.querySelector('summary')?.focus();}}}><summary aria-label={locale==='pt-BR'?'Opções da conversa':'Conversation options'} title={locale==='pt-BR'?'Opções da conversa':'Conversation options'}><Icon name="more"/></summary><div>
             {!comparisonMode&&<button className="soft-button" onClick={()=>setComparisonBrief(message)}>{locale==='pt-BR'?'Consultar dois agentes':'Consult two agents'}</button>}
@@ -483,8 +487,8 @@ export function ChatPanel({
                 </div>
                 {item.role==='user'&&item.sourceAgentName?<details className="received-agent-task">
                   <summary>{locale==='pt-BR'?`Tarefa recebida de ${item.sourceAgentName}`:`Task received from ${item.sourceAgentName}`}</summary>
-                  <p className="message-content">{item.content}</p>
-                </details>:item.content&&(item.role==='agent'&&activeSession?<ChatDeliveryCard agent={agent} session={activeSession} message={item}/>:<p className="message-content">{item.content}</p>)}
+                  <MessageMarkdown className="message-content" text={item.content}/>
+                </details>:item.content&&(item.role==='agent'&&activeSession?<ChatDeliveryCard agent={agent} session={activeSession} message={item}/>:item.role==='agent'?<MessageMarkdown className="message-content" text={item.content}/>:<p className="message-content">{item.content}</p>)}
                 {item.images?.length ? <ChatMessageImages images={item.images} onLoad={()=>{if(followLatestRef.current&&bodyRef.current)bodyRef.current.scrollTop=bodyRef.current.scrollHeight;}}/>:null}
                 {item.selectedSkill && (
                   <div className="message-skill-used">

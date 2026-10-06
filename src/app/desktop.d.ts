@@ -3,6 +3,7 @@ interface SkillDirectoryResult { directory: string; skills: InstalledSkillInfo[]
 
 interface Window {
   mainsAgentsSaveNow?: () => Promise<void>;
+  mainsAgentsHideSplash?: () => void;
   mainsAgentsDesktop?: {
     notify?(title:string,body:string):Promise<boolean>;
     canvasBrowser?: boolean;

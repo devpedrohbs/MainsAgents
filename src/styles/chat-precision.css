@@ -1,0 +1,122 @@
+/* Chat — Rodada 3 do Claude Design (direção Precisão).
+   Lateral 420px abaixo do topbar ou janela central 900px; tokens do tema, sem paleta própria. */
+:root{--bubble:#f0f0f2}
+:root[data-appearance=dark]{--bubble:#24262d}
+
+.studio-shell .editorial-chat,:root[data-appearance=dark] .studio-shell .editorial-chat{
+  --chat-bg:var(--surface);--chat-bubble:var(--bubble);--chat-text:var(--fg);--chat-secondary:var(--muted);--chat-line:var(--border-soft);
+  font-family:var(--font-body);background:var(--surface);color:var(--fg)
+}
+
+/* Painel lateral e janela */
+.studio-shell .chat-layer:not(.floating){width:min(420px,calc(100vw - var(--sidebar-w)));box-shadow:-8px 0 30px rgba(0,0,0,.05);border-left:1px solid var(--border)}
+.studio-shell:has(>.chat-layer:not(.floating))>.main{padding-right:min(420px,calc(100vw - var(--sidebar-w)))}
+.studio-shell .chat-floating-backdrop{background:rgba(10,10,14,.4)!important}
+.studio-shell .chat-layer.floating .inspector{position:absolute!important;display:flex;top:7%!important;bottom:5%!important;left:50%!important;right:auto!important;width:min(900px,calc(100vw - 48px))!important;height:auto!important;transform:translateX(-50%);border:1px solid var(--border);border-radius:16px;box-shadow:0 24px 80px rgba(0,0,0,.3);overflow:hidden}
+
+/* Cabeçalho */
+.studio-shell .editorial-chat .chat-head{display:flex;align-items:center;gap:10px;padding:12px 12px 12px 16px;min-height:60px;border-bottom:1px solid var(--border-soft)}
+.studio-shell .editorial-chat .conversation-avatar{position:relative}
+.studio-shell .editorial-chat .conversation-avatar .agent-avatar{width:32px;min-width:32px;height:32px;border-radius:9px;font-size:11px;font-weight:600;background:var(--accent-soft);color:var(--accent-strong,var(--accent))}
+.studio-shell .editorial-chat .conversation-avatar>i{position:absolute;right:-2px;bottom:-2px;width:9px;height:9px;border-radius:50%;border:2px solid var(--surface);background:var(--faint,var(--muted))}
+.studio-shell .editorial-chat .conversation-avatar.status-working>i,.studio-shell .editorial-chat .conversation-avatar.status-online>i,.studio-shell .editorial-chat .conversation-avatar.status-active>i{background:var(--success)}
+.studio-shell .editorial-chat .conversation-avatar.status-review>i{background:var(--warn)}
+.chat-head-identity{display:flex;flex-direction:column;gap:1px;min-width:0;flex:1}
+.studio-shell .editorial-chat .chat-head-identity .select-menu-trigger,.studio-shell .editorial-chat .collaboration-agent-name{font-size:13.5px;font-weight:600;color:var(--fg);padding:0;min-height:20px}
+.chat-head-subtitle{font-size:11.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.studio-shell .editorial-chat .chat-head-actions{display:flex;align-items:center;gap:2px;margin-left:auto;color:var(--muted)}
+.studio-shell .editorial-chat .chat-head-actions>.icon-button,.studio-shell .editorial-chat .conversation-options summary{width:30px;height:30px;min-height:30px;border-radius:7px;color:var(--muted);display:grid;place-items:center;font-size:17px}
+.studio-shell .editorial-chat .chat-head-actions>.icon-button:hover,.studio-shell .editorial-chat .conversation-options summary:hover{background:var(--surface-2);color:var(--fg)}
+.studio-shell .editorial-chat .conversation-expand{outline:none}
+
+/* Barra "Conectar agente" + tempo */
+.studio-shell .editorial-chat .agent-connection-bar{padding:8px 16px;border-bottom:1px solid var(--border-soft);background:var(--surface-2);font-size:12px}
+.studio-shell .editorial-chat .agent-connection-switch{font-size:12px;color:var(--fg);gap:8px}
+.studio-shell .editorial-chat .agent-switch-track{width:28px;height:16px;padding:2px;border-radius:999px;background:var(--border)}
+.studio-shell .editorial-chat .agent-switch-track i{width:12px;height:12px;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.studio-shell .editorial-chat .agent-connection-bar.connected .agent-switch-track{background:var(--accent)}
+.studio-shell .editorial-chat .chat-response-timer{padding:6px 16px;border-bottom:1px solid var(--border-soft);background:var(--surface-2);font-size:12px;color:var(--muted)}
+.studio-shell .editorial-chat .chat-response-timer time,.studio-shell .editorial-chat .chat-response-timer b{font-family:'Geist Mono',ui-monospace,monospace;color:var(--fg);font-weight:400}
+
+/* Corpo */
+.studio-shell .editorial-chat .chat-body{padding:16px 18px 12px;display:flex;flex-direction:column;gap:14px}
+.studio-shell .chat-layer.floating .editorial-chat .chat-body{padding:22px max(40px,calc((100% - 720px)/2)) 12px}
+.studio-shell .editorial-chat .active-session-bar,.studio-shell .editorial-chat .production-summary{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border-soft);border-radius:10px;background:var(--surface-2);font-size:12px;color:var(--muted)}
+.studio-shell .editorial-chat .active-session-bar>span{color:var(--fg);font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.studio-shell .editorial-chat .active-session-bar button,.studio-shell .editorial-chat .production-summary .text-link{font-size:12px;color:var(--accent-strong,var(--accent));background:none;border:0}
+.studio-shell .editorial-chat .production-summary>span{flex:1}
+
+.studio-shell .editorial-chat .chat-message{display:flex;flex-direction:column;gap:8px;max-width:100%;margin:0;padding:0;background:none;border:0}
+.studio-shell .editorial-chat .chat-message .message-meta{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+.studio-shell .editorial-chat .chat-message .message-meta b{color:var(--fg);font-weight:600}
+.studio-shell .editorial-chat .chat-message.user{align-self:flex-end;max-width:85%}
+.studio-shell .editorial-chat .chat-message.user .message-meta{display:none}
+.studio-shell .editorial-chat .chat-message.user .message-content{padding:10px 14px;border-radius:16px 16px 4px 16px;background:var(--bubble);font-size:13px;line-height:1.5;white-space:pre-wrap;margin:0;color:var(--fg)}
+.studio-shell .editorial-chat .received-agent-task{border:1px solid var(--border-soft);border-radius:10px;background:var(--surface-2);font-size:12px;color:var(--muted)}
+.studio-shell .editorial-chat .received-agent-task summary{padding:10px 12px;cursor:pointer;color:var(--fg);font-weight:500}
+.studio-shell .editorial-chat .received-agent-task .message-markdown{padding:0 12px 12px}
+
+/* Etapas de ferramenta */
+.studio-shell .editorial-chat .tool-activity{display:flex;align-items:center;gap:8px;margin:0;padding:5px 10px;border:1px solid var(--border-soft);border-radius:10px;font-size:12px;color:var(--muted);background:none}
+.studio-shell .editorial-chat .tool-activity+.tool-activity{margin-top:-12px;border-top-left-radius:0;border-top-right-radius:0;border-top:0}
+.studio-shell .editorial-chat .tool-activity:has(+.tool-activity){border-bottom-left-radius:0;border-bottom-right-radius:0}
+.studio-shell .editorial-chat .activity-symbol{width:16px;height:16px;border-radius:50%;display:grid;place-items:center;flex-shrink:0;font-size:9px;font-weight:700;background:var(--accent-soft);color:var(--accent)}
+.studio-shell .editorial-chat .tool-activity.done .activity-symbol{background:var(--success-soft);color:var(--success)}
+.studio-shell .editorial-chat .tool-activity.error .activity-symbol{background:var(--danger-soft);color:var(--danger)}
+.studio-shell .editorial-chat .activity-symbol svg{width:10px;height:10px}
+
+/* Markdown da resposta */
+.message-markdown{display:flex;flex-direction:column;gap:10px;font-size:13.5px;line-height:1.65;color:var(--fg);white-space:normal;overflow-wrap:anywhere}
+.message-markdown p{margin:0;white-space:pre-wrap;text-wrap:pretty}
+.message-markdown strong{font-weight:600}
+.message-markdown a{color:var(--accent-strong,var(--accent));text-decoration:underline;text-decoration-color:color-mix(in srgb,var(--accent) 35%,transparent);text-underline-offset:2px}
+.message-markdown code{font-family:'Geist Mono',ui-monospace,monospace;font-size:.88em;padding:1px 5px;border-radius:5px;background:var(--surface-2);border:1px solid var(--border-soft)}
+.message-markdown pre{margin:0;padding:12px 14px;border-radius:8px;background:var(--surface-2);border:1px solid var(--border-soft);overflow-x:auto}
+.message-markdown pre code{padding:0;border:0;background:none;font-size:12px;line-height:1.6}
+.message-markdown ul,.message-markdown ol{margin:0;padding-left:20px;display:grid;gap:4px}
+.message-markdown h4{margin:4px 0 0;font-size:13px;font-weight:600;letter-spacing:-.005em}
+.message-markdown h4.md-h1,.message-markdown h4.md-h2{font-size:14.5px}
+.message-markdown .md-script{margin:0;padding:10px 14px;border-left:2px solid var(--accent);background:var(--surface-2);border-radius:0 8px 8px 0;font-size:13px;line-height:1.6;white-space:pre-wrap}
+.message-markdown .md-file{font-family:'Geist Mono',ui-monospace,monospace;font-size:12px;padding:1px 6px;border-radius:5px;border:1px solid var(--border);color:var(--muted)}
+.md-sources{display:flex;flex-direction:column;gap:6px;margin-top:2px}
+.md-sources-label{font-size:11px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;color:var(--faint,var(--muted))}
+.md-sources>div{display:flex;flex-wrap:wrap;gap:6px}
+.md-sources a,.md-source-file{display:flex;align-items:center;gap:7px;max-width:100%;padding:5px 10px 5px 6px;border:1px solid var(--border);border-radius:8px;background:var(--surface);font-size:12px;color:var(--fg);text-decoration:none}
+.md-sources a:hover{background:var(--surface-2)}
+.md-source-n{width:18px;height:18px;border-radius:5px;display:grid;place-items:center;flex-shrink:0;background:var(--surface-2);font-family:'Geist Mono',ui-monospace,monospace;font-size:9.5px;color:var(--muted)}
+.md-source-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.md-source-domain{font-family:'Geist Mono',ui-monospace,monospace;font-size:10.5px;color:var(--faint,var(--muted));white-space:nowrap}
+.md-source-file{padding:5px 10px;font-family:'Geist Mono',ui-monospace,monospace;font-size:11px;color:var(--muted)}
+
+/* Ações da mensagem */
+.studio-shell .editorial-chat .message-actions{display:flex;flex-wrap:wrap;gap:2px;margin-left:-6px;opacity:1}
+.studio-shell .editorial-chat .message-actions button{height:26px;padding:0 8px;border:0;border-radius:6px;background:transparent;color:var(--muted);font-size:11.5px}
+.studio-shell .editorial-chat .message-actions button:hover:not(:disabled){background:var(--surface-2);color:var(--fg)}
+
+/* Entrega / aprovação */
+.studio-shell .editorial-chat .delivery-card,.studio-shell .editorial-chat .chat-delivery{border:1px solid var(--border);border-radius:12px;background:var(--surface);overflow:hidden}
+
+/* Composer */
+.studio-shell .editorial-chat .chat-compose{padding:8px 14px 14px;background:var(--surface);border:0}
+.studio-shell .chat-layer.floating .editorial-chat .chat-compose{padding:8px max(40px,calc((100% - 740px)/2)) 18px}
+.studio-shell .editorial-chat .composer{border:1px solid var(--border);border-radius:16px;background:var(--surface);box-shadow:0 1px 2px rgba(0,0,0,.04),0 6px 20px rgba(0,0,0,.05)}
+.studio-shell .editorial-chat .composer:focus-within{border-color:color-mix(in srgb,var(--accent) 45%,var(--border));box-shadow:0 0 0 3px var(--accent-soft)}
+.studio-shell .editorial-chat .composer textarea{font-size:13.5px;line-height:1.55;padding:14px 16px 6px;min-height:52px;color:var(--fg);background:transparent}
+.studio-shell .editorial-chat .composer textarea::placeholder{color:var(--faint,var(--muted))}
+.studio-shell .editorial-chat .composer-bar{padding:6px 8px 8px 10px;gap:6px}
+.studio-shell .editorial-chat .composer-options-trigger{width:30px;height:30px;border-radius:8px;color:var(--muted)}
+.studio-shell .editorial-chat .composer-options-trigger:hover{background:var(--surface-2)}
+.studio-shell .editorial-chat .send-button,.studio-shell .editorial-chat .composer-bar button[type=submit]{width:32px;height:32px;min-width:32px;border-radius:50%;background:var(--primary-bg,var(--accent));color:var(--primary-fg,#fff);border:0}
+.studio-shell .editorial-chat .send-button:disabled,.studio-shell .editorial-chat .composer-bar button[type=submit]:disabled{background:var(--border);color:var(--muted)}
+.studio-shell .editorial-chat .latest-message-button{border-radius:999px;font-size:12px;height:30px;padding:0 12px;background:var(--surface);color:var(--fg);border:1px solid var(--border);box-shadow:var(--node-shadow)}
+.studio-shell .editorial-chat .composer-model-summary{display:flex;align-items:center;gap:6px;height:28px;padding:0 9px;border:1px solid var(--border);border-radius:999px;background:var(--surface);font-size:11.5px;color:var(--fg)}
+.studio-shell .editorial-chat .composer-model-summary::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--success)}
+.studio-shell .editorial-chat .composer-hint{margin:8px 0 0;text-align:center;font-size:11px;color:var(--faint,var(--muted))}
+.studio-shell .editorial-chat .thinking-row{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+.studio-shell .editorial-chat .chat-error{border:1px solid color-mix(in srgb,var(--danger) 30%,var(--border));background:var(--danger-soft);border-radius:10px;padding:10px 12px;font-size:12px}
+.studio-shell .editorial-chat article.chat-message.user{padding:0;background:none;border-radius:0;box-shadow:none}
+.studio-shell .editorial-chat .tool-activity{align-self:stretch;width:auto;max-width:none}
+.studio-shell .editorial-chat .active-session-bar>span{font-family:var(--font-body);font-size:12.5px}
+.studio-shell .editorial-chat .tool-activity{justify-content:flex-start;text-align:left}
+.studio-shell .editorial-chat .tool-activity>span:last-child{flex:1;text-align:left}
+.studio-shell .chat-layer.floating .inspector>.chat-panel{flex:1;height:100%;min-height:0}

@@ -21,6 +21,9 @@ test('missing Claude CLI and missing login give the existing install/login comma
  assert.deepEqual([facts(login).Installation,facts(login).Login],['yes','no']);assert.equal(login.next.command,'claude auth login');
  const connected=claudeRow({state:'connected'},false);
  assert.equal(connected.level,'restricted');assert.equal(connected.next,undefined);assert.equal(facts(connected).MCP,'restricted');
+ const gated=claudeRow({state:'connected',mcp:'approval-gated',mcpServers:[{name:'paper',status:'connected'},{name:'claude.ai Notion',status:'login-required'}]},true);
+ assert.equal(facts(gated).MCP,'yes');assert.equal(gated.level,'attention');assert.match(gated.next.text,/claude\.ai Notion/);assert.equal(gated.tools.length,2);
+ assert.equal(claudeRow({state:'connected',mcp:'approval-gated',mcpServers:[{name:'paper',status:'connected'}]},true).level,'ready');
  assert.equal(claudeRow({},true).facts[0].state,'unknown'); // malformed response is not treated as installed
 });
 

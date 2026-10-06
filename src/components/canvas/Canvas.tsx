@@ -232,7 +232,7 @@ export function Canvas({onToast,onAskAgent,onSendToAgent}:CanvasProps) {
 
   return <section className="canvas-layout" data-od-id="creative-canvas" ref={layoutRef} onDragOver={handleDragOver} onDrop={(event)=>{if(event.target instanceof HTMLElement&&event.target.closest('.canvas-toolbar'))return;event.preventDefault();nodeFromDrag(event)}}>
 
-    <div className="studio-canvas-heading"><strong>{locale==='pt-BR'?'Espaço de criação':'Creative space'}</strong><span>{locale==='pt-BR'?'Arraste para organizar. Conecte para relacionar.':'Drag to organize. Connect to relate.'}</span></div>
+    <div className="studio-canvas-heading"><Icon name="canvas"/><div><strong>{currentWorkspace.name}</strong><span>{nodes.length} {t(nodes.length===1?'object':'objects')}</span></div></div>
     <div className="canvas-toolbar"><div className="canvas-title"><Icon name="canvas"/><strong>{currentWorkspace.name} canvas</strong><span>· {nodes.length} {t(nodes.length===1?'object':'objects')}</span></div><div className="canvas-tools" role="toolbar" aria-label={t('Canvas tools')}>
 
       <button className="canvas-tool" data-od-id="canvas-select-tool" aria-pressed={tool==='select'} aria-label={locale==='pt-BR'?'Selecionar objetos':'Select objects'} title={locale==='pt-BR'?'Selecionar · V':'Select · V'} onClick={()=>setTool('select')}><Icon name="cursor"/></button>
@@ -370,7 +370,7 @@ export function Canvas({onToast,onAskAgent,onSendToAgent}:CanvasProps) {
 
     </div>}
 
-    {selectedNodes.length>0&&<div className="selection-bar show"><span className="selection-label">{selectedNodes.length} {t('selected')}</span>{selectedNodes.length===1&&<button className="soft-button" aria-label={locale==='pt-BR'?'Editar objeto':'Edit object'} onClick={()=>setDetailsOpen(true)}><Icon name="edit"/>{locale==='pt-BR'?'Editar':'Edit'}</button>}<button className="soft-button" aria-label={t('Ask Agent')} onClick={()=>onAskAgent(selectedNodes.map((node)=>node.id))}><Icon name="message"/>{t('Ask Agent')}</button><button className="soft-button" aria-label={t('Send to Agent')} onClick={()=>onSendToAgent(selectedNodes.map((node)=>node.id))}><Icon name="users"/>{t('Send to Agent')}</button><button className="soft-button" aria-label={t('Group')} disabled={selectedNodes.length<2} onClick={groupSelected}><Icon name="folder"/>{t('Group')}</button></div>}
+    {selectedNodes.length>0&&<div className="selection-bar show"><span className="selection-label">{selectedNodes.length} {t('selected')}</span>{selectedNodes.length===1&&<button className="soft-button" aria-label={locale==='pt-BR'?'Editar objeto':'Edit object'} onClick={()=>setDetailsOpen(true)}><Icon name="edit"/>{locale==='pt-BR'?'Editar':'Edit'}</button>}<button className="soft-button" aria-label={t('Ask Agent')} onClick={()=>onAskAgent(selectedNodes.map((node)=>node.id))}><Icon name="message"/>{t('Ask Agent')}</button><button className="soft-button" aria-label={t('Send to Agent')} onClick={()=>onSendToAgent(selectedNodes.map((node)=>node.id))}><Icon name="users"/>{t('Send to Agent')}</button><button className="soft-button" aria-label={t('Group')} disabled={selectedNodes.length<2} onClick={groupSelected}><Icon name="folder"/>{t('Group')}</button><button className="icon-button" aria-label={locale==='pt-BR'?'Limpar seleção':'Clear selection'} onClick={()=>{setNodes(current=>current.map(node=>({...node,selected:false})));setEdges(current=>current.map(edge=>({...edge,selected:false})));}}><Icon name="close"/></button></div>}
 
   </section>;
 

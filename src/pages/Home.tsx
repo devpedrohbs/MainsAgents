@@ -12,6 +12,7 @@ import { editorialInbox, type EditorialInboxItem } from '../features/content/edi
 import { EditorialInbox } from '../components/content/EditorialInbox';
 import {ChatInbox} from '../components/chat/ChatInbox';
 import type {ChatInboxItem} from '../features/chat/chatInbox';
+import {HomeProductionPipeline} from '../components/content/HomeProductionPipeline';
 
 type TaskView = 'active' | 'review' | 'done';
 interface HomeProps {
@@ -114,6 +115,7 @@ export function Home({
         aria-label={pt ? 'Resumo das tarefas' : 'Task summary'}
         data-od-id="task-summary"
       >
+        <button className="summary-card summary-production" onClick={()=>onNavigate('flow')}><span className="summary-label">{pt?'Em produção':'In production'}<Icon name="link"/></span><strong>{state.contents.filter(content=>content.workspaceId===currentWorkspaceId&&content.productionStage!=='archived').length}</strong><span className="summary-detail">{pt?'Conteúdos neste workspace':'Contents in this workspace'}</span></button>
         {summaries.map((item) => (
           <button
             key={item.id}
@@ -136,8 +138,8 @@ export function Home({
         ))}
       </section>
       <div className="overview-priorities" data-od-id="overview-priorities">
+        <HomeProductionPipeline state={state} workspaceId={currentWorkspaceId} onOpenStudio={()=>onNavigate('content')}/>
         <EditorialInbox items={pendingEditorial} ready={ready} error={storageError || jobsError} onOpen={onOpenEditorial} onOpenStudio={() => onNavigate('content')} />
-        <ChatInbox items={chatInbox} onOpen={onOpenChatInbox}/>
       </div>
       <div className="overview-grid">
         <section className="work-panel" data-od-id="workspace-tasks" aria-labelledby="tasks-heading">
@@ -244,6 +246,7 @@ export function Home({
           )}
         </section>
         <aside className="overview-side" data-od-id="workspace-team">
+          <ChatInbox items={chatInbox} onOpen={onOpenChatInbox}/>
           <section className="team-panel" data-od-id="team-panel">
             <div className="panel-heading">
               <h2>{t('Your team')}</h2>

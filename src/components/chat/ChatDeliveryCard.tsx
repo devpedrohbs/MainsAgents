@@ -1,4 +1,5 @@
 import {useStudioDraftField,studioDraftKey} from '../../features/content/studioDrafts';
+import { MessageMarkdown } from './MessageMarkdown';
 import {useEffect,useState} from 'react';
 import type {Agent} from '../../features/agents/model/Agent';
 import type {AgentSession,ChatMessageItem} from '../../features/chat/model/Chat';
@@ -20,7 +21,7 @@ export function ChatDeliveryCard({agent,session,message}:{agent:Agent;session:Ag
   const [review,setReview]=useState<EditorialArtifact|null>(null);
   const [workContentId,setWorkContentId]=useState<string|null>(null);
   const delivery=decodeChatDelivery(message.content);
-  if(!delivery||message.deliveryState!=='completed')return <p className="message-content">{message.content}</p>;
+  if(!delivery||message.deliveryState!=='completed')return <MessageMarkdown className="message-content" text={message.content}/>;
   if(delivery.kind==='file-delivery')return <FileDeliveryCard agent={agent} session={session} message={message} delivery={delivery.data}/>;
   const artifacts=state.artifacts.filter(item=>item.type===delivery.kind&&item.source?.sessionId===session.id&&item.source?.messageId===message.id);
   const candidates=state.contents.filter(item=>item.workspaceId===agent.workspaceId&&state.topics.some(topic=>topic.id===item.topicId&&topic.status==='approved'));
@@ -44,7 +45,7 @@ export function ChatDeliveryCard({agent,session,message}:{agent:Agent;session:Ag
       return <div className="delivery-record" key={artifact.id}><span>{artifact.type==='research'?(artifact.data as {title:string}).title:content?.title}<small>{pt?'Versão':'Version'} {artifact.version} · {current?label:(pt?'Versão anterior':'Previous version')}</small></span><div className="delivery-actions">{artifact.type==='script-options'&&current&&<button type="button" className="soft-button" onClick={()=>setReview(structuredClone(artifact))}>{approved?(pt?'Ver aprovação':'Review approval'):(pt?'Revisar e aprovar':'Review and approve')}</button>}{content&&(approved||workJobs.some(job=>job.contentId===content.id))&&<button type="button" className="soft-button" onClick={()=>setWorkContentId(content.id)}>{pt?'Trabalho persistente':'Persistent work'}</button>}<button type="button" className="text-link" onClick={()=>open(artifact)}>{pt?'Abrir no Estúdio':'Open in Studio'}</button></div>{current&&decision&&!approved&&<p className="editorial-hint">{decision.notes}</p>}</div>;
     })}
     {error&&<p role="alert" className="delivery-error">{error}</p>}
-    <details className="delivery-original"><summary>{pt?'Ver resposta original':'View original response'}</summary><p className="message-content">{message.content}</p></details>
+    <details className="delivery-original"><summary>{pt?'Ver resposta original':'View original response'}</summary><MessageMarkdown className="message-content" text={message.content}/></details>
     {chooseContent&&<FlowDialog title={pt?'Salvar roteiro no conteúdo':'Save script to content'} description={pt?'Vincule esta resposta a uma pauta aprovada. As opções anteriores ficam no histórico; a nova versão precisa de aprovação.':'Link this response to an approved topic. Earlier options stay in history; the new version requires approval.'} onClose={()=>{if(!saving)setChooseContent(false)}}><div className="delivery-review-fields"><label>{pt?'Conteúdo':'Content'}<SelectMenu value={contentId} ariaLabel={pt?'Conteúdo da entrega':'Delivery content'} onChange={setContentId} options={[{value:'',label:pt?'Escolha um conteúdo':'Choose content'},...candidates.map(item=>({value:item.id,label:item.title}))]}/></label>{!candidates.length&&<p>{pt?'Aprove uma pauta no Estúdio antes de salvar o roteiro. Sua resposta permanece no chat.':'Approve a topic in Studio before saving script options. Your response stays in chat.'}</p>}{error&&<p role="alert" className="delivery-error">{error}</p>}<button className="primary-button" disabled={saving||!candidates.some(item=>item.id===contentId)} onClick={()=>void save(contentId)}>{pt?'Salvar nova versão':'Save new version'}</button></div></FlowDialog>}
     {review&&<ScriptDeliveryReview artifact={review} onClose={()=>setReview(null)}/>}
     {workContent&&<FlowDialog title={pt?'Enviar e acompanhar o especialista':'Send and follow the specialist'} description={pt?'Usa a fila salva do Estúdio. Este trabalho tem sua própria sessão de execução; os dois chats comuns continuam independentes.':'Uses Studio’s saved queue. This work has its own execution session; the ordinary chats remain independent.'} onClose={()=>setWorkContentId(null)}><EditorialWorkPanel topicId={workContent.topicId} content={workContent} initialSourceAgentId={agent.id}/></FlowDialog>}

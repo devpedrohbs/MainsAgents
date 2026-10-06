@@ -26,6 +26,7 @@ import {usePersistentState} from '../data/localPersistence';
 import {ContentMediaEditor} from '../components/content/ContentMediaEditor';
 import {ScriptDeliveryReview} from '../components/chat/ChatDeliveryCard';
 import type {EditorialArtifact} from '../features/content/model';
+import {networkLogos} from '../assets/networkLogos';
 
 const platforms: Platform[] = ['Instagram', 'TikTok', 'YouTube', 'LinkedIn'];
 const topicStatus: Record<EditorialTopic['status'], [string, string]> = {
@@ -89,6 +90,7 @@ export function ContentStudio({
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(requestedTopicId ?? null);
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState('');
+  const [topicFilter,setTopicFilter]=useState<'all'|'review'|'researching'|'approved'>('all');
   const [notionId,setNotionId]=useState('');
   const [syncNotion,setSyncNotion]=useState(false);
   const [connectionReady,setConnectionReady]=useState(false);
@@ -107,6 +109,7 @@ export function ContentStudio({
   const linkedContent = selectedContentId
     ? state.contents.find((item) => item.id === selectedContentId && item.workspaceId === currentWorkspaceId)
     : undefined;
+  const visibleTopics=topics.filter(item=>topicFilter==='all'||item.status===topicFilter);
   const topic = topics.find((item) => item.id === (selectedTopicId ?? linkedContent?.topicId)) ?? topics[0];
   const content = topic?.contentId ? state.contents.find((item) => item.id === topic.contentId) : undefined;
   const optionsArtifact = content?.scriptOptionsArtifactId
@@ -179,10 +182,12 @@ useEffect(() => {
   useEffect(() => {
     setSelectedTopicId(linkedContent?.topicId ?? requestedTopicId ?? null);
   }, [linkedContent?.id, requestedTopicId]);
-  const step = content?.status === 'script-approved' ? 3 : content ? 2 : topic?.researchArtifactId ? 1 : 0;
+  const notionConfirmed=jobs.some(job=>job.contentId===content?.id&&job.result);
+  const step = approvedArtifact ? (notionConfirmed?5:4) : content ? 3 : topic?.researchArtifactId ? 2 : topic?.status==='researching'?1:0;
+  const completeSteps=[!!topic,!!topic?.researchArtifactId,topic?.status==='approved',!!optionsArtifact,!!approvedArtifact,notionConfirmed];
   const steps = pt
-    ? ['Pesquisar pauta', 'Decidir pauta', 'Revisar roteiro', 'Roteiro aprovado']
-    : ['Research topic', 'Decide on topic', 'Review script', 'Script approved'];
+    ? ['Pauta','Pesquisa','Decisão','Roteiro','Aprovado','Notion']
+    : ['Topic','Research','Decision','Script','Approved','Notion'];
   const action = async (work: () => Promise<unknown>) => {
     setBusy(true);
     setFeedback('');
@@ -204,7 +209,7 @@ useEffect(() => {
         category,
         priority,
       });
-      setSelectedTopicId(created.id);
+      setSelectedTopicId(created.id);setTopicFilter('all');
       clearStudioDraft(intakeScope);
       if (!researchAgentId) {
         setFeedback(
@@ -272,11 +277,11 @@ useEffect(() => {
           <h1 data-od-id="studio-heading">{view==='calendar'?(pt?'Calendário de postagens':'Publishing calendar'):(pt ? 'Estúdio de conteúdo' : 'Content Studio')}</h1>
           <p>
             {view==='calendar'?(pt?'Conteúdo, canais e horários. Tudo no mesmo lugar.':'Content, channels and timing. All in one place.'):pt
-              ? 'Da pauta ao roteiro aprovado, com fontes, versões e decisões no mesmo lugar.'
-              : 'Take a topic to an approved script with sources, versions and decisions together.'}
+              ? 'Da ideia à publicação: pesquisa, decisão, roteiro e entregas por rede.'
+              : 'From idea to publication: research, decisions, scripts and channel deliverables.'}
           </p>
         </div>
-      </header>
+      <div className="studio-page-actions"><div className="editorial-segment content-studio-tabs" aria-label={pt?'Visão do Estúdio':'Studio view'}><button type="button" aria-pressed={view==='studio'} onClick={()=>setView('studio')}>{pt?'Produção':'Production'}</button><button type="button" aria-pressed={view==='calendar'} onClick={()=>setView('calendar')}>{pt?'Calendário':'Calendar'}</button></div>{view==='studio'&&<button className="primary-button" onClick={()=>{document.querySelector<HTMLTextAreaElement>('.editorial-intake textarea')?.focus();document.querySelector('.editorial-intake')?.scrollIntoView({block:'nearest',behavior:'smooth'});}}><Icon name="plus"/>{pt?'Nova pauta':'New topic'}</button>}</div></header>
       {storageError && (
         <p className="editorial-alert" role="alert">
           {storageError}
@@ -287,25 +292,12 @@ useEffect(() => {
           {feedback}
         </p>
       )}
-      <div className="editorial-segment content-studio-tabs" aria-label={pt?'Visão do Estúdio':'Studio view'}><button type="button" aria-pressed={view==='studio'} onClick={()=>setView('studio')}>{pt?'Produção':'Production'}</button><button type="button" aria-pressed={view==='calendar'} onClick={()=>setView('calendar')}>{pt?'Calendário':'Calendar'}</button></div>
+
       {view==='calendar'?<PublicationCalendar key={currentWorkspaceId} workspaceId={currentWorkspaceId}/>:<>
-      <ol className="editorial-progress" aria-label={pt ? 'Etapas de produção' : 'Production stages'}>
-        {steps.map((label, index) => (
-          <li
-            key={label}
-            className={index < step ? 'complete' : index === step ? 'current' : ''}
-            aria-current={index === step ? 'step' : undefined}
-          >
-            <span>{index < step ? '✓' : index + 1}</span>
-            {label}
-          </li>
-        ))}
-      </ol>
-      <div className="editorial-grid">
-        <aside className="editorial-rail">
-          <form className="editorial-card editorial-intake" onSubmit={submit}>
+
+      <form className="editorial-card editorial-intake" aria-label={pt?"Nova pauta":"New topic"} onSubmit={submit}>
             <h2>{pt ? 'Nova pauta' : 'New topic'}</h2>
-            <div
+            <div className="studio-intake-header"><div
               className="editorial-segment"
               role="group"
               aria-label={pt ? 'Tipo de entrada' : 'Input type'}
@@ -328,8 +320,8 @@ useEffect(() => {
                         : 'Suggest ideas'}
                 </button>
               ))}
-            </div>
-            <label className="editorial-field">
+            </div><p>{pt?'A pesquisa abre uma sessão do agente e traz fontes e ângulos.':'Research opens an agent session with sources and angles.'}</p></div>
+            <label className="editorial-field studio-intake-brief">
               <span>
                 {inputKind === 'ideas'
                   ? pt
@@ -342,7 +334,7 @@ useEffect(() => {
                       : 'Idea or brief'}
               </span>
               <textarea
-                rows={inputKind === 'url' ? 2 : 3}
+                rows={1}
                 value={input}
                 onChange={(event) => setInput(event.target.value)}
                 placeholder={
@@ -358,29 +350,9 @@ useEffect(() => {
                 }
               />
             </label>
-            <details className="editorial-intake-options">
-              <summary>{pt ? 'Categoria e prioridade' : 'Category and priority'}</summary>
-              <div>
-                {' '}
-                <label className="editorial-field">
-                  <span>{pt ? 'Categoria' : 'Category'}</span>
-                  <input value={category} onChange={(event) => setCategory(event.target.value)} />
-                </label>
-                <label className="editorial-field">
-                  <span>{pt ? 'Prioridade' : 'Priority'}</span>
-                  <SelectMenu
-                    ariaLabel={pt ? 'Prioridade' : 'Priority'}
-                    value={priority}
-                    onChange={(value) => setPriority(value as 'normal' | 'urgent')}
-                    options={[
-                      { value: 'normal', label: pt ? 'Normal' : 'Normal' },
-                      { value: 'urgent', label: pt ? 'Urgente' : 'Urgent' },
-                    ]}
-                  />
-                </label>
-              </div>
-            </details>
-            <label className="editorial-field">
+            <label className="editorial-field studio-intake-category"><span>{pt?'Categoria':'Category'}</span><input value={category} onChange={event=>setCategory(event.target.value)}/></label>
+<details className="editorial-intake-options"><summary>{pt?'Prioridade':'Priority'}</summary><SelectMenu ariaLabel={pt?'Prioridade':'Priority'} value={priority} onChange={value=>setPriority(value as 'normal'|'urgent')} options={[{value:'normal',label:pt?'Normal':'Normal'},{value:'urgent',label:pt?'Urgente':'Urgent'}]}/></details>
+            <label className="editorial-field studio-intake-agent">
               <span>{pt ? 'Agente de pesquisa' : 'Research agent'}</span>
               <SelectMenu
                 ariaLabel={pt ? 'Agente de pesquisa' : 'Research agent'}
@@ -412,7 +384,7 @@ useEffect(() => {
               </p>
             )}
             <button
-              className="primary-button"
+              className="primary-button studio-intake-submit"
               type="submit"
               disabled={!ready || busy || (inputKind !== 'ideas' && !input.trim())}
             >
@@ -423,20 +395,23 @@ useEffect(() => {
                   : 'Working…'
                 : researchAgentId
                   ? pt
-                    ? 'Criar e pesquisar'
-                    : 'Create and research'
+                    ? 'Pesquisar'
+                    : 'Research'
                   : pt
                     ? 'Salvar pauta'
                     : 'Save topic'}
             </button>
           </form>
+<div className="editorial-grid">
+        <aside className="editorial-rail">
+
           <div className="editorial-card editorial-list">
             <div className="editorial-section-head">
               <h2>{pt ? 'Pautas' : 'Topics'}</h2>
-              <span>{topics.length}</span>
-            </div>
-            {topics.length ? (
-              topics.map((item) => (
+              <span>{topics.length} {pt?'pautas':'topics'}</span>
+            </div><div className="studio-topic-filters" role="group" aria-label={pt?'Filtrar pautas':'Filter topics'}>{(['all','review','researching','approved'] as const).map(filter=><button type="button" key={filter} aria-pressed={topicFilter===filter} onClick={()=>setTopicFilter(filter)}>{({all:pt?'Todas':'All',review:pt?'Para decidir':'Review',researching:pt?'Pesquisando':'Researching',approved:pt?'Aprovadas':'Approved'})[filter]}<span>{filter==='all'?topics.length:topics.filter(item=>item.status===filter).length}</span></button>)}</div>
+            {visibleTopics.length ? (
+              visibleTopics.map((item) => (
                 <button
                   className={`editorial-list-item ${topic?.id === item.id ? 'active' : ''}`}
                   key={item.id}
@@ -484,7 +459,19 @@ useEffect(() => {
                     {pt ? topicStatus[topic.status][0] : topicStatus[topic.status][1]}
                   </span>
                 </div>
-                <p className="editorial-provenance">
+                <ol className="editorial-progress" aria-label={pt ? 'Etapas de produção' : 'Production stages'}>
+        {steps.map((label, index) => (
+          <li
+            key={label}
+            className={completeSteps[index] ? 'complete' : index === step ? 'current' : ''}
+            aria-current={index === step ? 'step' : undefined}
+          >
+            <span>{index < step ? '✓' : index + 1}</span>
+            {label}
+          </li>
+        ))}
+      </ol>
+<p className="editorial-provenance">
                   {pt ? 'Entrada original' : 'Original input'}:{' '}
                   {topic.originUrl ? (
                     <a href={topic.originUrl} target="_blank" rel="noreferrer">
@@ -518,7 +505,7 @@ useEffect(() => {
                 )}
                 {topic.researchArtifactId && (
                   <>
-                    <div className="editorial-copy">
+                    <div className="studio-topic-body"><div className="editorial-copy">
                       <h3>{pt ? 'Resumo' : 'Summary'}</h3>
                       <p>{topic.summary}</p>
                       <h3>{pt ? 'Por que importa' : 'Why it matters'}</h3>
@@ -549,7 +536,7 @@ useEffect(() => {
                           </ul>
                         </>
                       )}
-                    </div>
+                    </div><aside className="studio-topic-meta"><div><span>{pt?'Formato':'Format'}</span><strong>{(content?.format??format)==='carousel'?(pt?'Carrossel':'Carousel'):(content?.format??format)==='long-video'?(pt?'Vídeo longo':'Long video'):(pt?'Vídeo curto':'Short video')}</strong></div><div><span>{pt?'Redes':'Networks'}</span><div className="studio-network-badges">{(content?.platforms??selectedPlatforms).map(platform=><span key={platform}><img src={networkLogos[platform.toLowerCase()]} alt=""/>{platform}</span>)}</div></div><div><span>{pt?'Agente de pesquisa':'Research agent'}</span><strong>{agents.find(agent=>agent.id===(runs.find(run=>run.stage==='research')?.agentId??researchAgentId))?.name??(pt?'Não definido':'Not selected')}</strong></div><div><span>{pt?'Publicação planejada':'Planned publication'}</span><strong>{content?.plannedAt||plannedAt||(pt?'Não definida':'Not planned')}</strong></div><div><span>Notion</span>{jobs.find(job=>job.contentId===content?.id&&job.result)?.result?.url?<a href={jobs.find(job=>job.contentId===content?.id&&job.result)!.result!.url} target="_blank" rel="noopener noreferrer">{pt?'Abrir card confirmado':'Open confirmed card'}</a>:<small>{pt?'Card não vinculado':'No card linked'}</small>}</div></aside></div>
                     {topic.status === 'review' && (
                       <div className="editorial-review">
                         <h3>{pt ? 'Ajustar e decidir' : 'Edit and decide'}</h3>

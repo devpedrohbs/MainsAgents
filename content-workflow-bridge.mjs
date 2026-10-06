@@ -50,11 +50,11 @@ export function createContentWorkflowBridge({ dbPath, getConnector, getPublicati
   const calendarCredentials=createCalendarCredentials(db,secureStorage);
   const media=createEditorialMedia(db,{directory:join(dirname(dbPath),'media'),getCurrentProfile,...mediaOptions});
   production=createProductionCoordinator(db,{getRuntime,getAgents,getFlows,getSessions,getCurrentProfile,getNotion:getConnector,jobs,media,publications,publishing,directory:join(dirname(dbPath),'production-media'),inspect,...mediaOptions});
-  const binding=(threadId,sessionId)=>{
+  const binding=(threadId,sessionId,provider='codex')=>{
     if(!getAgents||!getSessions||!getCurrentProfile)return null;
     const profileId=getCurrentProfile(),session=[...(getSessions(profileId)??[]),...delegations.shadows(profileId)].find(item=>sessionId?item.id===sessionId:item.codexThreadId===threadId||item.remoteSessionId===threadId);
     const agent=session&&(getAgents(profileId)??[]).find(item=>item.id===session.agentId);
-    if(!agent||!session||(agent.providerId??'codex')!=='codex')return null;
+    if(!agent||!session||(agent.providerId??'codex')!==provider)return null;
     const shadow=delegations.shadows(profileId).find(item=>item.id===session.id);
     return {profileId,sessionId:session.id,agentId:agent.id,agentName:agent.name,workspaceId:agent.workspaceId,hash:actionHash({agent,sessionId:session.id}),agent,session:{...session,delegationAncestors:shadow?.delegationAncestors??session.delegationAncestors}};
   };
@@ -153,5 +153,5 @@ export function createContentWorkflowBridge({ dbPath, getConnector, getPublicati
     }
   }
 
-  return { handle, production,jobs, work, deliveries, publications,publishing,calendar,calendarCredentials,media,actions,binding,delegations,agents:()=>getAgents?.(getCurrentProfile?.())??[], close: async () => {await production.close();actions.close();await calendar.close();await publishing.close();await media.close();await delegations.close();await work.close();await jobs.close();db.close();} };
+  return { handle, production,jobs, work, deliveries, publications,publishing,calendar,calendarCredentials,media,actions,binding,claudeBinding:remoteSessionId=>binding(remoteSessionId,undefined,'claude'),delegations,agents:()=>getAgents?.(getCurrentProfile?.())??[], close: async () => {await production.close();actions.close();await calendar.close();await publishing.close();await media.close();await delegations.close();await work.close();await jobs.close();db.close();} };
 }

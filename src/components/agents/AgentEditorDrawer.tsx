@@ -37,6 +37,7 @@ export function AgentEditorDrawer({ agent, initialValues, onClose, onSave, onDel
   const draftKey=`mainsagents:agent-draft:${agent?.id??initialValues?.name??'new'}`;
   const [values, setValues] = useState<AgentEditorValues>(()=>{const fallback=agent ? pickValues(agent) : { ...emptyValues, ...initialValues, workspaceId: currentWorkspaceId };try{const saved=sessionStorage.getItem(draftKey);return saved?{...fallback,...JSON.parse(saved)}:fallback}catch{return fallback}});
   const [error, setError] = useState('');
+  const [editorSection,setEditorSection]=useState('identity');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [skillCommands,setSkillCommands]=useState(()=>[{id:Date.now(),command:''}]);
   const [skillStatus, setSkillStatus] = useState('');
@@ -49,6 +50,8 @@ export function AgentEditorDrawer({ agent, initialValues, onClose, onSave, onDel
   const originRef = useRef<HTMLElement|null>(document.activeElement as HTMLElement);
   const editing = Boolean(agent);
   const providerId=values.providerId??'codex';
+  const sectionComplete:Record<string,boolean>={identity:!!values.name.trim()&&!!values.role.trim(),behavior:!!values.instructions.trim(),provider:providerId!=='gemini'||!!values.modelId,tools:true,skills:true,permissions:true,notion:!values.notionAutomation?.enabled||/^(?:collection:\/\/)?[a-f0-9-]{32,36}$/i.test(values.notionAutomation.dataSourceId.trim())};
+  const completeSectionCount=Object.values(sectionComplete).filter(Boolean).length;
   const original=agent?pickValues(agent):{...emptyValues,...initialValues,workspaceId:currentWorkspaceId};
   const dirty=JSON.stringify(values)!==JSON.stringify(original);
   const close=()=>{if(dirty&&!window.confirm(locale==='pt-BR'?'Fechar e guardar este rascunho para continuar depois?':'Close and keep this draft for later?'))return;onClose();requestAnimationFrame(()=>originRef.current?.focus())};
@@ -77,8 +80,8 @@ export function AgentEditorDrawer({ agent, initialValues, onClose, onSave, onDel
       setError(t('Name and role are required.'));
       return;
     }
-    if(providerId==='gemini'&&!values.modelId){setError(t('Choose a provider model after connecting it in Settings.'));return}
-    if(values.notionAutomation?.enabled&&!/^(?:collection:\/\/)?[a-f0-9]{8}-?[a-f0-9]{4}-?[a-f0-9]{4}-?[a-f0-9]{4}-?[a-f0-9]{12}$/i.test(values.notionAutomation.dataSourceId.trim())){setError(locale==='pt-BR'?'Informe o ID da coleção ou sua URL collection://, e não o link de uma página.':'Enter the data source ID or collection:// URL, not a page link.');return;}
+    if(providerId==='gemini'&&!values.modelId){setEditorSection('provider');setError(t('Choose a provider model after connecting it in Settings.'));return}
+    if(values.notionAutomation?.enabled&&!/^(?:collection:\/\/)?[a-f0-9]{8}-?[a-f0-9]{4}-?[a-f0-9]{4}-?[a-f0-9]{4}-?[a-f0-9]{12}$/i.test(values.notionAutomation.dataSourceId.trim())){setEditorSection('notion');setError(locale==='pt-BR'?'Informe o ID da coleção ou sua URL collection://, e não o link de uma página.':'Enter the data source ID or collection:// URL, not a page link.');return;}
     sessionStorage.removeItem(draftKey);
     onSave({ ...values, skillsInstallKey:values.skillsInstallKey||agent?.id||`agent-${Date.now().toString(36)}`, name: values.name.trim(), role: values.role.trim(), description: values.description.trim(), instructions: values.instructions.trim() });
   };
@@ -126,29 +129,34 @@ export function AgentEditorDrawer({ agent, initialValues, onClose, onSave, onDel
       <aside className={`agent-drawer ${focusMode?'focus-writing':''}`} role="dialog" aria-modal="true" aria-labelledby="agent-editor-title">
         <header className="drawer-head">
           <div className="drawer-identity">
-            <AgentAvatar name={values.name || 'Agent'} image={values.avatarImage} />
+            <AgentAvatar name={values.name || (locale==='pt-BR'?'Novo Agente':'New Agent')} image={values.avatarImage} />
             <div><p>{t(editing ? 'Agent configuration' : 'New specialist')}</p><h2 id="agent-editor-title">{editing ? agent?.name : t('Create agent')}</h2></div>
           </div>
           <button className="icon-button" type="button" onClick={close} aria-label="Close agent editor">×</button>
         </header>
 
-        <form className="drawer-form" onSubmit={submit}>
+        <form className="drawer-form" onSubmit={submit} onInvalidCapture={event=>{event.preventDefault();const target=event.target as HTMLInputElement,section=target.closest<HTMLElement>('[data-editor-section]')?.dataset.editorSection;if(section)setEditorSection(section);setError(t('Name and role are required.'));requestAnimationFrame(()=>target.focus());}}>
+          <nav className="agent-editor-nav" aria-label={locale==='pt-BR'?'Seções da configuração':'Configuration sections'}>{[
+            ['identity','users',t('Identity')],['behavior','note',t('Behavior')],['provider','spark',locale==='pt-BR'?'Provedor de IA':'AI provider'],['tools','settings',t('Tools')],['skills','folder',t('Skills')],['permissions','settings',locale==='pt-BR'?'Permissões MCP':'MCP permissions'],['notion','link','Notion'],
+          ].map(([id,,label],index)=><button key={id} type="button" aria-pressed={editorSection===id} onClick={()=>setEditorSection(id)}><span className="agent-section-marker" data-complete={sectionComplete[id]} aria-hidden="true">{sectionComplete[id]?'✓':index+1}</span>{label}</button>)}</nav>
           <div className="drawer-scroll">
-            <section className="drawer-section">
+            {editorSection==='skills'&&providerId==='gemini'&&<p className="skill-status">{locale==='pt-BR'?'As skills locais são disponibilizadas pelos provedores CLI, Codex e Claude.':'Local skills are provided by the Codex and Claude CLI providers.'}</p>}
+            {editorSection==='notion'&&providerId==='gemini'&&<p className="skill-status">{locale==='pt-BR'?'A autorização automática Notion deste app está disponível para agentes Codex CLI e Claude Code CLI.':'This app’s automatic Notion permission is available to Codex CLI and Claude Code CLI agents.'}</p>}
+            <section className="drawer-section" data-editor-section="identity" hidden={editorSection!=='identity'}>
               <div className="drawer-section-title"><b>{t('Identity')}</b><span>{t('How this agent appears across the workspace.')}</span></div>
-              <div className="agent-avatar-editor"><AgentAvatar name={values.name||'Agent'} image={values.avatarImage}/><div><b>{t('Profile image')}</b><span>{t('Add a photo or illustrated icon to recognize this agent.')}</span><div><button className="soft-button" type="button" onClick={()=>avatarInputRef.current?.click()}>{t(values.avatarImage?'Change image':'Choose image')}</button>{values.avatarImage&&<button className="soft-button" type="button" onClick={()=>setField('avatarImage','')}>{t('Remove')}</button>}</div><input ref={avatarInputRef} hidden type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(event)=>void chooseAvatar(event)}/></div></div>
+              <div className="agent-avatar-editor"><AgentAvatar name={values.name||(locale==='pt-BR'?'Novo Agente':'New Agent')} image={values.avatarImage}/><div><b>{t('Profile image')}</b><span>{t('Add a photo or illustrated icon to recognize this agent.')}</span><div><button className="soft-button" type="button" onClick={()=>avatarInputRef.current?.click()}>{t(values.avatarImage?'Change image':'Choose image')}</button>{values.avatarImage&&<button className="soft-button" type="button" onClick={()=>setField('avatarImage','')}>{t('Remove')}</button>}</div><input ref={avatarInputRef} hidden type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(event)=>void chooseAvatar(event)}/></div></div>
               <label className="field"><span>{t('Name')} *</span><input ref={nameRef} required value={values.name} onChange={(event) => setField('name', event.target.value)} placeholder={locale==='pt-BR'?'ex.: Editor de Pesquisa':'e.g. Research Editor'} /></label>
               <label className="field"><span>{t('Role')} *</span><input required value={values.role} onChange={(event) => setField('role', event.target.value)} placeholder={locale==='pt-BR'?'ex.: Pesquisador editorial':'e.g. Editorial researcher'} /></label>
               <label className="field"><span>{t('Description')}</span><textarea rows={3} value={values.description} onChange={(event) => setField('description', event.target.value)} placeholder={locale==='pt-BR'?'Uma explicação breve do que este agente faz.':'A concise explanation of what this agent does.'} /></label>
             </section>
 
-            <section className="drawer-section">
+            <section className="drawer-section" data-editor-section="behavior" hidden={editorSection!=='behavior'}>
               <div className="drawer-section-title"><b>{t('Behavior')}</b><span>{t('Set the permanent context this agent should follow.')}</span></div>
               <label className="field"><span>{t('Instructions')}</span><textarea className="instructions-input" rows={7} value={values.instructions} onChange={(event) => setField('instructions', event.target.value)} placeholder={locale==='pt-BR'?'Descreva objetivos, processo, restrições e resultado esperado.':'Describe goals, process, constraints, and expected output.'} /></label>
               <div className="field"><span>{t('Workspace')}</span><SelectMenu className="field-select" value={values.workspaceId} onChange={(value) => setField('workspaceId', value)} ariaLabel={t('Workspace')} options={workspaces.map((workspace)=>({value:workspace.id,label:workspace.name}))}/></div>
             </section>
 
-            <section className="drawer-section">
+            <section className="drawer-section" data-editor-section="provider" hidden={editorSection!=='provider'}>
               <div className="drawer-section-title"><b>{t('AI provider')}</b><span>{t('Choose who answers and how usage is billed.')}</span></div>
               <div className="field"><span>{t('Provider')}</span><SelectMenu className="field-select" value={providerId} onChange={(value)=>{setField('providerId',value as AgentEditorValues['providerId']);setField('modelId','')}} ariaLabel={t('Provider')} options={[{value:'codex',label:'Codex CLI · ChatGPT/Codex'},{value:'claude',label:'Claude Code CLI'},{value:'gemini',label:'Gemini · Google AI API'}]}/></div>
               <div className="field"><span>{t('Model')}</span><SelectMenu className="field-select" value={values.modelId??''} onChange={(value)=>setField('modelId',value)} ariaLabel={t('Model')} options={[{value:'',label:t(providerId==='gemini'?'Choose a model':'Provider default')},...models.map((model)=>({value:model.id,label:model.name}))]}/></div>
@@ -156,12 +164,12 @@ export function AgentEditorDrawer({ agent, initialValues, onClose, onSave, onDel
               {providerError&&<div className="provider-error"><span>{providerError}</span>{onOpenProviderSettings&&<button type="button" onClick={onOpenProviderSettings}>{t('Open connection settings')}</button>}</div>}
             </section>
 
-            <section className="drawer-section">
+            <section className="drawer-section" data-editor-section="tools" hidden={editorSection!=='tools'}>
               <div className="drawer-section-title"><b>{t('Tools')}</b><span>{t('Choose what this agent can access in the prototype.')}</span></div>
               {providerId!=='gemini'?<div className="tool-grid">{tools.map((tool) => { const detail = agentToolDetails[tool]; const selected = values.tools.includes(tool); return <button className={`tool-option ${selected ? 'selected' : ''}`} type="button" aria-pressed={selected} key={tool} onClick={() => toggleTool(tool)}><span className="tool-check">{selected ? '✓' : ''}</span><span><b>{t(detail.label)}</b><small>{providerId==='claude'&&tool==='subagents'?(locale==='pt-BR'?'Envio manual ao especialista pelo app.':'Manual handoff to a specialist from the app.'):t(detail.description)}</small></span></button>; })}</div>:<p className="provider-billing">{t('Canvas context is sent as text. Web, file and subagent tools are unavailable for this provider.')}</p>}
             </section>
 
-            {(providerId==='codex'||providerId==='claude')&&<section className="drawer-section">
+            {(providerId==='codex'||providerId==='claude')&&<section className="drawer-section" data-editor-section="skills" hidden={editorSection!=='skills'}>
               <div className="drawer-section-title"><b>{t('Skills')}</b><span>{t('Install skills for this agent using an npx command, or point it to an existing skills folder.')}</span></div>
               <label className="field"><span>{t('Skills folder')}</span><div className="skill-path-row"><input value={values.skillsDirectory ?? ''} readOnly placeholder={t('No folder selected')}/><button className="soft-button" type="button" disabled={installingSkill||refreshingSkills} onClick={selectSkillDirectory}>{t('Choose folder')}</button><button className="soft-button" type="button" disabled={!values.skillsDirectory||installingSkill||refreshingSkills} onClick={refreshSkills}>{t(refreshingSkills?'Refreshing…':'Reload skills')}</button></div></label>
               <p className="skill-status">{t('Choose a folder with .md files or SKILL.md skill folders.')}</p>
@@ -172,9 +180,9 @@ export function AgentEditorDrawer({ agent, initialValues, onClose, onSave, onDel
               {skillStatus&&<p className="skill-status">{skillStatus}</p>}
             </section>}
 
-          {providerId==='codex'&&<section className="drawer-section" style={{padding:'0 24px 16px'}}><h3>{locale==='pt-BR'?'Permissões das ferramentas MCP':'MCP tool permissions'}</h3><p className="skill-status">{locale==='pt-BR'?'Cada chamada permitida ainda precisa da sua aprovação. Desmarque ações que este agente não deve realizar.':'Each permitted call still needs your approval. Uncheck actions this agent must not perform.'}</p>{(['read','write','schedule','publish','delete','unknown'] as const).map((kind,index)=><label className="delivery-notion-choice" key={kind}><input type="checkbox" checked={(values.mcpPermissions??['read','write','schedule','publish','delete','unknown']).includes(kind)} onChange={event=>setField('mcpPermissions',event.target.checked?[...(values.mcpPermissions??['read','write','schedule','publish','delete','unknown']),kind].filter((value,i,all)=>all.indexOf(value)===i):(values.mcpPermissions??['read','write','schedule','publish','delete','unknown']).filter(value=>value!==kind))}/>{(locale==='pt-BR'?['Consultar dados','Criar ou alterar dados','Agendar','Publicar ou enviar','Excluir ou cancelar','Ferramentas não classificadas']:['Read data','Create or change data','Schedule','Publish or send','Delete or cancel','Unclassified tools'])[index]}</label>)}</section>}
-            {editing && onDelete && <section className="drawer-danger"><div><b>{t('Delete agent')}</b><span>{t('This permanently removes the local agent and its configuration.')}</span></div>{confirmDelete ? <div className="delete-confirm"><button className="soft-button" type="button" onClick={() => setConfirmDelete(false)}>{t('Cancel')}</button><button className="danger-button" type="button" onClick={()=>{sessionStorage.removeItem(draftKey);onDelete()}}>{t('Confirm delete')}</button></div> : <button className="danger-button" type="button" onClick={() => setConfirmDelete(true)}>{t('Delete')}</button>}</section>}
-          {providerId==='codex'&&<section className="drawer-section" style={{padding:'0 24px 16px'}}>
+          {(providerId==='codex'||providerId==='claude')&&<section className="drawer-section" data-editor-section="permissions" hidden={editorSection!=='permissions'} style={{padding:'0 24px 16px'}}><h3>{locale==='pt-BR'?'Permissões das ferramentas MCP':'MCP tool permissions'}</h3><p className="skill-status">{locale==='pt-BR'?'Cada chamada permitida ainda precisa da sua aprovação. Desmarque ações que este agente não deve realizar.':'Each permitted call still needs your approval. Uncheck actions this agent must not perform.'}</p>{(['read','write','schedule','publish','delete','unknown'] as const).map((kind,index)=><label className="delivery-notion-choice" key={kind}><input type="checkbox" checked={(values.mcpPermissions??['read','write','schedule','publish','delete','unknown']).includes(kind)} onChange={event=>setField('mcpPermissions',event.target.checked?[...(values.mcpPermissions??['read','write','schedule','publish','delete','unknown']),kind].filter((value,i,all)=>all.indexOf(value)===i):(values.mcpPermissions??['read','write','schedule','publish','delete','unknown']).filter(value=>value!==kind))}/>{(locale==='pt-BR'?['Consultar dados','Criar ou alterar dados','Agendar','Publicar ou enviar','Excluir ou cancelar','Ferramentas não classificadas']:['Read data','Create or change data','Schedule','Publish or send','Delete or cancel','Unclassified tools'])[index]}</label>)}</section>}
+            {editing && onDelete && <section className="drawer-danger" data-editor-section="permissions" hidden={editorSection!=='permissions'}><div><b>{t('Delete agent')}</b><span>{t('This permanently removes the local agent and its configuration.')}</span></div>{confirmDelete ? <div className="delete-confirm"><button className="soft-button" type="button" onClick={() => setConfirmDelete(false)}>{t('Cancel')}</button><button className="danger-button" type="button" onClick={()=>{sessionStorage.removeItem(draftKey);onDelete()}}>{t('Confirm delete')}</button></div> : <button className="danger-button" type="button" onClick={() => setConfirmDelete(true)}>{t('Delete')}</button>}</section>}
+          {(providerId==='codex'||providerId==='claude')&&<section className="drawer-section" data-editor-section="notion" hidden={editorSection!=='notion'} style={{padding:'0 24px 16px'}}>
             <div className="drawer-section-title"><b>{locale==='pt-BR'?'Notion sem confirmações repetidas':'Notion without repeated confirmations'}</b></div>
             <label className="delivery-notion-choice"><input type="checkbox" checked={values.notionAutomation?.enabled??false} onChange={event=>setField('notionAutomation',{enabled:event.target.checked,dataSourceId:values.notionAutomation?.dataSourceId??''})}/>{locale==='pt-BR'?'Permitir consultas e criação de cards como Ideia':'Allow reads and creation of Idea cards'}</label>
             {values.notionAutomation?.enabled&&<label className="field"><span>{locale==='pt-BR'?'Coleção Notion autorizada':'Authorized Notion data source'}</span><input value={values.notionAutomation.dataSourceId} onChange={event=>setField('notionAutomation',{enabled:true,dataSourceId:event.target.value})} placeholder="collection://…"/></label>}
@@ -183,6 +191,7 @@ export function AgentEditorDrawer({ agent, initialValues, onClose, onSave, onDel
           </div>
           <footer className="drawer-footer">
             <span className="form-error" role="alert">{error}</span>
+            <span className="agent-editor-completion" title={locale==='pt-BR'?'Configuração dos campos; não confirma conexão com o provedor.':'Field configuration; does not confirm provider connection.'}>{completeSectionCount} {locale==='pt-BR'?'de 7 seções configuradas':'of 7 sections configured'}</span>
             <button className="soft-button" type="button" onClick={close}>{t('Cancel')}</button>
             <button className="primary-button" type="submit">{t(editing ? 'Save changes' : 'Create agent')}</button>
           </footer>

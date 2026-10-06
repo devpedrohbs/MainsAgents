@@ -4,7 +4,7 @@
   "author": "devpedrohbs",
   "license": "MIT",
   "private": true,
-  "version": "0.3.48",
+  "version": "0.3.54",
   "type": "module",
   "scripts": {
     "dev": "node dev.mjs",
@@ -58,6 +58,7 @@
       "agent-delegation-runtime.mjs",
       "canvas-runtime-bridge.mjs",
       "claude-code-bridge.mjs",
+      "claude-permission-mcp.mjs",
       "external-providers.mjs",
       "cloud-server.mjs",
       "content-workflow-bridge.mjs",
@@ -101,6 +102,9 @@
       "production-backup.mjs",
       "production-budget.mjs",
       "publication-time.mjs"
+    ],
+    "asarUnpack": [
+      "claude-permission-mcp.mjs"
     ],
     "directories": {
       "output": "release"

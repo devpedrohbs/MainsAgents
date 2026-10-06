@@ -1,9 +1,15 @@
 import { execFileSync, spawn } from 'node:child_process';
 import { createServer } from 'node:http';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, timingSafeEqual } from 'node:crypto';
 import { existsSync, mkdirSync, statSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { extname, join, resolve } from 'node:path';
+import { extname, join, resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { notionAutomationInstructions } from './notion-automation-policy.mjs';
+
+// Packaged builds unpack this script (build.asarUnpack) so the Claude CLI can start it as a plain process.
+const permissionServerScript = join(dirname(fileURLToPath(import.meta.url)), 'claude-permission-mcp.mjs').replace(/app\.asar(?=[\\/])/, 'app.asar.unpacked');
+const approvalServer = 'mainsagents';
 
 const terminalEvents = new Set(['execution.completed', 'execution.cancelled', 'execution.failed']);
 const modelOptions = [
@@ -96,6 +102,8 @@ function safeLabel(tool) {
   if (tool === 'Read') return 'Reading a file...';
   if (tool === 'Skill') return 'Using an installed skill...';
   if (tool === 'Glob' || tool === 'Grep') return 'Searching workspace files...';
+  const mcp = /^mcp__(.+?)__(.+)$/.exec(tool);
+  if (mcp) return `Using ${mcp[1]}: ${mcp[2]}...`;
   return 'Using a tool...';
 }
 
@@ -115,6 +123,7 @@ function makeUserPrompt(input, config) {
     skills,
     context ? `\nSelected workspace context:\n${context}` : '',
     `\nUser message:\n${String(input.content ?? '').trim()}`,
+    notionAutomationInstructions(config),
   ].join('\n');
 }
 
@@ -123,8 +132,51 @@ export function createClaudeCodeBridge({
   cwdRoot = join(homedir(), 'Documents', 'MainsAgents Workspace', 'Claude'),
   spawnImpl = cliLaunch,
   platform = process.platform,
+  getApprovals,
+  bindingWaitMs = 5000,
 } = {}) {
   const executions = new Map();
+  // Local permission gate: Claude's --permission-prompt-tool reaches this loopback server with a per-execution token.
+  const gateTokens = new Map();
+  let gate;
+  const gateUrl = () => {
+    if (gate) return gate.ready;
+    const server = createServer((request, response) => void (async () => {
+      const header = String(request.headers.authorization ?? '').replace(/^Bearer /, '');
+      const record = [...gateTokens.entries()].find(([token]) => token.length === header.length && timingSafeEqual(Buffer.from(token), Buffer.from(header)))?.[1];
+      if (request.method !== 'POST' || request.url !== '/permission' || !record) return json(response, 403, { behavior: 'deny', message: 'Unknown MainsAgents execution.' });
+      let body; try { body = await readBody(request); } catch { return json(response, 400, { behavior: 'deny', message: 'Invalid permission request.' }); }
+      json(response, 200, await decidePermission(record, body));
+    })().catch(() => json(response, 500, { behavior: 'deny', message: 'MainsAgents could not confirm this tool call.' })));
+    server.unref?.();
+    gate = { server, ready: new Promise((resolveUrl, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', () => resolveUrl(`http://127.0.0.1:${server.address().port}/permission`)); }) };
+    return gate.ready;
+  };
+  async function prepareGate(record) {
+    record.approvals = new Map();
+    if (!getApprovals) return;
+    try { record.gateUrl = await gateUrl(); record.gateToken = randomUUID() + randomUUID(); gateTokens.set(record.gateToken, record); }
+    catch { record.gateUrl = undefined; }
+  }
+  async function decidePermission(record, body) {
+    const toolName = String(body.toolName ?? '');
+    const mcp = /^mcp__(.+?)__(.+)$/.exec(toolName);
+    // Built-in tools outside the agent's allow-list were already excluded with --tools; never widen them here.
+    if (!mcp || mcp[1] === approvalServer) return { behavior: 'deny', message: 'This tool is not enabled for this MainsAgents agent.' };
+    const approvals = getApprovals?.();
+    if (!approvals) return { behavior: 'deny', message: 'MainsAgents approvals are unavailable. The tool call was not run.' };
+    const resolveBinding = () => approvals.claudeBinding(record.remoteSessionId);
+    let binding = resolveBinding();
+    for (const deadline = Date.now() + bindingWaitMs; !binding && Date.now() < deadline && !record.done;) { await new Promise((wait) => setTimeout(wait, 250)); binding = resolveBinding(); }
+    if (!binding) return { behavior: 'deny', message: 'Save the agent and session before using MCP tools.' };
+    const input = body.input && typeof body.input === 'object' ? body.input : {};
+    return new Promise((resolveDecision) => {
+      const id = approvals.actions.register({ requestId: String(body.toolUseId ?? randomUUID()), threadId: record.remoteSessionId, executionId: record.id, server: mcp[1], tool: mcp[2], arguments: input }, binding, (reply) => {
+        resolveDecision(reply.action === 'accept' ? { behavior: 'allow' } : { behavior: 'deny', message: 'Not approved in MainsAgents. Do not retry the same call; explain what you needed instead.' });
+      }, resolveBinding);
+      if (id && body.toolUseId) record.approvals.set(String(body.toolUseId), id);
+    });
+  }
   const activeSessions = new Map();
   const publish = (record, event) => {
     if (record.done) return;
@@ -161,13 +213,16 @@ export function createClaudeCodeBridge({
     // Keep subscription authentication; --bare can bypass CLI OAuth credentials.
     let settings={};try{settings=JSON.parse(readFileSync(join(homedir(),'.claude','settings.json'),'utf8'));}catch{}
     const settingsPath=join(directory,'mainsagents-runtime-settings.json'),mcpPath=join(directory,'mainsagents-runtime-mcp.json');
-    writeFileSync(settingsPath,JSON.stringify({disableAllHooks:true,enabledPlugins:Object.fromEntries(Object.keys(settings.enabledPlugins??{}).map(name=>[name,false]))}));
-    writeFileSync(mcpPath,JSON.stringify({mcpServers:{}}));
-    const args = ['--print', '--output-format', 'stream-json', '--verbose', '--include-partial-messages', '--input-format', 'text', '--permission-mode', 'dontAsk', '--settings',settingsPath,'--setting-sources','user','--strict-mcp-config','--mcp-config',mcpPath,'--disable-slash-commands'];
+    writeFileSync(settingsPath,JSON.stringify({disableAllHooks:true,permissions:{ask:['mcp__*']},enabledPlugins:Object.fromEntries(Object.keys(settings.enabledPlugins??{}).map(name=>[name,false]))}));
+        const mcpServers = record.gateUrl && getApprovals ? { [approvalServer]: { type: 'stdio', command: process.execPath, args: [permissionServerScript], env: { ELECTRON_RUN_AS_NODE: '1', MAINSAGENTS_PERMISSION_URL: record.gateUrl, MAINSAGENTS_PERMISSION_TOKEN: record.gateToken } } } : {};
+    writeFileSync(mcpPath,JSON.stringify({mcpServers}),{mode:0o600});
+    const args = ['--print', '--output-format', 'stream-json', '--verbose', '--include-partial-messages', '--input-format', 'text', '--settings',settingsPath,'--setting-sources','user',...(mcpServers[approvalServer]?[]:['--strict-mcp-config']),'--mcp-config',mcpPath,'--disable-slash-commands'];
+    // MCP tools are never pre-allowed: each call goes to the MainsAgents gate (agent permissions + per-call approval).
+    if (mcpServers[approvalServer]) args.push('--permission-mode', 'default', '--permission-prompt-tool', `mcp__${approvalServer}__approve`);
+    else args.push('--permission-mode', 'dontAsk', '--disallowedTools', 'mcp__*');
     const tools = toolAllowList(config);
     args.push('--tools', tools.join(','));
     if (tools.length) args.push('--allowedTools', ...tools);
-    args.push('--disallowedTools', 'mcp__*');
     if (input.modelId) {
       if (typeof input.modelId !== 'string' || !/^[a-zA-Z0-9_.:-]{1,120}$/.test(input.modelId)) throw new Error('Choose a valid Claude model.');
       args.push('--model', input.modelId);
@@ -210,6 +265,8 @@ export function createClaudeCodeBridge({
       }
       if (message.type === 'user' && Array.isArray(message.message?.content)) {
         for (const block of message.message.content) {
+          const approvalId = block?.type === 'tool_result' ? record.approvals?.get(block.tool_use_id) : undefined;
+          if (approvalId) { record.approvals.delete(block.tool_use_id); getApprovals?.()?.actions.settle(approvalId, !block.is_error, block.is_error ? 'The MCP tool reported an error.' : null); }
           if (block?.type === 'tool_result' && openTools.has(block.tool_use_id)) {
             const tool = openTools.get(block.tool_use_id);
             openTools.delete(block.tool_use_id);
@@ -254,6 +311,8 @@ export function createClaudeCodeBridge({
         publish(record, { type: 'execution.failed', executionId: record.id, code: needsLogin ? 'login_required' : 'claude_cli_error', message: needsLogin ? 'Claude Code CLI needs sign-in. Run `claude auth login` in a terminal, then check Settings again.' : 'Claude Code CLI could not complete this response. Check its connection and authentication, then retry.', retryable: true });
       }
       if (activeSessions.get(record.remoteSessionId) === record.id) activeSessions.delete(record.remoteSessionId);
+      if (record.gateToken) gateTokens.delete(record.gateToken);
+      getApprovals?.()?.actions.interrupt(record.id);
     });
     publish(record, { type: 'execution.started', executionId: record.id, threadId: record.remoteSessionId });
   };
@@ -283,7 +342,7 @@ export function createClaudeCodeBridge({
         const record = { id, remoteSessionId: input.remoteSessionId, config: input, events: [], listeners: new Set(), done: false, firstMessage: input.firstMessage === true };
         executions.set(id, record);
         activeSessions.set(input.remoteSessionId, id);
-        try { send(record, input); }
+        try { await prepareGate(record); send(record, input); }
         catch (error) { activeSessions.delete(input.remoteSessionId); executions.delete(id); throw error; }
         return json(response, 200, { executionId: id, remoteSessionId: input.remoteSessionId });
       }
@@ -321,27 +380,29 @@ export function createClaudeCodeBridge({
     send:async(remoteSessionId,content,agent)=>{
       if(activeSessions.has(remoteSessionId))throw new Error('This Claude session is already responding.');
       const executionId=randomUUID(),firstMessage=agent.runtimeFirstMessage===true,record={id:executionId,remoteSessionId,config:agent,events:[],listeners:new Set(),done:false,firstMessage};executions.set(executionId,record);activeSessions.set(remoteSessionId,executionId);
-      try{send(record,{...agent,remoteSessionId,content,firstMessage,agentName:agent.name});}catch(error){activeSessions.delete(remoteSessionId);executions.delete(executionId);throw error;}return {executionId};
+      try{await prepareGate(record);send(record,{...agent,remoteSessionId,content,firstMessage,agentName:agent.name});}catch(error){activeSessions.delete(remoteSessionId);executions.delete(executionId);throw error;}return {executionId};
     },
     events:async function*(id,signal){const record=executions.get(id);if(!record)throw new Error('Claude execution unavailable.');let index=0;while(true){while(index<record.events.length)yield record.events[index++];if(record.done)return;if(signal?.aborted)throw new Error('Execution cancelled.');await new Promise(resolve=>{let timer;const wake=()=>{clearTimeout(timer);record.listeners.delete(wake);signal?.removeEventListener('abort',wake);resolve();};record.listeners.add(wake);signal?.addEventListener('abort',wake,{once:true});timer=setTimeout(wake,1000);});}},
     cancel:async(_threadId,id)=>{const record=executions.get(id);if(record){record.cancelled=true;record.child?.kill();}},
   };
-  return { handle, status, runtime,diagnostics:async()=>({...(await status()),models:modelOptions,modelsVerified:false,mcp:'disabled',externalWrites:'blocked',hooks:'disabled',modelCheck:'provider-aliases'}) };
-}
-
-export function startClaudeCodeBridge({ port = 0, ...options } = {}) {
-  const bridge = createClaudeCodeBridge(options);
-  const server = createServer((request, response) => {
-    const url = new URL(request.url ?? '/', 'http://127.0.0.1');
-    void bridge.handle(request, response, url).then((handled) => {
-      if (!handled && !response.writableEnded) json(response, 404, { error: 'Not found.' });
-    }).catch(() => { if (!response.headersSent) json(response, 500, { error: 'Claude Code CLI bridge failed.' }); });
-  });
-  return new Promise((resolvePromise, reject) => {
-    server.once('error', reject);
-    server.listen(port, '127.0.0.1', () => {
-      server.off('error', reject);
-      resolvePromise({ server, port: server.address().port, ...bridge });
-    });
-  });
+  // `claude mcp list` runs Claude's own health check (no model inference) and includes claude.ai connectors.
+  async function mcpServers() {
+    const resolved = resolveCli();
+    if (!resolved) return [];
+    const result = await capture(resolved, ['mcp', 'list'], 30_000).catch(() => null);
+    const servers = [];
+    for (const raw of String(result?.output ?? '').split(/\r?\n/)) {
+      const match = /^(.+?):\s+(.+?)\s+-\s+(.+)$/.exec(raw.trim());
+      // Plugins are disabled for MainsAgents runs, so their servers never load there.
+      if (!match || match[1].startsWith('plugin:')) continue;
+      const state = match[3];
+      servers.push({ name: match[1], status: /needs auth/i.test(state) ? 'login-required' : /connected/i.test(state) && !/fail|✗/i.test(state) ? 'connected' : 'unavailable' });
+    }
+    return servers;
+  }
+  return { handle, status, runtime, diagnostics: async () => {
+    const base = await status();
+    const servers = base.state === 'connected' && getApprovals ? await mcpServers() : [];
+    return { ...base, models: modelOptions, modelsVerified: false, mcp: getApprovals ? 'approval-gated' : 'disabled', mcpServers: servers, externalWrites: getApprovals ? 'approval-gated' : 'blocked', hooks: 'disabled', modelCheck: 'provider-aliases' };
+  } };
 }

@@ -1,6 +1,6 @@
 /** Pure presentation of /api/codex/diagnostics and /api/providers/claude/diagnostics. Discovery never implies data access. */
 export interface CodexDiagnostics {checkedAt:string;runtime:string;account:string;modelCheck:string;models:{id:string;name:string}[];discovery:string;servers:{name:string;status:string;tools:string[];readEvidence?:{checkedAt:string;tool:string;agentId:string}[]}[];agents:{id:string;name:string;provider?:string;skills:{name:string;status:string;path?:string;mentions?:string[];dependencies?:{name:string;status:string;missingTools?:string[]}[]}[]}[]}
-export interface ClaudeDiagnostics {state?:string;message?:string;installCommand?:string;loginCommand?:string;mcp?:string}
+export interface ClaudeDiagnostics {state?:string;message?:string;installCommand?:string;loginCommand?:string;mcp?:string;mcpServers?:{name:string;status:string}[]}
 export type FactState='yes'|'no'|'unknown'|'unchecked'|'restricted';
 export type RowLevel='ready'|'unverified'|'attention'|'restricted'|'unchecked';
 export interface Fact {label:string;value:string;state:FactState}
@@ -28,13 +28,17 @@ export function codexRow(data:CodexDiagnostics|null,error:string,pt:boolean):Cap
 
 export function claudeRow(claude:ClaudeDiagnostics|null,pt:boolean):CapabilityRow{
  const t=(a:string,b:string)=>pt?a:b,state=claude?.state;
- const mcp=fact('MCP',t('Bloqueado pelo MainsAgents neste provedor','Blocked by MainsAgents for this provider'),'restricted');
+ const servers=claude?.mcpServers??[],ok=servers.filter(server=>server.status==='connected'),auth=servers.filter(server=>server.status==='login-required');
+ const gated=claude?.mcp==='approval-gated';
+ const mcp=gated?fact('MCP',servers.length?t(`Ativo com sua aprovação · ${ok.length}/${servers.length} conectados`,`On with your approval · ${ok.length}/${servers.length} connected`):t('Ativo com sua aprovação · nenhum servidor no Claude Code','On with your approval · no servers in Claude Code'),servers.length&&ok.length?'yes':'unknown'):fact('MCP',t('Bloqueado pelo MainsAgents neste provedor','Blocked by MainsAgents for this provider'),'restricted');
+ const mcpNext:NextAction|undefined=!gated?undefined:auth.length?{text:t(`Autentique no Claude Code: ${auth.map(server=>server.name).join(', ')}. Abra o Claude no terminal e use /mcp.`,`Authenticate in Claude Code: ${auth.map(server=>server.name).join(', ')}. Open Claude in a terminal and use /mcp.`),command:'claude'}:servers.length?undefined:{text:t('Adicione servidores ao Claude Code (por exemplo, claude mcp add --transport http notion https://mcp.notion.com/mcp) e verifique de novo.','Add servers to Claude Code (for example, claude mcp add --transport http notion https://mcp.notion.com/mcp), then check again.')};
+ const mcpTools=servers.map(server=>`${server.name} · ${statusLabel(server.status==='connected'?'connected':server.status==='login-required'?'login-required':'unavailable',pt)}`);
  if(!claude)return row(pt,{id:'claude',kind:'cli',title:'Claude Code CLI',level:'unchecked',facts:[fact(t('Instalação','Installation'),t('Ainda não verificado','Not checked yet'),'unchecked'),mcp]});
  const installed=state==='not-installed'?'no':state==='connected'||state==='login-required'?'yes':'unknown';
  const login=state==='connected'?'yes':state==='login-required'?'no':installed==='no'?'no':'unknown';
  const facts=[fact(t('Instalação','Installation'),installed==='yes'?t('Instalada','Installed'):installed==='no'?t('Não instalada','Not installed'):t('Não foi possível verificar','Could not check'),installed),fact('Login',login==='yes'?t('Conectado','Connected'):login==='no'?t('Sem login','Not signed in'):t('Não foi possível verificar','Could not check'),login),mcp];
- const next:NextAction|undefined=state==='not-installed'?{text:t('Instale a CLI no terminal e verifique de novo.','Install the CLI in a terminal, then check again.'),command:claude.installCommand}:state==='login-required'?{text:t('Entre pela própria CLI no terminal e verifique de novo.','Sign in through the CLI in a terminal, then check again.'),command:claude.loginCommand??'claude auth login'}:state!=='connected'?{text:t('Use “Verificar novamente” em “Conexão com a CLI do Claude Code”, logo abaixo.','Use “Check again” in “Claude Code CLI connection” below.')}:undefined;
- return row(pt,{id:'claude',kind:'cli',title:'Claude Code CLI',level:next?'attention':'restricted',facts,next});
+ const next:NextAction|undefined=state==='not-installed'?{text:t('Instale a CLI no terminal e verifique de novo.','Install the CLI in a terminal, then check again.'),command:claude.installCommand}:state==='login-required'?{text:t('Entre pela própria CLI no terminal e verifique de novo.','Sign in through the CLI in a terminal, then check again.'),command:claude.loginCommand??'claude auth login'}:state!=='connected'?{text:t('Use “Verificar novamente” em “Conexão com a CLI do Claude Code”, logo abaixo.','Use “Check again” in “Claude Code CLI connection” below.')}:mcpNext;
+ return row(pt,{id:'claude',kind:'cli',title:'Claude Code CLI',level:next&&next!==mcpNext?'attention':gated?(auth.length?'attention':'ready'):'restricted',facts,next,tools:mcpTools.length?mcpTools:undefined});
 }
 
 export function mcpRows(data:CodexDiagnostics,pt:boolean,locale:string):CapabilityRow[]{

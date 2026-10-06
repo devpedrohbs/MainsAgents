@@ -1,0 +1,27 @@
+{
+ "version": "0.0.1",
+ "configurations": [
+  {
+   "name": "vite-web",
+   "runtimeExecutable": "npx",
+   "runtimeArgs": [
+    "vite",
+    "--port",
+    "5199"
+   ],
+   "port": 5199
+  },
+  {
+   "name": "design-r3",
+   "runtimeExecutable": "python",
+   "runtimeArgs": [
+    "-m",
+    "http.server",
+    "5188",
+    "--directory",
+    ".mainsagents-workspaces/claude-redesign-r3"
+   ],
+   "port": 5188
+  }
+ ]
+}
