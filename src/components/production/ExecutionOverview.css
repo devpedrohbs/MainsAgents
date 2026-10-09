@@ -1,0 +1,20 @@
+.execution-overview{margin:20px 0;min-width:0;font-family:var(--font-body)}
+.execution-filters{display:flex;flex-wrap:wrap;gap:6px;padding:0 20px 16px}
+.execution-filters button{min-height:32px;padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--fg);font:inherit;font-size:12px;cursor:pointer}
+.execution-filters button:hover{background:var(--bg)}
+.execution-filters button[aria-pressed=true]{border-color:var(--accent);color:var(--accent);background:var(--bg)}
+.execution-filters button span{margin-left:5px}
+.execution-list{list-style:none;margin:0;padding:0;max-height:560px;overflow:auto}
+.execution-list li{padding:16px 20px;border-top:1px solid var(--border);min-width:0}
+.execution-title{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:8px;font-size:14px;overflow-wrap:anywhere}
+.execution-state{font-size:12px;color:var(--fg)}
+.execution-list dl{display:flex;flex-wrap:wrap;gap:12px 28px;margin:12px 0;font-size:12px}
+.execution-list dl div{min-width:0;max-width:100%}
+.execution-list dt{color:var(--muted);margin-bottom:4px}
+.execution-list dd{margin:0;color:var(--fg);overflow-wrap:anywhere}
+.execution-reason,.execution-notice{font-size:13px;color:var(--muted);line-height:1.55;overflow-wrap:anywhere}
+.execution-notice{padding:0 20px 20px;margin:0}
+.execution-actions{display:flex;flex-wrap:wrap;align-items:center;gap:16px;margin-top:12px}
+.execution-actions button{min-height:32px}
+.execution-actions button:disabled{opacity:.55;cursor:default}
+@media(max-width:600px){.execution-list li{padding:14px}.execution-filters{padding:0 14px 14px}.execution-list dl{gap:12px 18px}}

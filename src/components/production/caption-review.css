@@ -1,0 +1,32 @@
+.caption-review{display:grid;gap:12px;min-width:0}
+.caption-review-player{position:relative;max-width:420px;border-radius:8px;overflow:hidden;background:#000}
+.caption-review-player video{display:block;width:100%;max-height:420px}
+/* Approximate browser preview of the three generic styles; the burned file comes from FFmpeg/libass. */
+.caption-review-overlay{position:absolute;left:7%;right:7%;bottom:14%;text-align:center;font-weight:700;font-size:clamp(12px,4.2cqw,20px);line-height:1.25;white-space:pre-line;pointer-events:none;color:#fff}
+.caption-review-player{container-type:inline-size}
+.caption-review-overlay--classic{text-shadow:-2px -2px 0 #000,2px -2px 0 #000,-2px 2px 0 #000,2px 2px 0 #000}
+.caption-review-overlay--boxed{left:auto;right:auto;inset-inline:0;margin:0 auto;width:fit-content;max-width:86%;padding:2px 8px;background:rgb(0 0 0/.72)}
+.caption-review-overlay--highlight{bottom:24%;color:#ffd400;text-shadow:-2px -2px 0 #000,2px -2px 0 #000,-2px 2px 0 #000,2px 2px 0 #000}
+.caption-review-start,.caption-review-actions,.caption-review-approve{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.caption-review-file{position:relative;display:inline-flex;align-items:center;cursor:pointer}
+.caption-review-file input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.caption-review-file:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+.caption-review-version{margin:0;font-size:12px;color:var(--muted)}
+.caption-review-warnings{margin:0;padding:8px 12px 8px 28px;font-size:12px;line-height:1.5;border:1px solid var(--warn,#7a4f00);border-radius:8px;color:var(--fg)}
+.caption-review-rows{display:grid;gap:8px;margin:0;padding:0;list-style:none;max-height:460px;overflow:auto}
+.caption-review-row{display:grid;gap:6px;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--bg);min-width:0}
+.caption-review-row[data-live=true]{border-color:var(--accent)}
+.caption-review-row[data-invalid=true]{border-color:var(--danger,#b42318)}
+.caption-review-times{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;font-size:12px}
+.caption-review-times input{width:84px;min-height:30px;padding:0 6px;font:inherit;font-variant-numeric:tabular-nums;color:var(--fg);background:var(--surface);border:1px solid var(--border);border-radius:6px}
+.caption-review-row textarea{width:100%;min-width:0;font:inherit;font-size:13px;color:var(--fg);background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:6px 8px;resize:vertical}
+.caption-review-times input[aria-invalid=true],.caption-review-row textarea[aria-invalid=true]{border-color:var(--danger,#b42318)}
+.caption-review-row-actions{display:flex;gap:12px;font-size:12px}
+.caption-review-output{display:grid;gap:6px;padding:10px;border:1px solid var(--success,#0e6b33);border-radius:8px}
+.caption-review-output p{margin:0;font-size:13px}
+@media (max-width:520px){.caption-review-player{max-width:100%}}
+/* Compact row inside the production dialog (overrides the generic full-width .production-section fields). */
+.production-section.caption-review .caption-review-times label{display:inline;font-size:12px}
+.production-section.caption-review .caption-review-times input{width:88px;padding:4px 6px;min-height:30px}
+.production-section.caption-review .caption-review-row textarea{min-height:52px;padding:6px 8px;line-height:1.4}
+.production-section.caption-review .caption-review-times .text-link{font-size:12px}

@@ -11,7 +11,7 @@ test('official item notifications reach the chat stream and history without API 
  const item={type:'imageGeneration',id:'image-call',status:'completed',result:png};
  const threadId='01a0fcb7-5e86-7330-bf3b-2034c1492a89';
  writeFileSync(cli,`import{createInterface}from'node:readline';const threadId=${JSON.stringify(threadId)},item=${JSON.stringify(item)};const send=value=>process.stdout.write(JSON.stringify(value)+'\\n');createInterface({input:process.stdin}).on('line',line=>{const m=JSON.parse(line);if(m.id===undefined)return;let result={};if(m.method==='thread/resume')result={thread:{id:threadId,status:{type:'idle'}}};if(m.method==='thread/read')result={thread:{id:threadId,status:{type:'idle'},turns:[{id:'mock-turn',items:[item]}]}};if(m.method==='turn/start'){result={turn:{id:'mock-turn'}};setTimeout(()=>{send({method:'item/started',params:{turnId:'mock-turn',threadId,item:{...item,status:'in_progress',result:''}}});send({method:'item/completed',params:{turnId:'mock-turn',threadId,item}});send({method:'item/completed',params:{turnId:'mock-turn',threadId,item:{type:'agentMessage',text:'Your image is ready.'}}});send({method:'turn/completed',params:{turnId:'mock-turn',threadId,turn:{id:'mock-turn',status:'completed'}}});},20);}send({id:m.id,result});});`);
- const previous=process.env.CODEX_CLI_PATH;process.env.CODEX_CLI_PATH=cli;
+ const previous=process.env.MAINSAGENTS_CODEX_CLI_PATH;process.env.MAINSAGENTS_CODEX_CLI_PATH=cli;
  let bridge;
  try{
   bridge=await startCodexBridge({port:0,cwd:root,runtimeHome:join(root,'runtime'),sharedHome:shared,imagesDirectory:join(root,'images')});
@@ -25,5 +25,5 @@ test('official item notifications reach the chat stream and history without API 
   const url=events.find(event=>event.type==='image.completed').image.url;
   assert.equal((await fetch(base+url)).status,403);
   const image=await fetch(base+url,{headers});assert.equal(image.headers.get('content-type'),'image/png');assert.equal(Buffer.from(await image.arrayBuffer()).toString('base64'),png);
- }finally{if(bridge)await bridge.close();if(previous===undefined)delete process.env.CODEX_CLI_PATH;else process.env.CODEX_CLI_PATH=previous;rmSync(root,{recursive:true,force:true,maxRetries:5,retryDelay:100});}
+ }finally{if(bridge)await bridge.close();if(previous===undefined)delete process.env.MAINSAGENTS_CODEX_CLI_PATH;else process.env.MAINSAGENTS_CODEX_CLI_PATH=previous;rmSync(root,{recursive:true,force:true,maxRetries:5,retryDelay:100});}
 });

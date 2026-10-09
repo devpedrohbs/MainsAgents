@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import {createDesktopStateStore} from '../desktop-state-store.mjs';
 import {createContentWorkflowBridge} from '../content-workflow-bridge.mjs';
 import {registerEditorialFilesIpc} from '../editorial-files-ipc.mjs';
+import {captureReadyPng} from './ui-capture-ready.mjs';
 const root=resolve(import.meta.dirname,'..'),out=resolve(root,'.mainsagents-workspaces/production-flows-ui',String(Date.now()));mkdirSync(out,{recursive:true});app.setPath('userData',resolve(out,'electron'));app.on('window-all-closed',()=>{});
 const profile='handoff-test',workspaceId='my-workspace',at=new Date().toISOString(),input=resolve(out,'recording.mp4');
 // This tests association/briefing, not codec validity or an edited output.
@@ -29,7 +30,7 @@ const errors=[],js=code=>win.webContents.executeJavaScript(code);
 async function until(check){const end=Date.now()+15000;while(Date.now()<end){if(await check())return;await new Promise(resolve=>setTimeout(resolve,50))}throw Error('Production flow UI timed out')}
 async function click(selector){await until(()=>js(`Boolean(document.querySelector(${JSON.stringify(selector)}))`));await js(`document.querySelector(${JSON.stringify(selector)}).click()`)}
 async function button(text){await until(()=>js(`Array.from(document.querySelectorAll('button')).some(item=>item.textContent.trim()===${JSON.stringify(text)}&&!item.disabled)`));await js(`Array.from(document.querySelectorAll('button')).find(item=>item.textContent.trim()===${JSON.stringify(text)}&&!item.disabled).click()`)}
-async function screenshot(name){await new Promise(resolve=>setTimeout(resolve,100));writeFileSync(resolve(out,`${name}.png`),(await win.webContents.capturePage()).toPNG())}
+async function screenshot(name){writeFileSync(resolve(out,`${name}.png`),await captureReadyPng(win.webContents))}
 async function open(width=1440){win=new BrowserWindow({show:false,width,height:1000,webPreferences:{preload:resolve(root,'tests/fixtures/assets-ui-preload.cjs'),contextIsolation:true,sandbox:true,offscreen:true,backgroundThrottling:false}});win.webContents.on('console-message',event=>{if(/Uncaught|Maximum update depth|Cannot update a component/.test(event.message))errors.push(event.message)});await win.loadURL(`http://127.0.0.1:${server.address().port}/app.html#flow`);await until(()=>js('document.querySelectorAll(".production-box").length===4'))}
 app.whenReady().then(async()=>{try{
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));await open();await until(()=>store.read(profile,'production-flows')?.flows.length===1);assert.equal(sends,0);await screenshot('initial-flow');

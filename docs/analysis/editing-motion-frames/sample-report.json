@@ -1,0 +1,628 @@
+{
+  "fixture": "SINTÉTICA: vídeo desenhado pelo FFmpeg + voz offline do Windows (SSML). Não é gravação humana; a prosódia medida é a da voz sintética.",
+  "variants": [
+    {
+      "name": "landscape-intense",
+      "format": "original",
+      "intensity": "intense",
+      "renderSeconds": 39.3,
+      "outputDuration": 18.034,
+      "rendered": {
+        "width": 960,
+        "height": 540,
+        "fps": 30,
+        "durationSeconds": 18.067,
+        "audio": {
+          "mode": "mixed-sfx",
+          "codec": "aac",
+          "channels": 2,
+          "sampleRate": 48000
+        }
+      },
+      "summary": "intenso: 3 momento(s) — 2 aproximação(ões), 0 texto(s) animado(s), 1 cartão(ões) com tela dividida; 3 apoiado(s) na voz medida; 1 efeito(s) sonoro(s) suave(s).",
+      "cues": [
+        {
+          "id": "m1",
+          "kind": "punchIn",
+          "sourceStart": 6.7,
+          "sourceEnd": 8.3,
+          "start": 5.076,
+          "end": 6.676,
+          "focus": "é",
+          "layout": "camera-full",
+          "strength": 0.61,
+          "scale": 1.135,
+          "source": "measured",
+          "timing": "words",
+          "reason": "Aproximação: medido (voz +4 dB, entonação +5.4 st, palavra alongada)",
+          "signals": [
+            {
+              "kind": "loudness",
+              "source": "measured",
+              "value": 4
+            },
+            {
+              "kind": "pitch",
+              "source": "measured",
+              "value": 5.4
+            },
+            {
+              "kind": "stretch",
+              "source": "measured",
+              "value": 5.06
+            }
+          ]
+        },
+        {
+          "id": "m2",
+          "kind": "keyPoint",
+          "sourceStart": 14.04,
+          "sourceEnd": 17.06,
+          "start": 10.391,
+          "end": 13.411,
+          "text": "economiza 90%",
+          "focus": "90%",
+          "layout": "split",
+          "strength": 0.6,
+          "source": "mixed",
+          "timing": "words",
+          "reason": "Cartão explicativo: medido (entonação +4.2 st, palavra alongada); texto (número)",
+          "signals": [
+            {
+              "kind": "pitch",
+              "source": "measured",
+              "value": 4.2
+            },
+            {
+              "kind": "stretch",
+              "source": "measured",
+              "value": 2.81
+            },
+            {
+              "kind": "number",
+              "source": "inferred"
+            }
+          ],
+          "sfx": {
+            "kind": "whoosh",
+            "gainDb": -19,
+            "ducked": true
+          }
+        },
+        {
+          "id": "m3",
+          "kind": "punchIn",
+          "sourceStart": 19.5,
+          "sourceEnd": 20.13,
+          "start": 14.161,
+          "end": 14.791,
+          "focus": "E",
+          "layout": "camera-full",
+          "strength": 0.64,
+          "scale": 1.137,
+          "source": "measured",
+          "timing": "words",
+          "reason": "Aproximação: medido (voz +6.38 dB, entonação +2.6 st, pausa 1.95s antes)",
+          "signals": [
+            {
+              "kind": "loudness",
+              "source": "measured",
+              "value": 6.38
+            },
+            {
+              "kind": "pitch",
+              "source": "measured",
+              "value": 2.6
+            },
+            {
+              "kind": "pauseBefore",
+              "source": "measured",
+              "value": 1.95
+            }
+          ]
+        }
+      ],
+      "sfx": [
+        {
+          "cue": "m2",
+          "kind": "whoosh",
+          "at": 10.391,
+          "plannedGainDb": -19,
+          "ducked": true,
+          "during": {
+            "speechDb": -24.8,
+            "addedDb": -43
+          },
+          "control": {
+            "speechDb": -26.6,
+            "addedDb": -87.4
+          }
+        }
+      ],
+      "audioRms": {
+        "rendered": 1704,
+        "cutOnly": 1704
+      },
+      "frames": [
+        "landscape-intense-m1-punchIn-pico.png",
+        "landscape-intense-m2-keyPoint-entrando.png",
+        "landscape-intense-m2-keyPoint-cartao.png",
+        "landscape-intense-m2-keyPoint-retorno.png",
+        "landscape-intense-m3-punchIn-pico.png"
+      ]
+    },
+    {
+      "name": "portrait-balanced",
+      "format": "portrait",
+      "intensity": "balanced",
+      "renderSeconds": 42.7,
+      "outputDuration": 18.034,
+      "rendered": {
+        "width": 1080,
+        "height": 1920,
+        "fps": 30,
+        "durationSeconds": 18.067,
+        "audio": {
+          "mode": "mixed-sfx",
+          "codec": "aac",
+          "channels": 2,
+          "sampleRate": 48000
+        }
+      },
+      "summary": "equilibrado: 3 momento(s) — 2 aproximação(ões), 0 texto(s) animado(s), 1 cartão(ões) com tela dividida; 3 apoiado(s) na voz medida; 1 efeito(s) sonoro(s) suave(s).",
+      "cues": [
+        {
+          "id": "m1",
+          "kind": "punchIn",
+          "sourceStart": 6.7,
+          "sourceEnd": 8.3,
+          "start": 5.076,
+          "end": 6.676,
+          "focus": "é",
+          "layout": "camera-full",
+          "strength": 0.61,
+          "scale": 1.084,
+          "source": "measured",
+          "timing": "words",
+          "reason": "Aproximação: medido (voz +4 dB, entonação +5.4 st, palavra alongada)",
+          "signals": [
+            {
+              "kind": "loudness",
+              "source": "measured",
+              "value": 4
+            },
+            {
+              "kind": "pitch",
+              "source": "measured",
+              "value": 5.4
+            },
+            {
+              "kind": "stretch",
+              "source": "measured",
+              "value": 5.06
+            }
+          ]
+        },
+        {
+          "id": "m2",
+          "kind": "keyPoint",
+          "sourceStart": 14.04,
+          "sourceEnd": 17.06,
+          "start": 10.391,
+          "end": 13.411,
+          "text": "economiza 90%",
+          "focus": "90%",
+          "layout": "split",
+          "strength": 0.6,
+          "source": "mixed",
+          "timing": "words",
+          "reason": "Cartão explicativo: medido (entonação +4.2 st, palavra alongada); texto (número)",
+          "signals": [
+            {
+              "kind": "pitch",
+              "source": "measured",
+              "value": 4.2
+            },
+            {
+              "kind": "stretch",
+              "source": "measured",
+              "value": 2.81
+            },
+            {
+              "kind": "number",
+              "source": "inferred"
+            }
+          ],
+          "sfx": {
+            "kind": "whoosh",
+            "gainDb": -22,
+            "ducked": true
+          }
+        },
+        {
+          "id": "m3",
+          "kind": "punchIn",
+          "sourceStart": 19.5,
+          "sourceEnd": 20.13,
+          "start": 14.161,
+          "end": 14.791,
+          "focus": "E",
+          "layout": "camera-full",
+          "strength": 0.64,
+          "scale": 1.086,
+          "source": "measured",
+          "timing": "words",
+          "reason": "Aproximação: medido (voz +6.38 dB, entonação +2.6 st, pausa 1.95s antes)",
+          "signals": [
+            {
+              "kind": "loudness",
+              "source": "measured",
+              "value": 6.38
+            },
+            {
+              "kind": "pitch",
+              "source": "measured",
+              "value": 2.6
+            },
+            {
+              "kind": "pauseBefore",
+              "source": "measured",
+              "value": 1.95
+            }
+          ]
+        }
+      ],
+      "sfx": [
+        {
+          "cue": "m2",
+          "kind": "whoosh",
+          "at": 10.391,
+          "plannedGainDb": -22,
+          "ducked": true,
+          "during": {
+            "speechDb": -24.8,
+            "addedDb": -46
+          },
+          "control": {
+            "speechDb": -26.6,
+            "addedDb": -87.4
+          }
+        }
+      ],
+      "audioRms": {
+        "rendered": 1704,
+        "cutOnly": 1704
+      },
+      "frames": [
+        "portrait-balanced-m1-punchIn-pico.png",
+        "portrait-balanced-m2-keyPoint-entrando.png",
+        "portrait-balanced-m2-keyPoint-cartao.png",
+        "portrait-balanced-m2-keyPoint-retorno.png",
+        "portrait-balanced-m3-punchIn-pico.png"
+      ]
+    },
+    {
+      "name": "square-text-only",
+      "format": "original",
+      "intensity": "intense",
+      "square": true,
+      "textOnly": true,
+      "renderSeconds": 39.1,
+      "outputDuration": 18.034,
+      "rendered": {
+        "width": 540,
+        "height": 540,
+        "fps": 30,
+        "durationSeconds": 18.067,
+        "audio": {
+          "mode": "mixed-sfx",
+          "codec": "aac",
+          "channels": 2,
+          "sampleRate": 48000
+        }
+      },
+      "summary": "intenso: 4 momento(s) — 1 aproximação(ões), 2 texto(s) animado(s), 1 cartão(ões) com tela dividida; 0 apoiado(s) na voz medida; 1 efeito(s) sonoro(s) suave(s). ênfase da voz não medida (sem áudio utilizável); destaques vêm só do texto.",
+      "cues": [
+        {
+          "id": "m1",
+          "kind": "kineticText",
+          "sourceStart": 3.72,
+          "sourceEnd": 5.134,
+          "start": 3.72,
+          "end": 4.614,
+          "text": "mais rápido",
+          "focus": "rápido",
+          "layout": "camera-full",
+          "strength": 0.42,
+          "source": "inferred",
+          "timing": "words",
+          "reason": "Texto animado: texto (palavra-chave)",
+          "signals": [
+            {
+              "kind": "keyword",
+              "source": "inferred"
+            }
+          ]
+        },
+        {
+          "id": "m2",
+          "kind": "kineticText",
+          "sourceStart": 7.7,
+          "sourceEnd": 9.12,
+          "start": 6.076,
+          "end": 7.496,
+          "text": "nunca cortar",
+          "focus": "nunca",
+          "layout": "camera-full",
+          "strength": 0.42,
+          "source": "inferred",
+          "timing": "words",
+          "reason": "Texto animado: texto (palavra-chave)",
+          "signals": [
+            {
+              "kind": "keyword",
+              "source": "inferred"
+            }
+          ]
+        },
+        {
+          "id": "m3",
+          "kind": "keyPoint",
+          "sourceStart": 14.04,
+          "sourceEnd": 17.06,
+          "start": 10.391,
+          "end": 13.411,
+          "text": "economiza 90%",
+          "focus": "90%",
+          "layout": "split",
+          "strength": 0.49,
+          "source": "inferred",
+          "timing": "words",
+          "reason": "Cartão explicativo: texto (número)",
+          "signals": [
+            {
+              "kind": "number",
+              "source": "inferred"
+            }
+          ],
+          "sfx": {
+            "kind": "whoosh",
+            "gainDb": -19,
+            "ducked": true
+          }
+        },
+        {
+          "id": "m4",
+          "kind": "punchIn",
+          "sourceStart": 19.78,
+          "sourceEnd": 21.38,
+          "start": 14.441,
+          "end": 16.041,
+          "focus": "importante",
+          "layout": "camera-full",
+          "strength": 0.42,
+          "scale": 1.123,
+          "source": "inferred",
+          "timing": "words",
+          "reason": "Aproximação: texto (palavra-chave)",
+          "signals": [
+            {
+              "kind": "keyword",
+              "source": "inferred"
+            }
+          ]
+        }
+      ],
+      "sfx": [
+        {
+          "cue": "m3",
+          "kind": "whoosh",
+          "at": 10.391,
+          "plannedGainDb": -19,
+          "ducked": true,
+          "during": {
+            "speechDb": -24.8,
+            "addedDb": -43
+          },
+          "control": {
+            "speechDb": -26.6,
+            "addedDb": -87.4
+          }
+        }
+      ],
+      "audioRms": {
+        "rendered": 1704,
+        "cutOnly": 1704
+      },
+      "frames": [
+        "square-text-only-m1-kineticText-pico.png",
+        "square-text-only-m2-kineticText-pico.png",
+        "square-text-only-m3-keyPoint-entrando.png",
+        "square-text-only-m3-keyPoint-cartao.png",
+        "square-text-only-m3-keyPoint-retorno.png",
+        "square-text-only-m4-punchIn-pico.png"
+      ]
+    }
+  ],
+  "source": {
+    "duration": 25.066667,
+    "width": 960,
+    "height": 540,
+    "fps": 30
+  },
+  "transcription": {
+    "engine": "whisper.cpp",
+    "model": "ggml-base",
+    "words": 39,
+    "text": "Hoje eu vou te mostrar como editar vídeos bem mais rápido. O segredo é nunca cortar no meio da frase. Com esse cuidado você economiza 90% do tempo de revisão. E o mais importante, lhe vai antes de publicar."
+  },
+  "alignment": [
+    {
+      "text": "rápido.",
+      "whisper": [
+        4.42,
+        4.96
+      ],
+      "aligned": [
+        4.42,
+        4.5
+      ]
+    },
+    {
+      "text": "frase.",
+      "whisper": [
+        9.78,
+        10.4
+      ],
+      "aligned": [
+        9.78,
+        9.85
+      ]
+    },
+    {
+      "text": "revisão.",
+      "whisper": [
+        17.26,
+        18.04
+      ],
+      "aligned": [
+        17.26,
+        17.55
+      ]
+    },
+    {
+      "text": "importante,",
+      "whisper": [
+        20.86,
+        21.36
+      ],
+      "aligned": [
+        20.86,
+        21
+      ]
+    },
+    {
+      "text": "publicar.",
+      "whisper": [
+        22.68,
+        23.56
+      ],
+      "aligned": [
+        22.68,
+        23.24
+      ]
+    }
+  ],
+  "measuredWords": [
+    {
+      "start": 0.44,
+      "end": 0.6,
+      "text": "Hoje",
+      "loudnessDb": 3.82,
+      "pitchSt": 1.62,
+      "pauseBefore": 0,
+      "stretch": 0.37
+    },
+    {
+      "start": 1.54,
+      "end": 1.62,
+      "text": "te",
+      "loudnessDb": 4.01,
+      "pitchSt": 0.18,
+      "pauseBefore": 0,
+      "stretch": 0.38
+    },
+    {
+      "start": 6.46,
+      "end": 6.78,
+      "text": "O",
+      "loudnessDb": -3.17,
+      "pitchSt": -2.11,
+      "pauseBefore": 1.88,
+      "stretch": 3
+    },
+    {
+      "start": 7.24,
+      "end": 7.78,
+      "text": "é",
+      "loudnessDb": 4,
+      "pitchSt": 5.4,
+      "pauseBefore": 0,
+      "stretch": 5.06
+    },
+    {
+      "start": 15.04,
+      "end": 15.94,
+      "text": "90%",
+      "loudnessDb": 1.45,
+      "pitchSt": 4.2,
+      "pauseBefore": 0,
+      "stretch": 2.81
+    },
+    {
+      "start": 19.58,
+      "end": 19.68,
+      "text": "E",
+      "loudnessDb": 6.38,
+      "pitchSt": 2.6,
+      "pauseBefore": 1.95,
+      "stretch": 0.94
+    },
+    {
+      "start": 19.68,
+      "end": 19.86,
+      "text": "o",
+      "loudnessDb": 4.33,
+      "pitchSt": -0.29,
+      "pauseBefore": 0,
+      "stretch": 1.69
+    },
+    {
+      "start": 21.36,
+      "end": 21.58,
+      "text": "lhe",
+      "loudnessDb": 4.21,
+      "pitchSt": 0.19,
+      "pauseBefore": 0,
+      "stretch": 0.69
+    }
+  ],
+  "cuts": {
+    "silences": [
+      {
+        "start": 4.464146,
+        "end": 6.388479
+      },
+      {
+        "start": 9.835854,
+        "end": 12.160562
+      },
+      {
+        "start": 17.517896,
+        "end": 19.507854
+      },
+      {
+        "start": 23.223458,
+        "end": 25.066667
+      }
+    ],
+    "segments": [
+      {
+        "start": 0,
+        "end": 4.614
+      },
+      {
+        "start": 6.238,
+        "end": 9.986
+      },
+      {
+        "start": 12.011,
+        "end": 17.668
+      },
+      {
+        "start": 19.358,
+        "end": 23.373
+      }
+    ]
+  }
+}

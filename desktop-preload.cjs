@@ -42,6 +42,7 @@ contextBridge.exposeInMainWorld('mainsAgentsDesktop', {
     saveCheckpoint: () => ipcRenderer.invoke('state:checkpoint'),
   },
   selectSkillDirectory: () => ipcRenderer.invoke('skills:select-directory'),
+  selectOutputDirectory:()=>ipcRenderer.invoke('file-access:select-directory'),
   installSkill: (command, agentKey, directory) => ipcRenderer.invoke('skills:install', command, agentKey, directory),
   refreshSkillDirectory: directory => ipcRenderer.invoke('skills:refresh-directory', directory),
   saveProviderKey: (provider,key) => ipcRenderer.invoke('provider:save-key',provider,key),

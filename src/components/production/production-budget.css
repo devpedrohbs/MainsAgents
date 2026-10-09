@@ -20,3 +20,11 @@
 .production-budget .production-check input{width:16px;height:16px;flex-shrink:0;margin-top:3px;accent-color:var(--accent)}
 .production-budget-adjust .soft-button{justify-self:start;margin-top:10px}
 .production-budget-adjust small{display:block;margin-top:6px;color:var(--muted)}
+
+.production-budget-token{display:inline-block;margin-right:12px}
+.production-budget-facts small,.production-budget-calls small{display:block;color:var(--muted);line-height:1.5}
+.production-budget-calls{font-size:12px;line-height:1.6}
+.production-budget-calls summary{cursor:pointer;width:fit-content}
+.production-budget-calls summary:focus-visible{outline:2px solid var(--focus-ring,var(--accent));outline-offset:2px;border-radius:4px}
+.production-budget-calls ul{list-style:none;margin:6px 0 0;padding:0;display:grid;gap:6px}
+.production-budget-calls li{overflow-wrap:anywhere}

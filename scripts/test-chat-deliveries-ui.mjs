@@ -6,6 +6,7 @@ import {resolve,extname,sep} from 'node:path';
 import {DatabaseSync} from 'node:sqlite';
 import assert from 'node:assert/strict';
 import {createContentWorkflowBridge} from '../content-workflow-bridge.mjs';
+import {captureReadyPng} from './ui-capture-ready.mjs';
 
 const root=resolve(import.meta.dirname,'..'),out=resolve(root,'.mainsagents-workspaces/chat-deliveries-ui-test');mkdirSync(out,{recursive:true});
 app.setPath('userData',resolve(out,`profile-${Date.now()}`));app.on('window-all-closed',()=>{});
@@ -55,7 +56,7 @@ app.whenReady().then(async()=>{try {
   await click('Aprovar e enviar ao Notion');await until(()=>evaluate('document.body.textContent.includes("Card confirmado no Notion.")'));assert.equal(writes,1);
   await click('Aprovar e enviar ao Notion');await until(()=>evaluate('!document.querySelector(".delivery-review-footer > .primary-button").disabled'));assert.equal(writes,1);assert.equal(bridge.jobs.list(profile).length,1);
   const reviewGeometry=await evaluate('(()=>{const dialog=document.querySelector(".flow-dialog").getBoundingClientRect(),button=document.querySelector(".delivery-review-footer button").getBoundingClientRect();return {bottom:button.bottom,dialogBottom:dialog.bottom,height:innerHeight}})()');assert(reviewGeometry.bottom<=reviewGeometry.dialogBottom&&reviewGeometry.bottom<=reviewGeometry.height);
-  writeFileSync(resolve(out,'chat-review.png'),(await window.webContents.capturePage()).toPNG());
+  writeFileSync(resolve(out,'chat-review.png'),await captureReadyPng(window.webContents));
   await evaluate('document.querySelector(".flow-dialog header button").click()');await click('Trabalho persistente');await click('Enviar ao especialista');
   await setText('[aria-label="Briefing ao especialista"]','Review the approved script and explain which video inputs are missing.');await click('Enviar trabalho');
   await until(()=>bridge.work.list(profile).length===1);const jobId=bridge.work.list(profile)[0].id;assert.equal(bridge.work.list(profile)[0].agent.id,'video-agent');assert.equal(bridge.work.list(profile)[0].sourceAgent.id,'content-agent');
@@ -64,8 +65,8 @@ app.whenReady().then(async()=>{try {
   await click('Ver aprovação');await until(()=>evaluate('document.querySelector(".delivery-script")?.value.includes("EDITED_IN_CHAT")'));await evaluate('document.querySelector(".flow-dialog header button").click()');
   await evaluate('document.querySelector(".conversation-expand").click()');window.setSize(880,720);await new Promise(resolve=>setTimeout(resolve,200));
   const geometry=await evaluate('(()=>{const input=document.querySelector(".composer textarea").getBoundingClientRect();const body=document.querySelector(".chat-body").getBoundingClientRect();return {inputBottom:input.bottom,bodyBottom:body.bottom,height:innerHeight,scroll:document.documentElement.scrollWidth-innerWidth}})()');assert(geometry.inputBottom<=geometry.height);assert(geometry.bodyBottom<=geometry.inputBottom);assert(geometry.scroll<=1);
-  await evaluate('document.documentElement.dataset.appearance="dark"');await new Promise(resolve=>setTimeout(resolve,200));writeFileSync(resolve(out,'chat-delivery-dark-compact.png'),(await window.webContents.capturePage()).toPNG());
-  await evaluate('document.documentElement.dataset.appearance="light"');await new Promise(resolve=>setTimeout(resolve,200));writeFileSync(resolve(out,'chat-delivery-light-compact.png'),(await window.webContents.capturePage()).toPNG());
+  await evaluate('document.documentElement.dataset.appearance="dark"');writeFileSync(resolve(out,'chat-delivery-dark-compact.png'),await captureReadyPng(window.webContents));
+  await evaluate('document.documentElement.dataset.appearance="light"');writeFileSync(resolve(out,'chat-delivery-light-compact.png'),await captureReadyPng(window.webContents));
   await setText('.composer textarea','Research a new project');await until(()=>evaluate('!document.querySelector(".send-button").disabled'));await evaluate('document.querySelector(".send-button").click()');await until(()=>evaluate('document.querySelectorAll(".chat-delivery").length===2'));await click('Salvar entrega');await until(()=>evaluate('document.querySelectorAll(".chat-delivery")[1].textContent.includes("Versão 1")'));await evaluate('[...document.querySelectorAll(".chat-delivery")[1].querySelectorAll("button")].find(button=>button.textContent.trim()==="Abrir no Estúdio").click()');await until(()=>evaluate('Boolean(document.querySelector(".editorial-workspace"))||Boolean(document.querySelector(".editorial-progress"))'));
   const verify=new DatabaseSync(dbPath,{readOnly:true});const editorial=JSON.parse(verify.prepare('SELECT state_json FROM editorial_state WHERE profile_id=?').get(profile).state_json);verify.close();assert.equal(editorial.topics.filter(item=>item.status==='review').length,1);
   assert.deepEqual(errors,[]);writeFileSync(resolve(out,'result.json'),JSON.stringify({passed:true,streamGuard:true,persistedDelivery:true,editedApproval:true,notionWrites:writes,deduplicated:true,durableHandoff:true,restart:true,responsive:true,researchCapture:true}));

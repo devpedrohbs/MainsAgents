@@ -6,6 +6,7 @@ import {storageProfile} from '../../data/IndexedDbStateStore';
 import type {EditorialContent,VideoMetadata} from '../../features/content/model';
 import {SelectMenu} from '../common/SelectMenu';
 import {FlowDialog} from '../common/FlowDialog';
+import {EditReview} from './EditReview';
 import './content-media.css';
 
 export function ContentMediaEditor({content}:{content:EditorialContent}){
@@ -14,7 +15,7 @@ export function ContentMediaEditor({content}:{content:EditorialContent}){
   const scope=studioDraftKey('trim',content.workspaceId,content.id);
   const [open,setOpen]=useState(false),[assetId,setAssetId]=useStudioDraftField<string>(scope,'asset',''),[start,setStart]=useStudioDraftField<string>(scope,'start','0'),[duration,setDuration]=useStudioDraftField<string>(scope,'duration','');
   const [inspection,setInspection]=useState<{metadata:VideoMetadata;versionId:string;sha256:string}|null>(null),[capability,setCapability]=useState<{available:boolean;error:string}|null>(null);
-  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[requestKey,setRequestKey]=useState(()=>crypto.randomUUID());
+  const [reviewJob,setReviewJob]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[requestKey,setRequestKey]=useState(()=>crypto.randomUUID());
   const jobs=mediaJobs.filter(item=>item.contentId===content.id&&item.workspaceId===content.workspaceId);
   const action=async(work:()=>Promise<unknown>)=>{setBusy(true);setError('');try{await work()}catch(failure){setError(String((failure as Error).message))}finally{setBusy(false)}};
   const prepare=()=>{setOpen(true);setInspection(null);setCapability(null);if(!videos.some(item=>item.id===assetId))setAssetId(videos[0]?.id??'');setRequestKey(crypto.randomUUID());void action(async()=>setCapability(await mediaCapabilities()))};
@@ -26,10 +27,12 @@ export function ContentMediaEditor({content}:{content:EditorialContent}){
     {!videos.length&&<p className="editorial-hint">{pt?'Associe um vídeo na biblioteca acima para começar.':'Link a video in the library above to begin.'}</p>}
     {error&&!open&&<p className="delivery-error" role="alert">{error}</p>}
     <div className="media-jobs">{jobs.map(job=><article key={job.id} className="media-job"><div><b>{job.status==='succeeded'?(pt?'Vídeo exportado e verificado':'Video exported and verified'):job.status==='running'?(pt?'Exportando vídeo':'Exporting video'):job.status==='queued'?(pt?'Na fila':'Queued'):job.status==='canceled'?(pt?'Cancelado':'Canceled'):job.status==='interrupted'?(pt?'Exportação interrompida':'Export interrupted'):(pt?'Falha na exportação':'Export failed')}</b><small>{job.start}s – {Math.round((job.start+job.duration)*100)/100}s</small></div>{job.status==='running'&&<progress max={100} value={job.progress} aria-label={pt?'Progresso da exportação':'Export progress'}/>}{job.error&&<p role="status">{job.error}</p>}{job.result&&job.status==='succeeded'&&<p>{job.result.metadata.width} × {job.result.metadata.height} · {Math.round(job.result.metadata.duration*100)/100}s · {job.result.metadata.hasAudio?(pt?'Com áudio':'With audio'):(pt?'Sem áudio':'No audio')}</p>}<div className="editorial-actions">
+      {job.status==='succeeded'&&job.mode==='advanced'&&<button type="button" className="soft-button" onClick={()=>setReviewJob(job.id)}>{pt?'Conferir edição':'Review edit'}</button>}
       {['queued','running'].includes(job.status)&&<button type="button" className="soft-button" disabled={busy} onClick={()=>void action(()=>mediaAction(job.id,'cancel'))}>{pt?'Cancelar exportação':'Cancel export'}</button>}
       {['failed','interrupted'].includes(job.status)&&!job.imported&&<button type="button" className="soft-button" disabled={busy} onClick={()=>void action(()=>mediaAction(job.id,'retry'))}>{pt?'Verificar e retomar':'Verify and resume'}</button>}
       {job.status==='succeeded'&&job.result&&window.mainsAgentsDesktop?.files&&<><button className="soft-button" disabled={busy} onClick={()=>void action(()=>window.mainsAgentsDesktop!.files!.open(storageProfile(),content.id,job.assetId))}>{pt?'Ver original':'View original'}</button><button className="soft-button" disabled={busy} onClick={()=>void action(()=>window.mainsAgentsDesktop!.files!.open(storageProfile(),content.id,job.result!.assetId))}>{pt?'Revisar resultado':'Review result'}</button><button className="text-link" disabled={busy} onClick={()=>void action(()=>window.mainsAgentsDesktop!.files!.reveal(storageProfile(),content.id,job.result!.assetId))}>{pt?'Mostrar arquivo':'Show file'}</button></>}
     </div></article>)}</div>
+    {reviewJob&&<EditReview contentId={content.id} jobId={reviewJob} onClose={()=>setReviewJob('')}/>}
     {open&&<FlowDialog title={pt?'Cortar e exportar vídeo':'Trim and export video'} description={pt?'Execução local com FFmpeg. Nenhum upload ou controle do computador.':'Local FFmpeg operation. No uploads or computer control.'} onClose={()=>{if(!busy)setOpen(false)}}><div className="delivery-review-fields media-export-fields">
       {!capability?<p role="status">{pt?'Conferindo FFmpeg e ffprobe…':'Checking FFmpeg and ffprobe…'}</p>:!capability.available?<p role="alert">{pt?'FFmpeg e ffprobe precisam estar disponíveis no PATH. Reinicie o app depois de instalá-los.':'FFmpeg and ffprobe must be available on PATH. Restart the app after installing them.'} {capability.error}</p>:<p className="editorial-hint">{pt?'FFmpeg e ffprobe disponíveis.':'FFmpeg and ffprobe available.'}</p>}
       <label>{pt?'Vídeo original':'Source video'}<SelectMenu ariaLabel={pt?'Vídeo original':'Source video'} value={assetId} disabled={busy} onChange={value=>{setAssetId(value);setInspection(null)}} options={videos.map(item=>({value:item.id,label:item.name}))}/></label><button className="soft-button" disabled={busy||!assetId||!capability?.available} onClick={()=>void inspect()}>{pt?'Verificar duração e áudio':'Check duration and audio'}</button>

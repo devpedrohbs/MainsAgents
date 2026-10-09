@@ -13,6 +13,9 @@ import { EditorialInbox } from '../components/content/EditorialInbox';
 import {ChatInbox} from '../components/chat/ChatInbox';
 import type {ChatInboxItem} from '../features/chat/chatInbox';
 import {HomeProductionPipeline} from '../components/content/HomeProductionPipeline';
+import {useProduction} from '../features/production/ProductionProvider';
+import {ExecutionOverview} from '../components/production/ExecutionOverview';
+import type {ExecutionOverviewItem} from '../components/production/ExecutionOverviewProjection';
 
 type TaskView = 'active' | 'review' | 'done';
 interface HomeProps {
@@ -26,6 +29,8 @@ interface HomeProps {
   chatInbox:ChatInboxItem[];
   onOpenChatInbox:(item:ChatInboxItem)=>void;
   showEmptyPrompt: boolean;
+  onOpenExecution: (item: ExecutionOverviewItem) => void;
+  onOpenExecutionChat: (item: ExecutionOverviewItem) => void;
 }
 
 export function Home({
@@ -37,8 +42,10 @@ export function Home({
   onNavigate,
   onOpenEditorial,
   chatInbox,onOpenChatInbox,
+  onOpenExecution, onOpenExecutionChat,
 }: HomeProps) {
   const { agents: allAgents, getAgentById } = useAgents();
+  const { runs: productionRuns } = useProduction();
   const { currentWorkspaceId, currentWorkspace } = useWorkspaces();
   const { sessions, openSession } = useChat();
   const { locale, t } = useLanguage();
@@ -138,9 +145,10 @@ export function Home({
         ))}
       </section>
       <div className="overview-priorities" data-od-id="overview-priorities">
-        <HomeProductionPipeline state={state} workspaceId={currentWorkspaceId} onOpenStudio={()=>onNavigate('content')}/>
+        <HomeProductionPipeline state={state} workspaceId={currentWorkspaceId} runs={productionRuns} onOpenStudio={()=>onNavigate('content')}/>
         <EditorialInbox items={pendingEditorial} ready={ready} error={storageError || jobsError} onOpen={onOpenEditorial} onOpenStudio={() => onNavigate('content')} />
       </div>
+      <ExecutionOverview onOpen={onOpenExecution} onOpenChat={onOpenExecutionChat}/>
       <div className="overview-grid">
         <section className="work-panel" data-od-id="workspace-tasks" aria-labelledby="tasks-heading">
           <div className="panel-heading">

@@ -1,0 +1,145 @@
+{
+  "segments": [
+    {
+      "start": 0,
+      "end": 4.614
+    },
+    {
+      "start": 6.238,
+      "end": 9.986
+    },
+    {
+      "start": 12.011,
+      "end": 17.668
+    },
+    {
+      "start": 19.358,
+      "end": 23.373
+    }
+  ],
+  "animations": [
+    {
+      "id": "cta",
+      "kind": "cta",
+      "text": "Siga para mais dicas",
+      "start": 15.534,
+      "duration": 2.5
+    }
+  ],
+  "format": "portrait",
+  "normalizeAudio": false,
+  "theme": "dark",
+  "motion": {
+    "version": 1,
+    "intensity": "balanced",
+    "analysis": {
+      "wordTiming": "words",
+      "voice": "measured",
+      "limitations": [],
+      "measuredCandidates": 4,
+      "inferredCandidates": 0
+    },
+    "cues": [
+      {
+        "id": "m1",
+        "kind": "punchIn",
+        "sourceStart": 6.7,
+        "sourceEnd": 8.3,
+        "start": 5.076,
+        "end": 6.676,
+        "focus": "é",
+        "layout": "camera-full",
+        "strength": 0.61,
+        "scale": 1.084,
+        "source": "measured",
+        "timing": "words",
+        "reason": "Aproximação: medido (voz +4 dB, entonação +5.4 st, palavra alongada)",
+        "signals": [
+          {
+            "kind": "loudness",
+            "source": "measured",
+            "value": 4
+          },
+          {
+            "kind": "pitch",
+            "source": "measured",
+            "value": 5.4
+          },
+          {
+            "kind": "stretch",
+            "source": "measured",
+            "value": 5.06
+          }
+        ]
+      },
+      {
+        "id": "m2",
+        "kind": "keyPoint",
+        "sourceStart": 14.04,
+        "sourceEnd": 17.06,
+        "start": 10.391,
+        "end": 13.411,
+        "text": "economiza 90%",
+        "focus": "90%",
+        "layout": "split",
+        "strength": 0.6,
+        "source": "mixed",
+        "timing": "words",
+        "reason": "Cartão explicativo: medido (entonação +4.2 st, palavra alongada); texto (número)",
+        "signals": [
+          {
+            "kind": "pitch",
+            "source": "measured",
+            "value": 4.2
+          },
+          {
+            "kind": "stretch",
+            "source": "measured",
+            "value": 2.81
+          },
+          {
+            "kind": "number",
+            "source": "inferred"
+          }
+        ],
+        "sfx": {
+          "kind": "whoosh",
+          "gainDb": -22,
+          "ducked": true
+        }
+      },
+      {
+        "id": "m3",
+        "kind": "punchIn",
+        "sourceStart": 19.5,
+        "sourceEnd": 20.13,
+        "start": 14.161,
+        "end": 14.791,
+        "focus": "E",
+        "layout": "camera-full",
+        "strength": 0.64,
+        "scale": 1.086,
+        "source": "measured",
+        "timing": "words",
+        "reason": "Aproximação: medido (voz +6.38 dB, entonação +2.6 st, pausa 1.95s antes)",
+        "signals": [
+          {
+            "kind": "loudness",
+            "source": "measured",
+            "value": 6.38
+          },
+          {
+            "kind": "pitch",
+            "source": "measured",
+            "value": 2.6
+          },
+          {
+            "kind": "pauseBefore",
+            "source": "measured",
+            "value": 1.95
+          }
+        ]
+      }
+    ]
+  }
+}

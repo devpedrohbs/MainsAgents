@@ -2,6 +2,13 @@
 
 [Baixar a prévia desktop Windows 0.3.42](https://github.com/devpedrohbs/MainsAgents/releases/tag/v0.3.42) — instalador, SHA-256 e manifesto.
 
+## Versões: local x pública
+
+- **Versão local do projeto:** `package.json` está em **0.3.55**. É a versão do código nesta máquina; builds locais e instalação pessoal não são releases públicas.
+- **Última prévia pública comprovada:** **0.3.42**, conferida no GitHub (pré-lançamento `v0.3.42`, 05/10/2026) e registrada em [RELEASE.md](RELEASE.md). O link acima permanece nela até existir uma release 0.3.55 publicada e verificada.
+- As seções por versão mais abaixo (0.3.43 em diante) descrevem validações locais e preservam o histórico; não indicam publicação.
+- **Rodada de 07/10/2026 (entregue e validada localmente, não publicada):** verificação antes de iniciar a produção (D02), painel de execuções por workspace na Home (D03), rótulo "Estrutura compatível" no Fluxo (D04), contraste dos links de pré-requisito e escolha Codex/Claude/Ambos no chat (D13). Veja [a rodada](docs/analysis/desktop-approved-round-2026-10-07.md) e [o fechamento](docs/analysis/task-D12-final-2026-10-07.md).
+
 O Calendário de entregas também pode consultar posts existentes no Publora e Zernio pelos MCPs do Codex CLI, com contas escolhidas por workspace e cache local. [Configuração e limites do calendário](docs/provider-calendar-increment.md). A versão 0.3.42 amplia a publicação nativa para mídia e Zernio, conforme os limites descritos abaixo.
 
 MainsAgents é um workspace desktop para criar e operar agentes de IA especializados. Ele reúne agentes, sessões, tarefas, Canvas e contexto em uma interface única, com integração local às CLIs do Codex e Claude Code e histórico persistente.
@@ -268,6 +275,27 @@ As sessões do MainsAgents armazenam o `codexThreadId` legado e o identificador 
 O bridge local verifica o login usando `claude auth status` e executa cada resposta com `claude -p` em modo `stream-json`. O identificador UUID da sessão do MainsAgents é passado ao Claude Code CLI para iniciar ou retomar o transcript local. O adaptador limita as ferramentas built-in às habilitadas no agente e desativa servidores MCP descobertos automaticamente; a pasta de skills selecionada pode ser adicionada explicitamente.
 
 Se o CLI não estiver instalado, **Configurações → Conexões de IA → Claude Code** mostra o comando de instalação recomendado para o sistema. Depois de executar `claude auth login`, use **Check again**. As mensagens permanecem salvas no MainsAgents e o Claude Code CLI mantém seus próprios transcripts locais.
+
+### Capacidades reais Codex x Claude
+
+| | Codex | Claude Code |
+| --- | --- | --- |
+| Execução | `codex app-server` local | binário oficial `claude -p` (`stream-json`), conforme o [modo headless](https://code.claude.com/docs/en/headless) |
+| Login | no próprio runtime Codex | `claude auth login`, no CLI; o MainsAgents não lê nem coleta tokens |
+| Retomada | thread do Codex | `--session-id`/`--resume` com UUID da sessão do MainsAgents |
+| Ferramentas | sandbox somente leitura; MCP com aprovação por chamada | ferramentas built-in só as habilitadas no agente; MCP só com o portão de aprovação local, senão `mcp__*` é negado; sem subagentes automáticos |
+| Modelos | lista do runtime | lista informada pelo app, não verificada com a conta (`modelsVerified: false`) |
+
+**Comparar Codex e Claude (opcional):** no chat, abra as opções da conversa ou de uma resposta e escolha **Consultar dois agentes**. Selecione um agente Codex e um Claude do mesmo workspace e revise o briefing único: o envio só ocorre ao confirmar e consome duas execuções, uma em cada provedor. As respostas aparecem lado a lado (abas abaixo de 900 px), com acompanhamento e cancelamento por sessão; **Reabrir comparação** recupera o par. Escolher uma resposta apenas prepara rascunho; nenhuma síntese ou ação externa começa sozinha. Abrir, fechar ou recarregar não envia nada. Detalhes: [estado](docs/analysis/task-07-comparison-state.md) e [interface](docs/analysis/task-07-comparison-ui.md).
+
+**Gerar com Codex, Claude ou Ambos (chat e ideias):** o controle **Gerar com**, no compositor, escolhe o provedor e o modelo antes de uma nova execução, usando o mesmo agente, sem duplicá-lo nem mudar sua configuração salva.
+- **Codex ou Claude:** **Abrir nova conversa sem enviar** cria uma conversa nova com o provedor/modelo escolhido e copia texto, skill e contexto do rascunho. Nada é enviado até você usar o botão normal do compositor. A conversa anterior continua com o provedor original e o histórico intacto.
+- **Ambos:** **Revisar duas consultas** mostra briefing, contexto, modelo de cada lado e o aviso de duas chamadas; só **Iniciar duas consultas** executa. Cada lado falha, tenta de novo e cancela de forma independente. Escolher uma resposta apenas a transforma em rascunho local, sem novo envio. Reabrir a comparação não reenvia nada.
+- **Padrão por provedor:** "Padrão do provedor" usa o padrão do Codex configurado no app ou o da CLI do Claude, e nunca reaproveita um modelo salvo de outro provedor.
+- **Legado preservado:** **Consultar dois agentes** (um agente Codex e um Claude) continua funcionando como antes.
+- **Limite:** vale para chat e ideias. A geração editorial persistente e a produção semiautomática continuam somente com Codex; não há equivalência de ferramentas entre os provedores.
+
+**Validação:** os testes (`npm test` e os scripts Electron `scripts/test-*-ui.mjs`) usam provedores e CLIs simulados e dados sintéticos. Nenhum deles evidencia execução paga ou autenticada real de Claude/Codex; essa integração só deve ser declarada depois de um teste específico. Para a política da Anthropic, veja [Legal and compliance](https://code.claude.com/docs/en/legal-and-compliance); a pessoa mantém o fluxo original de login do CLI, e o MainsAgents não coleta OAuth.
 
 Antes de distribuir o MainsAgents com suporte ao Claude Code CLI, consulte [PROVIDER_COMPATIBILITY.md](PROVIDER_COMPATIBILITY.md) e cumpra o acordo comercial e as condições de distribuição aplicáveis da Anthropic.
 

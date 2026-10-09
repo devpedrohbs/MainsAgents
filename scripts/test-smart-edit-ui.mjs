@@ -1,0 +1,109 @@
+// Smart edit journey in real Electron: synthetic Windows-voice video, real whisper.cpp, FFmpeg and Remotion (installed Chrome),
+// simulated agent runtime/providers, no personal accounts or paid calls. Run: npx electron scripts/test-smart-edit-ui.mjs
+import {app,BrowserWindow,ipcMain} from 'electron';
+import {createServer} from 'node:http';
+import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
+import {resolve,extname,sep,join} from 'node:path';
+import {DatabaseSync} from 'node:sqlite';
+import assert from 'node:assert/strict';
+import {createDesktopStateStore} from '../desktop-state-store.mjs';
+import {createContentWorkflowBridge} from '../content-workflow-bridge.mjs';
+import {registerEditorialFilesIpc} from '../editorial-files-ipc.mjs';
+import {createChatImageArtifacts} from '../chat-image-artifacts.mjs';
+import {runMediaProcess} from '../editorial-media.mjs';
+import {inspectLocalAsset} from '../editorial-local-files.mjs';
+import {createZernioPublicationConnector} from '../zernio-publication-connector.mjs';
+import {captureReadyPng} from './ui-capture-ready.mjs';
+import {probeVideo} from '../editorial-media.mjs';
+import {createWhisperTranscriber} from '../editorial-transcribe.mjs';
+import {createRemotionAnimator} from '../editorial-animate.mjs';
+import {createHash} from 'node:crypto';
+import {spawnSync} from 'node:child_process';
+const root=resolve(import.meta.dirname,'..'),out=resolve(root,'.mainsagents-workspaces/smart-edit-ui',String(Date.now()));mkdirSync(out,{recursive:true});app.setPath('userData',resolve(out,'electron'));app.on('window-all-closed',()=>{});
+const profile='handoff-test',workspaceId='space',at=new Date().toISOString(),dbPath=join(out,'workspace-state.sqlite'),input=join(out,'original.mp4'),png=join(out,'native-tool.png'),inspect=path=>inspectLocalAsset(path,{stabilityMs:0});
+const source={id:'source',name:'Editor de Conteúdo',role:'Conteúdo',instructions:'Use my own role and skills',description:'Fixture',skills:['own-skill'],workspaceId,providerId:'codex',tools:['files'],status:'idle',createdAt:at,updatedAt:at},editor={...source,id:'editor',name:'Editor de Vídeo',role:'Vídeo'};
+const flow={id:'flow',workspaceId,name:'Fluxo de criação de conteúdo',nodes:[{id:'content-box',kind:'content-agent',title:'Agente de conteúdo',agentId:'source',position:{x:80,y:140}},{id:'input-box',kind:'video-input',title:'Vídeos da gravação',position:{x:430,y:140}},{id:'editor-box',kind:'video-agent',title:'Editor de vídeo',agentId:'editor',position:{x:780,y:140}},{id:'publish-box',kind:'publishing-agent',title:'Preparar publicação',agentId:'source',position:{x:1130,y:140}}],edges:[],createdAt:at,updatedAt:at};
+const topic={id:'topic',workspaceId,requestId:'idea',inputKind:'text',input:'Automation',priority:'normal',status:'review',title:'Minha ideia de automação',category:'Tech',summary:'Uma demonstração prática de automação.',whyItMatters:'Explica como economizar tempo no dia a dia.',angles:['Demo','Explicação'],sources:[{title:'Referência',url:'https://example.com'}],factualQuestions:[],createdAt:at,updatedAt:at};
+const store=createDesktopStateStore(out,'test');store.initialize(profile,{agents:[source,editor],workspaces:[{id:workspaceId,name:'Content',createdAt:at,updatedAt:at}],sessions:[],'current-workspace':workspaceId,'active-sessions':{},language:'pt-BR','welcome-dismissed':true,'focus-mode':false,'production-flows':{schemaVersion:1,flows:[flow],activeByWorkspace:{[workspaceId]:flow.id}}});
+ipcMain.handle('test:read',(_e,key)=>store.read(profile,key));ipcMain.handle('test:write',(_e,key,value)=>store.write(profile,key,value));ipcMain.handle('test:all',()=>store.readAll(profile));
+const images=createChatImageArtifacts(join(out,'images')),executions=new Map(),threads=new Map();let serial=0,sends=0,posts=0,post,win;
+const options={hooks:['Primeira opção','Segunda opção','Terceira opção'],ctas:['Salve','Experimente'],paths:[{title:'Demo',outline:'Mostre o problema e a solução em uma demonstração clara.'},{title:'História',outline:'Explique o contexto do problema e como chegou à solução.'}],improvisationTopics:['Demo','Contexto'],thumbnailDirection:'Capa profissional',draftScript:'Uma automação prática pode economizar tempo em uma tarefa repetitiva. Comece pelo problema, demonstre a solução funcionando e explique como o público pode aplicar a mesma ideia na própria rotina.'};
+const runtime={createSession:async()=>{const id=`thread-${++serial}`;threads.set(id,{turns:[]});return id},resumeSession:async()=>{},readThread:async id=>threads.get(id),cancel:async()=>{},imageFile:image=>images.pathForImage(image),send:async(thread,text)=>{sends++;const id=`execution-${++serial}`,output=text.includes('Retorne SOMENTE JSON: {"start"')?JSON.stringify({start:0,duration:1.5,format:'original',normalizeAudio:true,fadeSeconds:.15,summary:'Áudio normalizado e acabamento'}):text.includes('"removeSilences"')?JSON.stringify({removeSilences:true,silence:{thresholdDb:-35,minDuration:0.6,padding:0.2},normalizeAudio:false,animations:{title:'Edição automática',cta:'Siga o canal'},summary:'Cortar pausas e animar abertura e CTA'}):text.includes('Prepare legendas')?JSON.stringify({deliveries:[{platform:'Instagram',caption:'Legenda aprovada da minha automação.',coverPrompt:'Capa profissional clara, vertical'}]}):text.includes('Gere uma imagem de capa')?'Imagem pronta':JSON.stringify(options);executions.set(id,{thread,text,output,image:text.includes('Gere uma imagem de capa')});return {executionId:id}},events:async function*(id){const e=executions.get(id);yield {type:'message.completed',content:e.output};if(e.image)yield images.fromItem({id:'native-image',type:'imageGeneration',status:'completed',result:readFileSync(png).toString('base64')},id);threads.get(e.thread).turns.push({id,status:'completed',items:[{type:'userMessage',content:[{type:'text',text:e.text}]},{type:'agentMessage',text:e.output}]});yield {type:'execution.completed'}}};
+const fetchImpl=async(url,init={})=>{const path=new URL(url).pathname.split('/api/v1/')[1];if(init.method==='PUT'&&!path){for await(const _chunk of init.body){}return new Response('');}if(path==='accounts')return Response.json({accounts:[{_id:'ig-fixture',platform:'instagram',username:'Minha conta de teste',isActive:true}]});if(path==='media/presign'){const id=++serial;return Response.json({uploadUrl:`https://media.zernio.com/upload/${id}`,publicUrl:`https://media.zernio.com/temp/${id}.jpg`})}if(path==='posts'&&init.method==='POST'){posts++;const body=JSON.parse(init.body);post={...body,_id:'post-fixture',status:'scheduled',platforms:body.platforms.map(t=>({...t,status:'scheduled'}))};return Response.json({post});}if(path==='posts/post-fixture')return Response.json({post});throw Error('Unexpected provider request')};
+const media={inspect,transcriber:createWhisperTranscriber(),...createRemotionAnimator()},makeBridge=()=>createContentWorkflowBridge({dbPath,getCurrentProfile:()=>profile,getAgents:()=>store.read(profile,'agents'),getFlows:()=>store.read(profile,'production-flows'),getSessions:()=>store.read(profile,'sessions'),getRuntime:()=>runtime,inspect,mediaOptions:media,getPublicationConnector:()=>createZernioPublicationConnector(()=> 'fixture',{fetchImpl}),getConnector:()=>({upsert:async(payload,ctx)=>{ctx.authorize();return {pageId:'12345678-1234-1234-1234-123456789abc',url:'https://www.notion.so/12345678123412341234123456789abc',artifactVersion:payload.artifact.version,verifiedAt:at}},readCard:async()=>({text:'Notas editadas pelo usuário no Notion',fetchedAt:at})})});
+let bridge=makeBridge();
+const seed=new DatabaseSync(dbPath);seed.prepare('INSERT INTO editorial_state VALUES(?,?,?,?)').run(profile,1,JSON.stringify({schemaVersion:1,topics:[topic],contents:[],artifacts:[],approvals:[],runs:[],assets:[],publications:[]}),at);seed.close();bridge.jobs.configure(profile,workspaceId,{dataSourceId:'12345678-1234-1234-1234-123456789abc',autoSync:true});
+registerEditorialFilesIpc({ipcMain,dialog:{showOpenDialog:async()=>({canceled:false,filePaths:[input]})},shell:{openPath:async()=>''},getWindow:()=>win,getStore:()=>store});
+const json=(response,value)=>{response.setHeader('content-type','application/json');response.end(JSON.stringify(value))};
+const server=createServer(async(request,response)=>{const url=new URL(request.url,'http://localhost');if(images.handle(request,response,url))return;if(await bridge.handle(request,response,url))return;if(url.pathname.endsWith('/health'))return json(response,{ready:true,accountType:'chatgpt'});if(url.pathname.endsWith('/models'))return json(response,{models:[]});if(url.pathname.endsWith('/images'))return json(response,{events:[]});if(url.pathname.startsWith('/api/'))return json(response,{});try{const file=resolve(root,'dist',url.pathname==='/'?'app.html':url.pathname.slice(1));assert(file.startsWith(resolve(root,'dist')+sep));response.setHeader('content-type',({'.html':'text/html','.js':'application/javascript','.css':'text/css','.png':'image/png','.svg':'image/svg+xml'})[extname(file)]??'application/octet-stream');response.end(readFileSync(file))}catch{response.statusCode=404;response.end()}});
+const log=[],errors=[],js=code=>win.webContents.executeJavaScript(code);async function until(check,timeout=60000){const end=Date.now()+timeout;while(Date.now()<end){if(await check())return;await new Promise(resolve=>setTimeout(resolve,40))}throw Error('Semi-automatic UI timed out')}
+async function click(selector){await until(()=>js(`Boolean(document.querySelector(${JSON.stringify(selector)})&&!document.querySelector(${JSON.stringify(selector)}).disabled)`));await js(`document.querySelector(${JSON.stringify(selector)}).click()`)}
+async function button(text){await until(()=>js(`Array.from(document.querySelectorAll('button')).some(el=>(el.querySelector('.select-menu-option-copy b')?.textContent??el.textContent).trim()===${JSON.stringify(text)}&&!el.disabled)`));await js(`Array.from(document.querySelectorAll('button')).find(el=>(el.querySelector('.select-menu-option-copy b')?.textContent??el.textContent).trim()===${JSON.stringify(text)}&&!el.disabled).click()`)}
+async function inputText(selector,value){await js(`(()=>{const el=document.querySelector(${JSON.stringify(selector)});Object.getOwnPropertyDescriptor(el.tagName==='TEXTAREA'?HTMLTextAreaElement.prototype:HTMLInputElement.prototype,'value').set.call(el,${JSON.stringify(value)});el.dispatchEvent(new Event('input',{bubbles:true}))})()`)}
+async function shot(name){writeFileSync(join(out,`${name}.png`),await captureReadyPng(win.webContents))}
+async function open(){win=new BrowserWindow({show:false,width:1440,height:1000,webPreferences:{preload:resolve(root,'tests/fixtures/assets-ui-preload.cjs'),contextIsolation:true,sandbox:true,offscreen:true,backgroundThrottling:false}});win.webContents.on('console-message',event=>{if(/Uncaught|Maximum update depth|Cannot update a component/.test(event.message))errors.push(event.message)});await win.loadURL(`http://127.0.0.1:${server.address().port}/app.html#flow`);await until(()=>js('Boolean(document.querySelector(".production-flow-page"))'))}
+app.whenReady().then(async()=>{try{
+ const speech=join(out,'speech.wav'),voice=spawnSync('powershell.exe',['-NoProfile','-NonInteractive','-Command',"Add-Type -AssemblyName System.Speech;$s=New-Object System.Speech.Synthesis.SpeechSynthesizer;$v=$s.GetInstalledVoices()|Where-Object{$_.VoiceInfo.Culture.Name -eq 'pt-BR'}|Select-Object -First 1;if(-not $v){exit 3};$b=New-Object System.Speech.Synthesis.PromptBuilder([System.Globalization.CultureInfo]'pt-BR');$b.StartVoice($v.VoiceInfo);foreach($p in ($env:SPEECH_PARTS -split '\\|')){$b.AppendText($p);$b.AppendBreak([TimeSpan]::FromMilliseconds(1600))};$b.EndVoice();$s.SetOutputToWaveFile($env:SPEECH_OUT);$s.Speak($b);$s.Dispose()"],{env:{...process.env,SPEECH_PARTS:'Hoje vamos falar de edição|Hoje vamos falar de edição automática no computador|Obrigado por assistir',SPEECH_OUT:speech},windowsHide:true});if(voice.status!==0)throw Error('Windows pt-BR voice unavailable');
+  await runMediaProcess('ffmpeg',['-nostdin','-v','error','-n','-f','lavfi','-i','testsrc2=size=320x180:rate=24','-i',speech,'-shortest','-c:v','libx264','-pix_fmt','yuv420p','-c:a','aac','-ar','48000',input]);const originalSha=createHash('sha256').update(readFileSync(input)).digest('hex');await runMediaProcess('ffmpeg',['-nostdin','-v','error','-n','-f','lavfi','-i','color=c=white:size=64x96','-frames:v','1',png]);await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));await open();await button('Iniciar produção');await click('[aria-label="Ideia da produção"]');await button(topic.title);await until(()=>js('document.querySelector(".production-preflight [role=status]")?.textContent.includes("Nenhum bloqueio")'));assert.equal(await js('Array.from(document.querySelectorAll(".flow-dialog button")).find(el=>el.textContent.includes("Aprovar ideia e iniciar produção")).disabled'),true);assert.equal(bridge.production.list(profile).length,0);await click('.production-panel-body .production-check input[type=checkbox]');await until(()=>js('document.querySelector(".production-panel-body .production-check input[type=checkbox]").checked===true'));await button('Aprovar ideia e iniciar produção');await until(()=>js('document.body.textContent.includes("Aguardando aprovação do roteiro")'));await click('.production-script .production-check input');await button('Aprovar roteiro');await until(()=>js('document.body.textContent.includes("Aguardando gravação")'));assert.equal(posts,0);await button('Adicionar arquivos');await until(()=>js('document.querySelector(".production-panel-body").textContent.includes("original.mp4")'));await click('[aria-label="Vídeo da produção"]');await button('original.mp4');assert(await js(`document.querySelector('[aria-label="Movimento na edição"]')?.textContent.includes("Equilibrado")===true`),'motion intensity offered for the automatic edit');await button('Enviar vídeo e iniciar edição automática');await until(()=>js('document.body.textContent.includes("Aguardando aprovação do vídeo")'));const run1=bridge.production.list(profile)[0],job1=bridge.media.list(profile).find(job=>job.id===run1.videoJobId);
+  assert.equal(run1.editPlan.mode,'smart');assert.equal(run1.editPlan.transcribed,true,'local whisper ran');assert(run1.editPlan.cuts>=2,`cuts ${run1.editPlan.cuts}`);
+  assert.equal(job1.mode,'advanced');assert.deepEqual(job1.plan.animations.map(item=>item.kind),['title','cta'],'Remotion overlays planned');
+  const raw=await probeVideo(input),edited=await probeVideo(job1.result.file.path);assert(edited.duration<raw.duration-1.5,`edited ${edited.duration} raw ${raw.duration}`);assert.equal(edited.hasAudio,true);
+  log.push(`automatic: raw ${raw.duration.toFixed(2)}s -> edited ${edited.duration.toFixed(2)}s, ${run1.editPlan.cuts} cuts, retakes ${run1.editPlan.possibleRetakes.length}, animations ${job1.plan.animations.length}`);
+  for(const [name,time] of [['frame-title',1],['frame-end',edited.duration-0.8]])await runMediaProcess('ffmpeg',['-nostdin','-v','error','-n','-ss',String(time),'-i',job1.result.file.path,'-frames:v','1',join(out,`${name}.png`)]);
+  const state1=JSON.parse(new DatabaseSync(dbPath).prepare('SELECT state_json FROM editorial_state WHERE profile_id=?').get(profile).state_json),srt=state1.assets.find(item=>item.subtitlesForJobId===job1.id);
+  assert(srt,'SRT attached to the automatic edit');const srtText=readFileSync(srt.versions[0].path,'utf8');assert.match(srtText,/-->/);assert.match(srtText,/assistir/i);writeFileSync(join(out,'captions.srt'),srtText);
+  await shot('video-review');
+  await button('Conferir edição (bruto × editado)');
+  await until(()=>js('document.querySelectorAll(".edit-review-players video").length===2'));
+  await until(()=>js('Array.from(document.querySelectorAll(".edit-review-players video")).every(video=>video.readyState>=1&&video.duration>0)'));
+  const durations=await js('Array.from(document.querySelectorAll(".edit-review-players video")).map(video=>video.duration)');
+  assert(Math.abs(durations[0]-raw.duration)<0.2&&Math.abs(durations[1]-edited.duration)<0.2,JSON.stringify(durations));
+  assert.equal(await js('document.querySelectorAll(".edit-review-cuts li").length'),run1.editPlan.cuts);
+  // Motion (balanced by default): measured voice emphasis on the TTS fixture; the review always shows the motion section.
+  assert.equal(run1.editPreferences.motion,'balanced');assert(await js('Boolean(document.querySelector(".edit-review-motion"))'),'motion review section');
+  log.push(`motion: ${run1.editPlan.motionSummary??'(none)'}; cues ${job1.plan.motion?.cues.length??0}; review rows ${await js('document.querySelectorAll(".edit-review-motion-list li").length')}`);
+  assert(await js('document.body.textContent.includes("Mostrar legendas (.srt)")'),'SRT offered for CapCut');
+  if(run1.editPlan.possibleRetakes.length)assert(await js('document.body.textContent.includes("Possíveis retomadas (não cortadas)")'));
+  assert.equal(await js('document.querySelectorAll(".edit-review-warning").length'),0,'automatic pause cuts carry no sound warning');
+  for(let step=0;step<8;step++)await js(`document.querySelector(".edit-review-cuts li [aria-label='Início mais cedo']").click()`);
+  await until(()=>js('document.querySelector(".edit-review-cuts li .edit-review-warning")?.textContent.includes("com som")'));
+  log.push(`widened cut warns: ${await js('document.querySelector(".edit-review-cuts li .edit-review-warning").textContent')}`);
+  await js('Array.from(document.querySelectorAll(".edit-review-cuts button")).find(item=>item.textContent==="Ouvir no bruto").click()');
+  await until(()=>js('document.querySelector(".edit-review-players video").currentTime>0'));
+  await shot('edit-review');
+  // The user keeps the first removed part and exports their own version.
+  await js('document.querySelector(".edit-review-cuts li input[type=checkbox]").click()');
+  await until(()=>js('document.body.textContent.includes("Com seus ajustes")'));
+  await button('Exportar versão com meus ajustes');
+  await until(()=>js('document.body.textContent.includes("Versão ajustada exportada e verificada.")'),120000);
+  await shot('adjusted-exported');
+  await button('Usar esta versão na produção');
+  await until(()=>bridge.production.list(profile)[0].videoJobId!==job1.id);
+  const run2=bridge.production.list(profile)[0],job2=bridge.media.list(profile).find(job=>job.id===run2.videoJobId);
+  assert.equal(run2.stage,'video-review');assert.notEqual(run2.outputVideo.assetId,run1.outputVideo.assetId);assert(job2.duration>job1.duration+0.3,`adjusted ${job2.duration} vs ${job1.duration}`);
+  log.push(`adjusted by user: ${job1.duration}s -> ${job2.duration}s, production now uses ${job2.id}`);
+  assert.equal(createHash('sha256').update(readFileSync(input)).digest('hex'),originalSha,'original untouched');
+  // Cancel and restart with real FFmpeg while the app is open.
+  const ref={contentId:run2.contentId,assetId:run2.inputVideo.assetId,versionId:run2.inputVideo.versionId,sha256:run2.inputVideo.sha256};
+  const cancelPlan=await bridge.media.plan(profile,{...ref,plan:{segments:[{start:0,end:raw.duration}]}}),revision=()=>new DatabaseSync(dbPath).prepare('SELECT revision FROM editorial_state WHERE profile_id=?').get(profile).revision;
+  const cancelJob=bridge.media.enqueue(profile,{mode:'advanced',authorize:true,revision:revision(),requestKey:'ui-cancel',...ref,plan:cancelPlan.plan,planHash:cancelPlan.planHash}).job;
+  await until(()=>bridge.media.list(profile).find(job=>job.id===cancelJob.id).status==='running');await bridge.media.cancel(profile,cancelJob.id);
+  assert.equal(bridge.media.list(profile).find(job=>job.id===cancelJob.id).status,'canceled');
+  const restartPlan=await bridge.media.plan(profile,{...ref,plan:{segments:[{start:0,end:raw.duration-1}]}});
+  const restartJob=bridge.media.enqueue(profile,{mode:'advanced',authorize:true,revision:revision(),requestKey:'ui-restart',...ref,plan:restartPlan.plan,planHash:restartPlan.planHash}).job;
+  await until(()=>bridge.media.list(profile).find(job=>job.id===restartJob.id).status==='running');await bridge.close();bridge=makeBridge();
+  assert.equal(bridge.media.list(profile).find(job=>job.id===restartJob.id).status,'interrupted');await bridge.media.retry(profile,restartJob.id);
+  await until(()=>bridge.media.list(profile).find(job=>job.id===restartJob.id).status==='succeeded',120000);log.push('cancel -> canceled without delivery; restart -> interrupted -> explicit retry -> succeeded');
+  // Tampered source: the player refuses the changed raw file and adjusted exports are blocked.
+  const pristine=readFileSync(input);writeFileSync(input,Buffer.concat([pristine,Buffer.from('tamper')]));
+  await win.webContents.executeJavaScript('location.reload()');await new Promise(resolve=>setTimeout(resolve,1500));
+  const status=await win.webContents.executeJavaScript(`fetch('/api/content/media/file?profile=${profile}&contentId=${ref.contentId}&assetId=${ref.assetId}&versionId=${ref.versionId}').then(response=>response.status)`);
+  assert.equal(status,409,'changed raw file is not streamed');
+  await assert.rejects(()=>bridge.media.plan(profile,{...ref,plan:{segments:[{start:0,end:2}]}}),/changed|unavailable/);
+  writeFileSync(input,pristine);log.push('tampered raw file -> stream 409 and plan refused; restored bytes');
+  assert.deepEqual(errors,[]);writeFileSync(join(out,'journey.log'),log.join('\n'));
+  console.log(`SMART_EDIT_UI_OK: ${log.join(' | ')} | artifacts ${out}`);
+  win.destroy();await bridge.close();store.close();server.close();app.exit(0);
+
+ }catch(error){console.error(error);console.error(errors);if(win&&!win.isDestroyed()){console.log(await js('document.body.innerText'));await shot('failure');win.destroy()}await bridge.close();store.close();server.close();app.exit(1)}
+});

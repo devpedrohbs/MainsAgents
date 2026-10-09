@@ -9,6 +9,7 @@ import {createContentWorkflowBridge} from '../content-workflow-bridge.mjs';
 import {registerEditorialFilesIpc} from '../editorial-files-ipc.mjs';
 import {inspectLocalAsset} from '../editorial-local-files.mjs';
 import {runMediaProcess} from '../editorial-media.mjs';
+import {captureReadyPng} from './ui-capture-ready.mjs';
 
 const root=resolve(import.meta.dirname,'..'),out=resolve(root,'.mainsagents-workspaces/editorial-media-ui-test');mkdirSync(out,{recursive:true});
 app.setPath('userData',resolve(out,`profile-${Date.now()}`));
@@ -45,7 +46,7 @@ app.whenReady().then(async()=>{try{
   await evaluate('(()=>{const [start,duration]=document.querySelectorAll(".media-export-fields input[type=number]");for(const [input,value] of [[start,"0.5"],[duration,"1.2"]]){Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value").set.call(input,value);input.dispatchEvent(new Event("input",{bubbles:true}))}})()');
   await clickText('Autorizar e exportar este trecho');await until(()=>evaluate('document.querySelector(".content-media")?.textContent.includes("Vídeo exportado e verificado")'));await until(()=>evaluate('document.querySelectorAll(".content-asset").length===2'));assert.equal(calls,0);
   await clickText('Ver original');await clickText('Revisar resultado');await until(()=>opened.length===2);assert.equal(opened.length,2);assert.equal(opened[0],originalPath);assert.notEqual(opened[1],originalPath);
-  await evaluate('document.documentElement.dataset.appearance="dark";document.querySelector(".content-media").scrollIntoView({block:"center"})');await new Promise(resolve=>setTimeout(resolve,250));writeFileSync(resolve(out,'video-export-dark.png'),(await window.webContents.capturePage()).toPNG());
+  await evaluate('document.documentElement.dataset.appearance="dark";document.querySelector(".content-media").scrollIntoView({block:"center"})');writeFileSync(resolve(out,'video-export-dark.png'),await captureReadyPng(window.webContents));
   window.setSize(880,720);await evaluate('document.documentElement.dataset.appearance="light"');await new Promise(resolve=>setTimeout(resolve,250));assert(await evaluate('document.documentElement.scrollWidth<=innerWidth+1'));
   await evaluate('window.mainsAgentsSaveNow()');window.destroy();await bridge.close();bridge=createContentWorkflowBridge({dbPath});await open();await until(()=>evaluate('document.querySelector(".content-media")?.textContent.includes("Vídeo exportado e verificado")'));
   assert.equal(bridge.media.list(profile).length,1);assert.equal(bridge.media.list(profile)[0].result.metadata.hasAudio,true);assert.deepEqual(errors,[]);console.log('PASS real FFmpeg desktop UI: source inspection, authorized cut, verified new output, original/result review through trusted IPC, compact layout and restart. No user data or AI generation.');

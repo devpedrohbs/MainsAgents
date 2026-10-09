@@ -1,3 +1,4 @@
+import {parseInspirationState,type InspirationLibraryState} from './inspiration';
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type PropsWithChildren } from 'react';
 import { useAgents } from '../agents/AgentsProvider';
 import { useChat } from '../chat/ChatProvider';
@@ -10,9 +11,9 @@ import {updatePersistentValue} from '../../data/localPersistence';
 import type {AgentSession} from '../chat/model/Chat';
 import {attachAssetFiles,reviseAssetFile,verifyAssetFiles,changeAssetMetadata,removeAsset,type AssetRole,type LocalAssetInspection} from './assetModel';
 import { emptyEditorialState, newEditorialId, type ApprovedScript, type ContentFormat, type EditorialArtifact, type EditorialContent, type EditorialState, type EditorialTopic, type Platform, type Priority, type ResearchProposal, type WorkflowRun, type WorkflowJob, type EditorialJob, type NotionConnection, type ProductionStage } from './model';
-import type {MediaJob,VideoMetadata} from './model';
+import type {EditReviewData,MediaJob,VideoMetadata} from './model';
 import type {CalendarAccount,CalendarProvider,CalendarSource} from './publicationCalendar';
-import {createRecordingContent as buildRecordingContent} from './recordingContent';
+import {createRecordingContent as buildRecordingContent,createSessionContent as buildSessionContent} from './recordingContent';
 
 type TopicInput = {workspaceId:string;inputKind:'text'|'url'|'ideas';input:string;category:string;priority:Priority};
 interface ContentContextValue {
@@ -28,12 +29,16 @@ interface ContentContextValue {
   retryJob:(id:string)=>Promise<void>;
   setProductionStage:(contentId:string,stage:ProductionStage)=>Promise<void>;
   attachFiles:(contentId:string,files:LocalAssetInspection[],role:AssetRole)=>Promise<void>;
+  /** Persists the reference library (validated again by the server on save). */
+  saveInspiration:(next:InspirationLibraryState)=>Promise<void>;
   reviseFile:(assetId:string,versionId:string,file:LocalAssetInspection,relink:boolean)=>Promise<void>;
   verifyFiles:(checks:Array<{id:string;versionId:string;inspection:LocalAssetInspection}>)=>Promise<void>;
   changeFile:(assetId:string,role:AssetRole,sourceAssetId?:string)=>Promise<void>;
   removeFile:(assetId:string)=>Promise<void>;
   createTopic:(input:TopicInput)=>Promise<EditorialTopic>;
   createRecordingContent:(workspaceId:string,title:string)=>Promise<EditorialContent>;
+  /** Content owned by one chat session of an agent ("Novo conteúdo"). */
+  createSessionContent:(workspaceId:string,title:string,brief?:string)=>Promise<EditorialContent>;
   runResearch:(topicId:string,agentId:string)=>Promise<void>;
   reviseTopic:(topicId:string,changes:Pick<ResearchProposal,'title'|'summary'|'whyItMatters'|'angles'>)=>Promise<void>;
   decideTopic:(topicId:string,decision:'approved'|'rejected',notes:string,format?:ContentFormat,platforms?:Platform[],plannedAt?:string)=>Promise<EditorialContent|undefined>;
@@ -56,6 +61,17 @@ interface ContentContextValue {
   inspectVideo:(contentId:string,assetId:string)=>Promise<{metadata:VideoMetadata;versionId:string;sha256:string}>;
   exportVideo:(input:Record<string,unknown>)=>Promise<void>;
   mediaAction:(id:string,action:'retry'|'cancel')=>Promise<void>;
+  mediaReview:(jobId:string)=>Promise<EditReviewData>;
+  planVideoEdit:(input:Record<string,unknown>)=>Promise<{revision:number;plan:EditReviewData['plan'];planHash:string;outputDuration:number}>;
+  createSubtitles:(jobId:string)=>Promise<void>;
+  /** Read-only motion plan (measured voice emphasis + spoken key words) for the given kept segments. */
+  planMotion:(input:Record<string,unknown>)=>Promise<{revision:number;motion:import('./model').MotionPlan;summary:string}>;
+  previewEdit:(input:Record<string,unknown>)=>Promise<import('./model').EditPreviewData>;
+  cancelPreview:()=>Promise<unknown>;
+  measureAudio:(input:Record<string,unknown>)=>Promise<{revision:number;audio:import('./model').AudioAssessment}>;
+  snapCut:(input:Record<string,unknown>)=>Promise<{revision:number;result:{start:number;end:number;boundary:'voice'|'transcript'|'silence';words:string[]}|{rejected:string}}>;
+  previewFileUrl:(contentId:string,assetId:string,id:string)=>string;
+  mediaFileUrl:(contentId:string,assetId:string,versionId:string)=>string;
 }
 const Context=createContext<ContentContextValue|null>(null);
 const profile=()=>{if(window.mainsAgentsDesktop?.state)return storageProfile();try{return localStorage.getItem('mainsagents-profile')||'default'}catch{return 'default'}};
@@ -147,6 +163,11 @@ export function ContentWorkflowProvider({children}:PropsWithChildren){
     await commit(current=>{const created=buildRecordingContent(current,workspaceId,title);content=created.content;return created.state;});
     return content!;
   },[commit]);
+  const createSessionContent=useCallback(async(workspaceId:string,title:string,brief?:string)=>{
+    let content:EditorialContent|undefined;
+    await commit(current=>{const created=buildSessionContent(current,workspaceId,title,brief);content=created.content;return created.state;});
+    return content!;
+  },[commit]);
 
 
   const enqueueWork=useCallback(async(kind:'research'|'script'|'handoff',targetId:string,agentId:string,extra:Record<string,unknown>={})=>{
@@ -200,6 +221,16 @@ export function ContentWorkflowProvider({children}:PropsWithChildren){
   const mediaCapabilities=useCallback(()=>request('media/capabilities'),[request]);
   const inspectVideo=useCallback((contentId:string,assetId:string)=>request('media/inspect',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({contentId,assetId})}),[request]);
   const exportVideo=useCallback((input:Record<string,unknown>)=>storage.command(`/api/content/media?profile=${encodeURIComponent(profile())}`,input),[storage]);
+  const mediaReview=useCallback((jobId:string)=>request('media/review',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({jobId})}),[request]);
+  const planVideoEdit=useCallback((input:Record<string,unknown>)=>request('media/plan',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(input)}),[request]);
+  const planMotion=useCallback((input:Record<string,unknown>)=>request('media/motion',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(input)}),[request]);
+  const previewEdit=useCallback((input:Record<string,unknown>)=>request('media/preview',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(input)}),[request]);
+  const snapCut=useCallback((input:Record<string,unknown>)=>request('media/snap',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(input)}),[request]);
+  const measureAudio=useCallback((input:Record<string,unknown>)=>request('media/audio',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(input)}),[request]);
+  const cancelPreview=useCallback(()=>request('media/preview-cancel',{method:'POST',headers:{'content-type':'application/json'},body:'{}'}),[request]);
+  const previewFileUrl=useCallback((contentId:string,assetId:string,id:string)=>`/api/content/media/preview-file?profile=${encodeURIComponent(profile())}&contentId=${encodeURIComponent(contentId)}&assetId=${encodeURIComponent(assetId)}&id=${encodeURIComponent(id)}`,[]);
+  const createSubtitles=useCallback((jobId:string)=>storage.command(`/api/content/media/subtitles?profile=${encodeURIComponent(profile())}`,{jobId}),[storage]);
+  const mediaFileUrl=useCallback((contentId:string,assetId:string,versionId:string)=>`/api/content/media/file?profile=${encodeURIComponent(profile())}&contentId=${encodeURIComponent(contentId)}&assetId=${encodeURIComponent(assetId)}&versionId=${encodeURIComponent(versionId)}`,[]);
   const mediaAction=useCallback((id:string,action:'retry'|'cancel')=>storage.command(`/api/content/media/${encodeURIComponent(id)}/${action}?profile=${encodeURIComponent(profile())}`,{}),[storage]);
 
   const captureChatDelivery=useCallback(async(sessionId:string,messageId:string,expectedContent:string,contentId?:string)=>{
@@ -222,12 +253,13 @@ export function ContentWorkflowProvider({children}:PropsWithChildren){
     if(!['planning','ready-to-record','recording','editing','video-review','ready','archived'].includes(stage))throw new Error('Invalid production stage.');
     await commit(current=>({...current,contents:current.contents.map(item=>item.id===contentId?{...item,productionStage:stage,updatedAt:now()}:item)}));
   },[commit]);
+  const saveInspiration=useCallback((next:InspirationLibraryState)=>commit(current=>({...current,inspiration:parseInspirationState(next)})),[commit]);
   const attachFiles=useCallback((contentId:string,files:LocalAssetInspection[],role:AssetRole)=>commit(current=>attachAssetFiles(current,contentId,files,role)),[commit]);
   const reviseFile=useCallback((assetId:string,versionId:string,file:LocalAssetInspection,relink:boolean)=>commit(current=>reviseAssetFile(current,assetId,versionId,file,relink)),[commit]);
   const verifyFiles=useCallback((checks:Array<{id:string;versionId:string;inspection:LocalAssetInspection}>)=>commit(current=>verifyAssetFiles(current,checks)),[commit]);
   const changeFile=useCallback((assetId:string,role:AssetRole,sourceAssetId?:string)=>commit(current=>changeAssetMetadata(current,assetId,role,sourceAssetId)),[commit]);
   const removeFile=useCallback((assetId:string)=>commit(current=>removeAsset(current,assetId)),[commit]);
   const transferWork=useCallback((contentId:string,sourceAgentId:string,targetAgentId:string,instructions:string,assetIds:string[],newSession:boolean,expectedArtifactId?:string)=>enqueueWork('handoff',contentId,targetAgentId,{sourceAgentId,instructions,assetIds,newSession,expectedArtifactId}),[enqueueWork]);
-  return <Context.Provider value={{state,ready,storageError,jobs,jobsError,workJobs,workError,mediaJobs,mediaCapabilities,inspectVideo,exportVideo,mediaAction,transferWork,retryWork,cancelWork,workDetail,getNotionConnection,configureNotion,retryJob,setProductionStage,createTopic,createRecordingContent,runResearch,reviseTopic,decideTopic,runScript,approveScript,reviewScript,reviewFiles,publicationCommand,publicationAccounts,publicationOptions,preparePublicationChange,publicationTransport,configureCalendarRefresh,publicationCalendar,calendarAccounts,syncCalendar,captureChatDelivery,attachFiles,reviseFile,verifyFiles,changeFile,removeFile}}>{children}</Context.Provider>;
+  return <Context.Provider value={{saveInspiration,state,ready,storageError,jobs,jobsError,workJobs,workError,mediaJobs,mediaCapabilities,inspectVideo,exportVideo,mediaAction,mediaReview,planVideoEdit,planMotion,previewEdit,cancelPreview,measureAudio,snapCut,previewFileUrl,createSubtitles,mediaFileUrl,transferWork,retryWork,cancelWork,workDetail,getNotionConnection,configureNotion,retryJob,setProductionStage,createTopic,createRecordingContent,createSessionContent,runResearch,reviseTopic,decideTopic,runScript,approveScript,reviewScript,reviewFiles,publicationCommand,publicationAccounts,publicationOptions,preparePublicationChange,publicationTransport,configureCalendarRefresh,publicationCalendar,calendarAccounts,syncCalendar,captureChatDelivery,attachFiles,reviseFile,verifyFiles,changeFile,removeFile}}>{children}</Context.Provider>;
 }
 export function useContentWorkflow(){const context=useContext(Context);if(!context)throw new Error('useContentWorkflow requires ContentWorkflowProvider');return context}

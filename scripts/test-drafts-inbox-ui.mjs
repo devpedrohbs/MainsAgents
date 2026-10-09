@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { resolve, join, extname, sep } from 'node:path';
 import assert from 'node:assert/strict';
 import { createDesktopStateStore } from '../desktop-state-store.mjs';
+import {captureReadyPng} from './ui-capture-ready.mjs';
 
 const root = resolve(import.meta.dirname, '..'), directory = mkdtempSync(join(tmpdir(), 'mains-drafts-inbox-'));
 app.setPath('userData', join(directory, 'electron')); app.on('window-all-closed', () => {});
@@ -52,7 +53,13 @@ async function openChat() { await evaluate("document.querySelector('.agent-nav')
 app.whenReady().then(async () => {
   try {
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve)); await open();
+    // Home keeps the inbox compact: two rows plus a "View all (N)" toggle; all three pending items must be reachable.
+    await until(() => evaluate("document.querySelector('.editorial-inbox .inbox-count')?.textContent === '3'"));
+    assert.equal(await evaluate("document.querySelectorAll('.inbox-row').length"), 2);
+    assert.equal(await evaluate("document.querySelector('.editorial-inbox .panel-footer-action').getAttribute('aria-expanded')"), 'false');
+    await evaluate("document.querySelector('.editorial-inbox .panel-footer-action').click()");
     await until(() => evaluate("document.querySelectorAll('.inbox-row').length === 3"));
+    assert.equal(await evaluate("document.querySelector('.editorial-inbox .panel-footer-action').getAttribute('aria-expanded')"), 'true');
     assert.equal(await evaluate("document.querySelector('.inbox-row').textContent.includes('Pesquisa interrompida')"), true);
     assert.equal(await evaluate("document.querySelector('.editorial-inbox').textContent.includes('OUTRO_WORKSPACE')"), false);
     await evaluate("[...document.querySelectorAll('.inbox-row')].find(row => row.textContent.includes('Pauta correta')).click()");
@@ -65,10 +72,10 @@ app.whenReady().then(async () => {
     jobsFailed = true; await until(() => evaluate("document.querySelector('.editorial-inbox').textContent.includes('QUEUE_UNAVAILABLE')"));
     assert.equal(await evaluate("document.querySelectorAll('.inbox-row').length"), 2); jobsFailed = false;
     await until(() => evaluate("!document.querySelector('.editorial-inbox [role=alert]')"));
-    writeFileSync(join(root, '.mainsagents-workspaces/inbox-light.png'), (await window.webContents.capturePage()).toPNG());
+    writeFileSync(join(root, '.mainsagents-workspaces/inbox-light.png'), await captureReadyPng(window.webContents));
     window.setSize(760, 900); await evaluate("document.documentElement.dataset.appearance = 'dark'");
     assert.equal(await evaluate("(() => { const panel=document.querySelector('.editorial-inbox'); return panel.scrollWidth <= panel.clientWidth + 1; })()"), true);
-    writeFileSync(join(root, '.mainsagents-workspaces/inbox-dark-compact.png'), (await window.webContents.capturePage()).toPNG());
+    writeFileSync(join(root, '.mainsagents-workspaces/inbox-dark-compact.png'), await captureReadyPng(window.webContents));
     window.setSize(1440, 940); await evaluate("document.documentElement.dataset.appearance = 'light'");
     await openChat(); assert.equal(await evaluate("document.querySelector('.composer textarea').value"), draft.text);
     assert.equal(await evaluate("document.querySelector('.composer-selected-skill').textContent.includes('editorial')"), true);

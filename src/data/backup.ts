@@ -32,6 +32,9 @@ function mergeEditorial(current:Record<string,unknown>,incoming:Record<string,un
     for(const item of ((current[key]??[]) as Array<{id:string}>))rows.set(item.id,item);
     result[key]=[...rows.values()];
   }
+  // Reference library: union by id, the current copy wins (same rule as the other collections).
+  const library=(value:unknown)=>((value as {references?:Array<{id:string}>}|undefined)?.references??[]);
+  if(current.inspiration||incoming.inspiration){const rows=new Map<string,unknown>();for(const item of library(incoming.inspiration))rows.set(item.id,item);for(const item of library(current.inspiration))rows.set(item.id,item);result.inspiration={schemaVersion:1,references:[...rows.values()]};}
   if(Array.isArray(result.contents))result.contents=(result.contents as Array<{id:string}>).map(content=>({...content,assetIds:(result.assets as Array<{id:string;contentId:string}>).filter(asset=>asset.contentId===content.id).map(asset=>asset.id)}));
   return result;
 }

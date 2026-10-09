@@ -1,0 +1,393 @@
+{
+  "fixture": "SINTÉTICA: vídeo desenhado pelo FFmpeg (bloco claro = posição do rosto), transcrição escrita no script, foco manual. Sem voz humana, sem reconhecimento de fala, sem detecção facial.",
+  "variants": [
+    {
+      "name": "landscape-compare-steps",
+      "size": "960x540",
+      "fps": 30,
+      "durationSeconds": 53.6,
+      "audio": {
+        "mode": "mixed-sfx",
+        "codec": "aac",
+        "channels": 2,
+        "sampleRate": 48000
+      },
+      "renderSeconds": 118.5,
+      "summary": "intenso: 8 momento(s) — 0 aproximação(ões), 6 texto(s) animado(s), 0 cartão(ões) com tela dividida; 0 apoiado(s) na voz medida; 2 efeito(s) sonoro(s) suave(s); 2 explicativo(s) com base no que foi dito. ênfase da voz não medida (sem áudio utilizável); destaques vêm só do texto; foco manual.",
+      "density": {
+        "cuesPerMinute": 8.96,
+        "layoutShare": 0.27,
+        "sfxPerMinute": 2.24
+      },
+      "proof": {
+        "ok": true,
+        "problems": []
+      },
+      "protect": null,
+      "faceBox": {
+        "x": 0.68,
+        "y": 0.36,
+        "w": 0.16041666666666668,
+        "h": 0.3
+      },
+      "cues": [
+        {
+          "id": "m1",
+          "kind": "kineticText",
+          "layout": "camera-full",
+          "start": 1.1,
+          "end": 2.76,
+          "text": "pessoal hoje a"
+        },
+        {
+          "id": "m2",
+          "kind": "explainer",
+          "layout": "split",
+          "start": 5.63,
+          "end": 12.5,
+          "visual": {
+            "type": "compare",
+            "before": {
+              "label": "Antes",
+              "text": "eu gastava três horas editando cada vídeo"
+            },
+            "after": {
+              "label": "Agora",
+              "text": "faço tudo em vinte minutos"
+            }
+          },
+          "origin": "speech",
+          "quote": "Antes eu gastava três horas editando cada vídeo. Agora faço tudo em vinte minutos."
+        },
+        {
+          "id": "m3",
+          "kind": "kineticText",
+          "layout": "camera-full",
+          "start": 19.95,
+          "end": 21.61,
+          "text": "pessoal hoje a"
+        },
+        {
+          "id": "m4",
+          "kind": "kineticText",
+          "layout": "camera-full",
+          "start": 24.86,
+          "end": 26.52,
+          "text": "pessoal hoje a"
+        },
+        {
+          "id": "m5",
+          "kind": "kineticText",
+          "layout": "camera-full",
+          "start": 29.77,
+          "end": 31.43,
+          "text": "pessoal hoje a"
+        },
+        {
+          "id": "m6",
+          "kind": "explainer",
+          "layout": "split",
+          "start": 34.3,
+          "end": 41.9,
+          "visual": {
+            "type": "steps",
+            "items": [
+              "Grave o áudio limpo",
+              "Corte os silêncios longos",
+              "Publique o vídeo curto"
+            ]
+          },
+          "origin": "speech",
+          "quote": "Primeiro, grave o áudio limpo. Segundo, corte os silêncios longos. Terceiro, publique o vídeo curto."
+        },
+        {
+          "id": "m7",
+          "kind": "kineticText",
+          "layout": "camera-full",
+          "start": 42.92,
+          "end": 44.58,
+          "text": "pessoal hoje a"
+        },
+        {
+          "id": "m8",
+          "kind": "kineticText",
+          "layout": "camera-full",
+          "start": 47.83,
+          "end": 49.49,
+          "text": "pessoal hoje a"
+        }
+      ],
+      "frames": [
+        {
+          "file": "landscape-compare-steps-m2-entrando.png",
+          "t": 5.83
+        },
+        {
+          "file": "landscape-compare-steps-m2-item1.png",
+          "t": 6.31
+        },
+        {
+          "file": "landscape-compare-steps-m2-item2.png",
+          "t": 9.7
+        },
+        {
+          "file": "landscape-compare-steps-m2-completo.png",
+          "t": 11.8
+        },
+        {
+          "file": "landscape-compare-steps-m2-saindo.png",
+          "t": 12.35
+        },
+        {
+          "file": "landscape-compare-steps-m6-entrando.png",
+          "t": 34.5
+        },
+        {
+          "file": "landscape-compare-steps-m6-item1.png",
+          "t": 34.98
+        },
+        {
+          "file": "landscape-compare-steps-m6-item2.png",
+          "t": 37.23
+        },
+        {
+          "file": "landscape-compare-steps-m6-item3.png",
+          "t": 39.48
+        },
+        {
+          "file": "landscape-compare-steps-m6-completo.png",
+          "t": 41.2
+        },
+        {
+          "file": "landscape-compare-steps-m6-saindo.png",
+          "t": 41.75
+        }
+      ]
+    },
+    {
+      "name": "portrait-stat-captions",
+      "size": "540x960",
+      "fps": 25,
+      "durationSeconds": 25.32,
+      "audio": {
+        "mode": "mixed-sfx",
+        "codec": "aac",
+        "channels": 2,
+        "sampleRate": 48000
+      },
+      "renderSeconds": 47.5,
+      "summary": "equilibrado: 4 momento(s) — 0 aproximação(ões), 3 texto(s) animado(s), 0 cartão(ões) com tela dividida; 0 apoiado(s) na voz medida; 1 efeito(s) sonoro(s) suave(s); 1 explicativo(s) com base no que foi dito. ênfase da voz não medida (sem áudio utilizável); destaques vêm só do texto; foco manual.",
+      "density": {
+        "cuesPerMinute": 9.49,
+        "layoutShare": 0.168,
+        "sfxPerMinute": 2.37
+      },
+      "proof": {
+        "ok": true,
+        "problems": []
+      },
+      "protect": {
+        "captionBand": {
+          "top": 0.7,
+          "bottom": 0.8
+        }
+      },
+      "faceBox": {
+        "x": 0.5,
+        "y": 0.3,
+        "w": 0.15925925925925927,
+        "h": 0.16979166666666667
+      },
+      "cues": [
+        {
+          "id": "m1",
+          "kind": "kineticText",
+          "layout": "camera-full",
+          "start": 1.1,
+          "end": 2.76,
+          "text": "pessoal hoje a"
+        },
+        {
+          "id": "m2",
+          "kind": "kineticText",
+          "layout": "camera-full",
+          "start": 6.01,
+          "end": 7.67,
+          "text": "pessoal hoje a"
+        },
+        {
+          "id": "m3",
+          "kind": "explainer",
+          "layout": "split",
+          "start": 11.68,
+          "end": 15.92,
+          "visual": {
+            "type": "stat",
+            "chart": "bar",
+            "values": [
+              {
+                "label": "Vendas",
+                "value": 30,
+                "unit": "%"
+              },
+              {
+                "label": "Custos",
+                "value": 12,
+                "unit": "%"
+              }
+            ]
+          },
+          "origin": "speech",
+          "quote": "vendas subiram 30% e os custos caíram 12%."
+        },
+        {
+          "id": "m4",
+          "kind": "kineticText",
+          "layout": "camera-full",
+          "start": 19.6,
+          "end": 21.26,
+          "text": "pessoal hoje a"
+        }
+      ],
+      "frames": [
+        {
+          "file": "portrait-stat-captions-m3-entrando.png",
+          "t": 11.88
+        },
+        {
+          "file": "portrait-stat-captions-m3-item1.png",
+          "t": 13.12
+        },
+        {
+          "file": "portrait-stat-captions-m3-item2.png",
+          "t": 15.02
+        },
+        {
+          "file": "portrait-stat-captions-m3-completo.png",
+          "t": 15.22
+        },
+        {
+          "file": "portrait-stat-captions-m3-saindo.png",
+          "t": 15.77
+        }
+      ]
+    },
+    {
+      "name": "square-process-image",
+      "size": "540x540",
+      "fps": 30,
+      "durationSeconds": 28.7,
+      "audio": {
+        "mode": "mixed-sfx",
+        "codec": "aac",
+        "channels": 2,
+        "sampleRate": 48000
+      },
+      "renderSeconds": 64.2,
+      "summary": "intenso: 3 momento(s) — 0 aproximação(ões), 1 texto(s) animado(s), 0 cartão(ões) com tela dividida; 0 apoiado(s) na voz medida; 1 efeito(s) sonoro(s) suave(s); 1 explicativo(s) com base no que foi dito; 1 escolhido(s) por você. ênfase da voz não medida (sem áudio utilizável); destaques vêm só do texto; foco manual.",
+      "density": {
+        "cuesPerMinute": 6.27,
+        "layoutShare": 0.443,
+        "sfxPerMinute": 2.09
+      },
+      "proof": {
+        "ok": true,
+        "problems": []
+      },
+      "protect": null,
+      "faceBox": {
+        "x": 0.3,
+        "y": 0.38,
+        "w": 0.15925925925925927,
+        "h": 0.24074074074074073
+      },
+      "cues": [
+        {
+          "id": "m1",
+          "kind": "kineticText",
+          "layout": "camera-full",
+          "start": 1.1,
+          "end": 2.76,
+          "text": "pessoal hoje a"
+        },
+        {
+          "id": "m2",
+          "kind": "explainer",
+          "layout": "motion-focus",
+          "start": 5.63,
+          "end": 14.34,
+          "visual": {
+            "type": "process",
+            "nodes": [
+              "Você grava",
+              "O app transcreve",
+              "Corta os silêncios",
+              "Exporta o vídeo"
+            ]
+          },
+          "origin": "speech",
+          "quote": "Primeiro você grava. Depois o app transcreve. Em seguida corta os silêncios. Por fim exporta o vídeo."
+        },
+        {
+          "id": "u1",
+          "kind": "explainer",
+          "layout": "split",
+          "start": 19.52,
+          "end": 23.52,
+          "visual": {
+            "type": "image",
+            "assetId": "material",
+            "caption": "Seu material (exemplo sintético)"
+          },
+          "origin": "user"
+        }
+      ],
+      "frames": [
+        {
+          "file": "square-process-image-m2-entrando.png",
+          "t": 5.83
+        },
+        {
+          "file": "square-process-image-m2-item1.png",
+          "t": 6.31
+        },
+        {
+          "file": "square-process-image-m2-item2.png",
+          "t": 7.8
+        },
+        {
+          "file": "square-process-image-m2-item3.png",
+          "t": 10.05
+        },
+        {
+          "file": "square-process-image-m2-item4.png",
+          "t": 12.3
+        },
+        {
+          "file": "square-process-image-m2-completo.png",
+          "t": 13.64
+        },
+        {
+          "file": "square-process-image-m2-saindo.png",
+          "t": 14.19
+        },
+        {
+          "file": "square-process-image-u1-entrando.png",
+          "t": 19.72
+        },
+        {
+          "file": "square-process-image-u1-completo.png",
+          "t": 22.82
+        },
+        {
+          "file": "square-process-image-u1-saindo.png",
+          "t": 23.37
+        }
+      ]
+    }
+  ],
+  "bundle": {
+    "seconds": 3.2,
+    "note": "bundle próprio em pasta temporária (dist/remotion não foi tocado)"
+  }
+}

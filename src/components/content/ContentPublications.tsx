@@ -9,6 +9,7 @@ import {localTimeToInstant,zonedDateTime} from '../../../publication-time.mjs';
 import {SelectMenu} from '../common/SelectMenu';
 import {FlowDialog} from '../common/FlowDialog';
 import './content-publications.css';
+import {PublicationStatusRefresh} from './PublicationStatusRefresh';
 
 
 const labels:Record<PublicationStatus,[string,string]>={draft:['Rascunho','Draft'],'in-review':['Em revisão','In review'],approved:['Aprovado para envio','Approved to send'],sending:['Envio pendente','Sending'],scheduled:['Agendamento confirmado','Schedule confirmed'],published:['Publicado','Published'],failed:['Falha','Failed']};
@@ -25,6 +26,7 @@ export function ContentPublications({content}:{content:EditorialContent}){
     <div className="editorial-section-head"><div><h2>{pt?'Entregas por rede':'Network deliveries'}</h2><p className="editorial-hint">{pt?'Revise texto, arquivos e horário de cada rede. Um horário planejado ainda não é um agendamento.':'Review text, files and time for each network. A planned time is not a confirmed schedule.'}</p></div><button type="button" className="text-link" onClick={()=>window.dispatchEvent(new CustomEvent('mainsagents:publication-calendar'))}>{pt?'Ver calendário':'View calendar'}</button></div>
     <div className="publication-rows">{deliveries.map(item=><button type="button" className="publication-row" key={item.id} onClick={()=>setEditing(structuredClone(item))}><b>{item.platform}</b><span>{publicationLabel(item.status,pt)}<small>v{item.version}{item.plannedAt?` · ${pt?'Planejado':'Planned'}: ${new Date(item.plannedAt).toLocaleString(locale,{timeZone:item.timeZone})} (${item.timeZone})`:''}</small></span><span>{pt?'Abrir':'Open'}</span></button>)}</div>
     <div className="editorial-actions">{publicationPlatforms.filter(platform=>!deliveries.some(item=>item.platform===platform)).map(platform=><button type="button" className="soft-button" key={platform} disabled={busy} onClick={()=>void add(platform as Platform)}>+ {platform}</button>)}</div>
+    <PublicationStatusRefresh deliveries={deliveries} pt={pt}/>
     {error&&<p className="delivery-error" role="alert">{error}</p>}
     {editing&&<PublicationEditor delivery={editing} onClose={()=>setEditing(null)}/>}
   </section>;

@@ -1,3 +1,4 @@
+import { createUsageCollector } from './claude-usage.mjs';
 import { execFileSync, spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import { randomUUID, timingSafeEqual } from 'node:crypto';
@@ -239,6 +240,9 @@ export function createClaudeCodeBridge({
     let streamedText = false;
     let toolIndex = 0;
     const openTools = new Map();
+    const usageCollector = createUsageCollector();
+    // One report per execution, published before the terminal event so the consumer sees it while still listening.
+    const publishUsage = () => { const usage = usageCollector.finish({ cancelled: record.cancelled === true }); if (usage) publish(record, { type: 'usage.reported', executionId: record.id, usage }); };
     const finishTools = () => {
       for (const [callId, tool] of openTools) publish(record, { type: 'tool.finished', executionId: record.id, tool, callId });
       openTools.clear();
@@ -247,6 +251,7 @@ export function createClaudeCodeBridge({
       if (!line.trim()) return;
       let message;
       try { message = JSON.parse(line); } catch { return; }
+      usageCollector.observe(message);
       if (message.type === 'stream_event') {
         const event = message.event;
         if (event?.type === 'content_block_start' && event.content_block?.type === 'tool_use') {
@@ -296,12 +301,14 @@ export function createClaudeCodeBridge({
     child.stdin?.end(makeUserPrompt(input, config));
     child.once('error', () => {
       finishTools();
+      publishUsage();
       publish(record, { type: 'execution.failed', executionId: record.id, code: 'cli_launch_failed', message: 'Could not start Claude Code CLI.', retryable: true });
     });
     child.once('close', (code) => {
       if (lineBuffer.trim()) handleLine(lineBuffer);
       finishTools();
       record.child = undefined;
+      publishUsage();
       if (record.cancelled) publish(record, { type: 'execution.cancelled', executionId: record.id });
       else if (code === 0 && !record.resultError && record.resultReceived) {
         if (accumulated) publish(record, { type: 'message.completed', executionId: record.id, content: accumulated });

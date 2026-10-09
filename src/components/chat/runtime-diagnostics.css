@@ -31,3 +31,16 @@
 .capability-skills ul{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:8px}
 .capability-skills li{display:grid;gap:4px;padding:10px;border:1px solid var(--border);border-radius:8px}
 .capability-skills small{display:block;color:var(--muted)}
+.readiness-checklist{display:grid;gap:8px;padding:12px;border:1px solid var(--border);border-radius:9px;background:var(--surface)}
+.readiness-checklist h3{margin:0;font-size:14px}
+.readiness-summary{margin:0;font-size:12px;line-height:1.6}
+.readiness-checklist ul{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.readiness-checklist li{display:grid;grid-template-columns:minmax(120px,max-content) 1fr;gap:6px 12px;align-items:baseline;padding:8px 0;border-top:1px solid var(--border);font-size:12px;line-height:1.6}
+.readiness-checklist li>div{display:grid;gap:2px;min-width:0;overflow-wrap:anywhere}
+.readiness-checklist small{color:var(--muted);font-size:12px}.readiness-checklist em{font-style:normal;font-weight:400;color:var(--muted)}
+.readiness-state{font-weight:600}
+.readiness-checklist [data-state=ready] .readiness-state>span{color:var(--success)}
+.readiness-checklist [data-state=blocked] .readiness-state>span{color:var(--danger)}
+.readiness-checklist [data-state=unverified] .readiness-state>span{color:var(--warn)}
+.readiness-checklist .readiness-next{color:var(--fg)}
+@media (max-width:560px){.readiness-checklist li{grid-template-columns:1fr}}

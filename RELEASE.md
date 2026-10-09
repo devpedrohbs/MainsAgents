@@ -1,6 +1,12 @@
 # Publicação e recuperação do MainsAgents (Windows)
 
-Versão desta rodada: 0.3.40. O instalador NSIS mantém o mesmo `appId`. O estado principal e editorial do desktop ficam no SQLite permanente em `%USERPROFILE%\.mainsagents\storage`, fora da instalação. O perfil Electron em `%APPDATA%\mains-agents` mantém cookies e dados auxiliares; históricos antigos foram migrados sem substituir dados atuais.
+## Estado das versões (07/10/2026)
+
+- **Local:** `package.json` = 0.3.57, instalado nesta máquina em 08/10/2026 (0.3.56 → 0.3.57: check-up B01–B03/B05/B07/B09–B11; estado preservado, instalador `e2e780f6…0e40d`, app.asar `80de0d37…b4e9`; detalhes em [docs/analysis/local-update-0.3.57.md](docs/analysis/local-update-0.3.57.md)). Anterior: 0.3.56, instalado nesta máquina em 07/10/2026 (0.3.55 → 0.3.56: gate de roteiro, Claude por etapa, pacote de gravação, capas locais e biblioteca de referências; estado preservado, instalador `d461084e…b7bc`, app.asar `054b22c0…7000`; detalhes em [docs/analysis/local-update-0.3.56.md](docs/analysis/local-update-0.3.56.md)). Anterior: 0.3.55 ([docs/analysis/local-update-0.3.55.md](docs/analysis/local-update-0.3.55.md)).
+- **Pública:** última prévia efetivamente comprovada = [v0.3.42](https://github.com/devpedrohbs/MainsAgents/releases/tag/v0.3.42) (pré-lançamento, 05/10/2026; verificação em [docs/validation-0.3.42.md](docs/validation-0.3.42.md)). O link do README só muda após uma release nova publicada e conferida (hash, instalação, manifesto).
+- **Rodada de 07/10/2026:** D02 (verificação antes de iniciar), D03 (execuções/fila), D04, escolha Codex/Claude/Ambos no chat (D13), contraste e prontidão do consentimento foram entregues e validados localmente: `npm test` 298/298, `npm run build` e `tsc` sem erros, mais as fixtures Electron de provider-choice, comparação legada, preflight, execution-overview, flow-execution, semi-production, production-flows, drafts-inbox, refined-workspace e native-persistence. Nenhum instalador novo, instalação ou release foi feito; os hashes abaixo são históricos. Nenhuma autenticação real, chamada de IA, Notion ou publicação pessoal ocorreu. Detalhes em [docs/analysis/task-D12-final-2026-10-07.md](docs/analysis/task-D12-final-2026-10-07.md).
+
+Versão do histórico abaixo: 0.3.40. O instalador NSIS mantém o mesmo `appId`. O estado principal e editorial do desktop ficam no SQLite permanente em `%USERPROFILE%\.mainsagents\storage`, fora da instalação. O perfil Electron em `%APPDATA%\mains-agents` mantém cookies e dados auxiliares; históricos antigos foram migrados sem substituir dados atuais.
 
 ## Validação local 0.3.40
 

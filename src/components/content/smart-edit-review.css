@@ -1,0 +1,15 @@
+.smart-cut-review,.smart-edit-fields{display:grid;gap:14px;min-width:0;font-size:13px}
+.smart-cut-review h3,.smart-edit-fields h3{font-size:14px;margin:0;color:var(--fg)}
+.smart-cut-review p,.smart-edit-fields p{margin:0;line-height:1.55;color:var(--muted);overflow-wrap:anywhere}
+.smart-candidates,.smart-manual-list{list-style:none;padding:0;margin:0;display:grid;gap:8px}
+.smart-candidates li{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--border);padding:12px;border-radius:8px;min-width:0}
+.smart-candidates label{display:flex;align-items:flex-start;gap:10px;flex:1;min-width:180px}
+.smart-candidates label span{display:grid;gap:5px;min-width:0;overflow-wrap:anywhere}.smart-candidates small{font-size:12px;color:var(--muted)}
+.smart-manual{border:1px solid var(--border);border-radius:8px;padding:14px;display:grid;gap:12px;min-width:0}.smart-manual legend{font-weight:600}
+.smart-range-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.smart-range-fields label,.smart-manual>label,.smart-edit-fields>label{display:grid;gap:6px;min-width:0}
+.smart-edit-fields input:not([type=checkbox]),.smart-edit-fields textarea,.smart-manual input{max-width:100%;box-sizing:border-box;min-width:0;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--fg);padding:9px;font:inherit}
+.smart-manual-list li{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;padding:10px;border-bottom:1px solid var(--border)}
+.smart-timeline-summary{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;display:grid;gap:10px}.smart-timeline-summary>p{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px}.smart-timeline-summary summary{cursor:pointer}.smart-timeline-summary ol{max-height:160px;overflow:auto}
+.smart-edit-video{width:100%;max-height:260px;background:#000;border-radius:8px}.smart-edit-confirmation{border:1px solid var(--accent);padding:12px;border-radius:8px;display:grid;gap:10px}
+.smart-animation{display:grid;gap:10px;padding-top:12px;border-top:1px solid var(--border)}.smart-animation>label:not(:first-child){display:grid;gap:6px}.smart-edit-toolbar{display:flex;gap:8px;flex-wrap:wrap}.smart-transcript{max-height:220px;overflow:auto;display:grid;gap:8px;padding:12px;background:var(--bg);border-radius:8px}
+@media(max-width:600px){.smart-range-fields{grid-template-columns:minmax(0,1fr)}.smart-candidates label{min-width:140px}.smart-candidates button{min-height:32px}}

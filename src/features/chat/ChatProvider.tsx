@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type PropsWithChildren } from 'react';
 import type { Agent, AgentId } from '../agents/model/Agent';
-import type { AgentSession, ChatActivityItem, ChatContextReference, ChatItem, ChatRunState, ReasoningEffort } from './model/Chat';
+import type { AgentSession, ChatActivityItem, ChatContextReference, ChatItem, ChatMessageItem, ChatRunState, ReasoningEffort } from './model/Chat';
 import type { CodexEvent } from './CodexService';
 import type { AiProvider } from './AiProvider';
 import { sessionProviderId, sessionRemoteId } from './AiProvider';
@@ -14,15 +14,16 @@ import { handoffBriefing, handoffTargets, validateHandoff, type AgentHandoff, ty
 import { useCanvas } from '../../components/canvas/CanvasProvider';
 import {storageProfile} from '../../data/IndexedDbStateStore';
 import {mergeNativeDelegations,type NativeDelegationSnapshot} from './nativeDelegations';
-import {finishResponseTiming,recoverResponseTiming} from './responseTiming';
+import {finishResponseTiming,recoverResponseTiming,startRunItem} from './responseTiming';
 import {createComparisonLauncher,deriveComparisons,type AgentComparison,type AgentComparisonInput} from './agentComparison';
+import {activeAfterCreate,childContentLink} from './contentSessions';
 
 interface ChatContextValue {
   sessions: readonly AgentSession[];
   getAgentSessions: (agentId: AgentId) => AgentSession[];
   getActiveSession: (agentId: AgentId) => AgentSession | undefined;
   getRunState: (sessionId?: string) => ChatRunState;
-  createSession: (agentId: AgentId, title?: string, providerId?:AgentSession['providerId'], modelId?:string,editorial?:Pick<AgentSession,'contentId'|'topicId'>) => AgentSession;
+  createSession: (agentId: AgentId, title?: string, providerId?:AgentSession['providerId'], modelId?:string,editorial?:Pick<AgentSession,'contentId'|'topicId'|'contentTitle'>,activate?:boolean) => AgentSession;
   openSession: (agentId: AgentId, sessionId: string) => void;
   renameSession: (sessionId: string, title: string) => void;
   deleteSession: (sessionId: string) => void;
@@ -85,13 +86,13 @@ export function ChatProvider({ children, providers }: PropsWithChildren<{provide
     recovered.current=true;
     setSessions(current=>current.map(session=>recoverResponseTiming({
       ...session,
-      messages:session.messages.map(item=>item.type==='activity'&&item.status==='running'?{...item,status:'error' as const}:item.type==='message'&&item.deliveryState==='streaming'?{...item,deliveryState:'interrupted' as const}:item),
+      messages:session.messages.map(item=>item.type==='activity'&&item.kind!=='run'&&item.status==='running'?{...item,status:'error' as const}:item.type==='message'&&item.deliveryState==='streaming'?{...item,deliveryState:'interrupted' as const}:item),
       handoffs:session.handoffs?.map(item=>item.status==='running'?{...item,status:'interrupted' as const,error:'The app closed before the specialist returned. Open its saved session before retrying.',updatedAt:new Date().toISOString()}:item),
     })));
   },[sessionsReady,setSessions]);
 
   const updateSession=useCallback((sessionId:string,change:(session:AgentSession)=>AgentSession)=>setSessions((current)=>current.map((session)=>session.id===sessionId?change(session):session)),[setSessions]);
-  const createSession=useCallback((agentId:AgentId,title?:string,providerId:AgentSession['providerId']='codex',modelId?:string,editorial?:Pick<AgentSession,'contentId'|'topicId'>)=>{const session={...makeSession(agentId,title,providerId,modelId??(providerId==='codex'?defaultCodexModelId||undefined:undefined)),...editorial};pendingSessions.current.set(session.id,session);setSessions((current)=>[session,...current]);setActiveSessionIds((current)=>({...current,[agentId]:session.id}));setRunStates((current)=>({...current,[session.id]:'idle'}));return session},[defaultCodexModelId,setActiveSessionIds,setSessions]);
+  const createSession=useCallback((agentId:AgentId,title?:string,providerId:AgentSession['providerId']='codex',modelId?:string,editorial?:Pick<AgentSession,'contentId'|'topicId'|'contentTitle'>,activate=true)=>{const session={...makeSession(agentId,title,providerId,modelId??(providerId==='codex'?defaultCodexModelId||undefined:undefined)),...childContentLink(editorial)};pendingSessions.current.set(session.id,session);setSessions((current)=>[session,...current]);setActiveSessionIds((current)=>activeAfterCreate(current,agentId,session.id,activate));setRunStates((current)=>({...current,[session.id]:'idle'}));return session},[defaultCodexModelId,setActiveSessionIds,setSessions]);
   const openSession=useCallback((agentId:AgentId,sessionId:string)=>setActiveSessionIds((current)=>({...current,[agentId]:sessionId})),[setActiveSessionIds]);
   const renameSession=useCallback((sessionId:string,title:string)=>{const clean=title.trim();if(clean)updateSession(sessionId,(session)=>({...session,title:clean,updatedAt:new Date().toISOString()}))},[updateSession]);
   const deleteSession=useCallback((sessionId:string)=>{
@@ -120,7 +121,7 @@ export function ChatProvider({ children, providers }: PropsWithChildren<{provide
     const source=agentsRef.current.find(item=>item.id===session?.agentId),target=agentsRef.current.find(item=>item.id===connection?.targetAgentId);
     if(!session||!connection?.enabled||!source||!target||source.workspaceId!==target.workspaceId)throw new Error('Choose a connected agent.');
     if(inFlightSessions.current.has(sessionId)||connection.targetSessionId&&inFlightSessions.current.has(connection.targetSessionId))throw new Error('Wait for both agents to finish.');
-    const child=createSession(target.id,undefined,target.providerId??'codex',target.modelId);
+    const child=createSession(target.id,undefined,target.providerId??'codex',target.modelId,childContentLink(session));
     updateSession(sessionId,current=>({...current,agentConnection:{...connection,targetSessionId:child.id},updatedAt:new Date().toISOString()}));
   },[createSession,updateSession]);
 
@@ -143,7 +144,7 @@ export function ChatProvider({ children, providers }: PropsWithChildren<{provide
       updateSession(sessionId,(session)=>{const exists=session.messages.some((item)=>item.id===activityId);const activity:ChatActivityItem={id:activityId,type:'activity',label,status:isFinished?'done':'running'};return {...session,updatedAt:new Date().toISOString(),messages:exists?session.messages.map((item):ChatItem=>item.id===activityId?activity:item):[...session.messages,activity]}});
       return;
     }
-    if(event.type==='execution.completed'){setRunStates((current)=>({...current,[sessionId]:'finished'}));updateSession(sessionId,(session)=>({...session,updatedAt:new Date().toISOString(),messages:session.messages.map((item):ChatItem=>item.type==='activity'&&item.status==='running'?{...item,status:'done'}:item.type==='message'&&item.id===`codex-${event.executionId}`?{...item,deliveryState:'completed'}:item)}));return}
+    if(event.type==='execution.completed'){setRunStates((current)=>({...current,[sessionId]:'finished'}));updateSession(sessionId,(session)=>({...session,updatedAt:new Date().toISOString(),messages:session.messages.map((item):ChatItem=>item.type==='activity'&&item.kind!=='run'&&item.status==='running'?{...item,status:'done'}:item.type==='message'&&item.id===`codex-${event.executionId}`?{...item,deliveryState:'completed'}:item)}));return}
     if(event.type==='execution.cancelled'){updateSession(sessionId,session=>({...session,messages:session.messages.map((item):ChatItem=>item.type==='activity'&&item.status==='running'&&item.id.startsWith(`codex-activity-${event.executionId}-`)?{...item,status:'error',label:`${item.label} · interrupted`}:item.type==='message'&&item.id===`codex-${event.executionId}`?{...item,deliveryState:'interrupted'}:item)}));setRunStates((current)=>({...current,[sessionId]:'idle'}));return}
     if(event.type==='execution.failed'){setRunStates((current)=>({...current,[sessionId]:'error'}));updateSession(sessionId,(session)=>({...session,updatedAt:new Date().toISOString(),messages:[...session.messages.map((item):ChatItem=>item.type==='activity'&&item.status==='running'&&item.id.startsWith(`codex-activity-${event.executionId}-`)?{...item,status:'error'}:item.type==='message'&&item.id===`codex-${event.executionId}`?{...item,deliveryState:'interrupted'}:item),{id:makeId('activity'),type:'activity',label:event.message,status:'error'}]}))}
   },[updateSession]);
@@ -165,7 +166,8 @@ export function ChatProvider({ children, providers }: PropsWithChildren<{provide
     const responseTiming={id:makeId('response'),startedAt:new Date().toISOString()};
     let timingOutcome:'completed'|'interrupted'|'error'='error';
     setRunStates((current)=>({...current,[sessionId]:'thinking'}));
-    updateSession(sessionId,(current)=>({...current,responseTiming,title:['New session','Nova sessão'].includes(current.title)?titleFromMessage(clean):current.title,updatedAt:new Date().toISOString(),messages:[...current.messages,{id:makeId('message'),type:'message',role:'user',content:clean,createdAt:new Date().toISOString(),contextNodes:contextNodes.length?[...contextNodes]:undefined,selectedSkill,sourceAgentName:ancestors.length?agentsRef.current.find(item=>item.id===ancestors[ancestors.length-1])?.name:undefined,handoffId:handoffId??session.originHandoffId}]}));
+    const userMessageId=makeId('message');
+    updateSession(sessionId,(current)=>({...current,responseTiming,title:['New session','Nova sessão'].includes(current.title)?titleFromMessage(clean):current.title,updatedAt:new Date().toISOString(),messages:[...current.messages,{id:userMessageId,type:'message',role:'user',content:clean,createdAt:new Date().toISOString(),contextNodes:contextNodes.length?[...contextNodes]:undefined,selectedSkill,sourceAgentName:ancestors.length?agentsRef.current.find(item=>item.id===ancestors[ancestors.length-1])?.name:undefined,handoffId:handoffId??session.originHandoffId},startRunItem(responseTiming.id,responseTiming.startedAt)]}));
     const controller=new AbortController();abortControllers.current[sessionId]=controller;
     let failureReported=false;
       try{
@@ -173,7 +175,10 @@ export function ChatProvider({ children, providers }: PropsWithChildren<{provide
         if(!provider)throw new Error(`Provider ${sessionProviderId(session)} is not available. The history is still saved locally.`);
         let providerContent=providerSkillPrompt(agent,clean,selectedSkill);
         if(!selectedSkill)providerContent+=`\n\nMainsAgents optional editorial delivery format:\n${chatDeliveryInstructions}`;
-        if(session.productionContext)providerContent+=`\n\nMainsAgents authoritative production snapshot (reference data, not authorization to run tools):\n${JSON.stringify(session.productionContext)}\nThe app owns these production steps. Use its production controls for approvals and scheduling. Never claim a step advanced or a post was scheduled merely from your text response.`;
+        // Read when sending (not at click time): an approval made just before must reach the prompt.
+        const productionSnapshot=(context:AgentSession['productionContext'])=>context?`\n\nMainsAgents authoritative production snapshot (reference data, not authorization to run tools):\n${JSON.stringify(context)}\nThe app owns these production steps. Use its production controls for approvals and scheduling. Never claim a step advanced or a post was scheduled merely from your text response.`:'';
+        // Content session before any production: its identity only (never another content or chat).
+        const sessionSnapshot=(current:AgentSession)=>current.productionContext?productionSnapshot(current.productionContext):current.contentId?`\n\nMainsAgents content session (reference data for THIS conversation only):\n${JSON.stringify({contentId:current.contentId,title:current.contentTitle??current.title,production:'none yet: no script, recording or edit has started in the app'})}\nAnswer only about this content; other contents and chats are not part of this conversation. Productions start from the app controls, never from your text.`:'';
         const connection=session.agentConnection?.enabled?session.agentConnection:undefined;
         const available=handoffTargets(agent,agentsRef.current,ancestors);
         // Comparison sessions never fan out unless the user later enables a connection explicitly.
@@ -188,7 +193,8 @@ export function ChatProvider({ children, providers }: PropsWithChildren<{provide
         if(!remoteId)updateSession(sessionId,(current)=>({...current,providerId:provider.id,remoteSessionId:thread.remoteSessionId,codexThreadId:provider.id==='codex'?thread.remoteSessionId:current.codexThreadId,delegationRuntimeVersion:provider.id==='codex'?2:undefined,previousCodexThreadId:migrate?oldRemoteId:current.previousCodexThreadId,updatedAt:new Date().toISOString()}));
         await saveNow();
         if(controller.signal.aborted)throw new Error('Execution cancelled.');
-        const execution=await provider.sendMessage({remoteSessionId:thread.remoteSessionId,content:providerContent,modelId:session.modelId,reasoningEffort:session.reasoningEffort??'medium',instructions:agent.instructions,agentId:agent.id,agentName:agent.name,role:agent.role,workspaceId:agent.workspaceId,tools:agent.tools,skillsDirectory:agent.skillsDirectory,skills:agent.skills,firstMessage:!remoteId,history:session.messages.filter((item)=>item.type==='message').map((item)=>({role:item.role,content:item.content})),context:contextNodes.map((node)=>({id:node.nodeId,kind:node.kind,label:node.label,content:node.content})),delegation:{sourceAgentId:agent.id,workspaceId:agent.workspaceId,targets:targets.map(item=>({id:item.id,name:item.name,role:item.role})),connectedAgentId:connection?.targetAgentId}});
+        const live=sessionsRef.current.find(item=>item.id===sessionId)??session;
+        const execution=await provider.sendMessage({remoteSessionId:thread.remoteSessionId,content:providerContent+sessionSnapshot(live),modelId:session.modelId,reasoningEffort:session.reasoningEffort??'medium',instructions:agent.instructions,agentId:agent.id,agentName:agent.name,role:agent.role,workspaceId:agent.workspaceId,tools:agent.tools,skillsDirectory:agent.skillsDirectory,skills:agent.skills,firstMessage:!remoteId,history:(sessionsRef.current.some(item=>item.id===sessionId)?live.messages:session.messages).filter((item):item is ChatMessageItem=>item.type==='message'&&item.id!==userMessageId).map((item)=>({role:item.role,content:item.content})),context:contextNodes.map((node)=>({id:node.nodeId,kind:node.kind,label:node.label,content:node.content})),delegation:{sourceAgentId:agent.id,workspaceId:agent.workspaceId,targets:targets.map(item=>({id:item.id,name:item.name,role:item.role})),connectedAgentId:connection?.targetAgentId}});
         executions.current[sessionId]=execution.executionId;
         if(controller.signal.aborted){await provider.cancelExecution(execution.executionId);throw new Error('Execution cancelled.');}
         let output='', completed=false, delegationCount=0, imageCount=0;
@@ -232,7 +238,8 @@ export function ChatProvider({ children, providers }: PropsWithChildren<{provide
     const existing=linked&&request.sessionMode!=='new'&&connection.targetSessionId?sessionsRef.current.find(item=>item.id===connection.targetSessionId&&item.agentId===target.id)??pendingSessions.current.get(connection.targetSessionId):undefined;
     if(existing&&existing.agentId!==target.id)throw new Error('The connected session belongs to another agent. Choose a new session.');
     if(existing&&inFlightSessions.current.has(existing.id))throw new Error('The connected agent is already responding. Wait before sending another task.');
-    const child=existing??createSession(target.id,request.title,target.providerId??'codex',target.modelId);
+    // A specialist child keeps the target agent's visible session and belongs to the requesting content.
+    const child=existing??createSession(target.id,request.title,target.providerId??'codex',target.modelId,childContentLink(liveSession),false);
     if(linked)updateSession(sourceSession.id,current=>({...current,agentConnection:{enabled:true,targetAgentId:target.id,targetSessionId:child.id},updatedAt:new Date().toISOString()}));
     const now=new Date().toISOString();
     const handoff:AgentHandoff={...request,id:makeId('handoff'),sourceAgentId:source.id,sourceSessionId:sourceSession.id,targetSessionId:child.id,workspaceId:source.workspaceId,context:[...context],status:'running',createdAt:now,updatedAt:now};
@@ -292,7 +299,8 @@ export function ChatProvider({ children, providers }: PropsWithChildren<{provide
       for(const session of pair)pendingSessions.current.set(session.id,session);
       const ids=new Set(pair.map(session=>session.id));
       setSessions(current=>[...pair,...current.filter(session=>!ids.has(session.id))]);
-      setActiveSessionIds(current=>({...current,...Object.fromEntries(pair.map(session=>[session.agentId,session.id]))}));
+      // Same-agent comparisons share one agent id: keep the Codex side (first) as that agent's active session.
+      setActiveSessionIds(current=>({...current,...Object.fromEntries([...pair].reverse().map(session=>[session.agentId,session.id]))}));
       setRunStates(current=>({...current,...Object.fromEntries(pair.map(session=>[session.id,'idle' as const]))}));
       await saveNow();
     },

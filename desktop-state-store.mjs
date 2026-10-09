@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import {executionSnapshot,executionRevision,restoreExecution} from './editorial-execution-backup.mjs';
 import {validateEditorialAssets} from './editorial-assets-validation.mjs';
+import {validateInspirationState} from './editorial-inspiration.mjs';
 import {validatePublications} from './editorial-publications.mjs';
 
 // This file lives in userData, never in the application installation directory.
@@ -58,7 +59,7 @@ export function createDesktopStateStore(directory, version) {
     restoreWorkspace(profile,values,nextEditorial,expected,nextExecution) {
       validateProfile(profile);
       if(!this.hasProfile(profile))throw new Error('Storage profile has not been restored');
-      if(nextEditorial?.schemaVersion!==1||!['topics','contents','runs','artifacts','approvals'].every(key=>Array.isArray(nextEditorial[key]))||!validateEditorialAssets(nextEditorial)||!validatePublications(nextEditorial))throw new Error('Invalid editorial backup');
+      if(nextEditorial?.schemaVersion!==1||!['topics','contents','runs','artifacts','approvals'].every(key=>Array.isArray(nextEditorial[key]))||!validateInspirationState(nextEditorial)||!validateEditorialAssets(nextEditorial)||!validatePublications(nextEditorial))throw new Error('Invalid editorial backup');
       if(nextEditorial.assets)nextEditorial={...nextEditorial,assets:nextEditorial.assets.map(asset=>({...asset,status:'unchecked',checkedAt:undefined,lastError:undefined}))};
       transaction(()=>{
         const current=this.readAllVersioned(profile);

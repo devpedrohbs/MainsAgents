@@ -30,12 +30,34 @@ import { useContentWorkflow } from '../features/content/ContentWorkflowProvider'
 import { editorialInbox, type EditorialInboxItem } from '../features/content/editorialInbox';
 import {useChatInbox} from '../features/chat/useChatInbox';
 import {AgentComparisonView} from '../components/chat/AgentComparisonView';
+import {useProduction} from '../features/production/ProductionProvider';
+import {ProductionDialog} from '../components/production/ProductionDialog';
+import {executionOverview, type ExecutionOverviewItem} from '../components/production/ExecutionOverviewProjection';
+import {startDraftScope} from '../features/production/productionDrafts';
+import {putStudioField, type StudioDrafts} from '../features/content/studioDraftModel';
 
 export function App() {
   const { page, navigate } = useHashRouter();
   const { locale, focusMode, t } = useLanguage();
   const { agents: allAgents, getAgentById, createAgent, updateAgent, deleteAgent } = useAgents();
   const { currentWorkspaceId, workspaces, setCurrentWorkspaceId } = useWorkspaces();
+  const {runs: productionRuns} = useProduction();
+  const [executionId, setExecutionId] = useState<string | null>(null);
+  useEffect(() => setExecutionId(null), [currentWorkspaceId]);
+  const currentExecution = executionOverview(productionRuns, currentWorkspaceId, locale === 'pt-BR').find(item => item.id === executionId);
+  const openExecution = (item: ExecutionOverviewItem, chat = false) => {
+    const current = executionOverview(productionRuns, currentWorkspaceId, locale === 'pt-BR').find(candidate => candidate.id === item.id);
+    if (!current) return;
+    if (chat) {
+      if (!current.chat || !allAgents.some(agent => agent.id === current.chat?.agentId && agent.workspaceId === currentWorkspaceId)) return;
+      openSession(current.chat.agentId, current.chat.sessionId);
+      selectAgent(current.chat.agentId);
+    } else if (current.detail) {
+      const target = current.detail;
+      updatePersistentValue<StudioDrafts>('studio-drafts', {}, drafts => putStudioField(drafts, startDraftScope(target.workspaceId, target.flowId, target.sessionId), 'run', target.runId));
+      setExecutionId(current.id);
+    }
+  };
   const { sessions, createSession, openSession } = useChat();
   const chatInbox=useChatInbox(sessions,allAgents,currentWorkspaceId);
   const { state: editorialState, ready: editorialReady, jobs: editorialJobs } = useContentWorkflow();
@@ -478,11 +500,14 @@ export function App() {
           chatInbox={chatInbox}
           onOpenChatInbox={item=>{openSession(item.agentId,item.sessionId);selectAgent(item.agentId);}}
           showEmptyPrompt={welcomeDismissed}
+          onOpenExecution={item => openExecution(item)}
+          onOpenExecutionChat={item => openExecution(item, true)}
         />
       </>
     );
   return (
     <>
+      {currentExecution?.detail && <ProductionDialog key={currentExecution.id} workspaceId={currentExecution.detail.workspaceId} flowId={currentExecution.detail.flowId} sessionId={currentExecution.detail.sessionId} onClose={() => setExecutionId(null)} onSelectAgent={id => selectAgent(id)}/>}
       <AppShell
         onProviderSettings={() => {
           setSettingsSection('providers');

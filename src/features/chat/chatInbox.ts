@@ -8,7 +8,7 @@ export function sessionInboxEvents(session:AgentSession):ChatInboxItem[] {
   const rows:ChatInboxItem[]=[];
   for(const item of session.messages) {
     if(item.type==='message'&&item.role==='agent'&&item.content.trim()&&item.deliveryState!=='streaming') rows.push({id:`message:${item.id}`,sessionId:session.id,agentId:session.agentId,workspaceId:'',title:session.title,detail:item.content.slice(0,180),at:item.createdAt,kind:item.deliveryState==='interrupted'?'blocked':'delivery'});
-    if(item.type==='activity'&&item.status==='error') rows.push({id:`error:${item.id}`,sessionId:session.id,agentId:session.agentId,workspaceId:'',title:session.title,detail:item.label,at:session.updatedAt,kind:'blocked'});
+    if(item.type==='activity'&&item.kind!=='run'&&item.status==='error') rows.push({id:`error:${item.id}`,sessionId:session.id,agentId:session.agentId,workspaceId:'',title:session.title,detail:item.label,at:session.updatedAt,kind:'blocked'});
   }
   for(const handoff of session.handoffs??[]) if(['error','interrupted'].includes(handoff.status)) rows.push({id:`handoff:${handoff.id}:${handoff.updatedAt}`,sessionId:session.id,agentId:session.agentId,workspaceId:handoff.workspaceId,title:handoff.title,detail:handoff.error??'',at:handoff.updatedAt,kind:'blocked'});
   return rows;

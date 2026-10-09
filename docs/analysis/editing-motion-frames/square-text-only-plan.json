@@ -1,0 +1,136 @@
+{
+  "segments": [
+    {
+      "start": 0,
+      "end": 4.614
+    },
+    {
+      "start": 6.238,
+      "end": 9.986
+    },
+    {
+      "start": 12.011,
+      "end": 17.668
+    },
+    {
+      "start": 19.358,
+      "end": 23.373
+    }
+  ],
+  "animations": [
+    {
+      "id": "cta",
+      "kind": "cta",
+      "text": "Siga para mais dicas",
+      "start": 15.534,
+      "duration": 2.5
+    }
+  ],
+  "format": "original",
+  "normalizeAudio": false,
+  "theme": "dark",
+  "motion": {
+    "version": 1,
+    "intensity": "intense",
+    "analysis": {
+      "wordTiming": "words",
+      "voice": "unavailable",
+      "limitations": [
+        "voiceUnavailable"
+      ],
+      "measuredCandidates": 0,
+      "inferredCandidates": 7
+    },
+    "cues": [
+      {
+        "id": "m1",
+        "kind": "kineticText",
+        "sourceStart": 3.72,
+        "sourceEnd": 5.134,
+        "start": 3.72,
+        "end": 4.614,
+        "text": "mais rápido",
+        "focus": "rápido",
+        "layout": "camera-full",
+        "strength": 0.42,
+        "source": "inferred",
+        "timing": "words",
+        "reason": "Texto animado: texto (palavra-chave)",
+        "signals": [
+          {
+            "kind": "keyword",
+            "source": "inferred"
+          }
+        ]
+      },
+      {
+        "id": "m2",
+        "kind": "kineticText",
+        "sourceStart": 7.7,
+        "sourceEnd": 9.12,
+        "start": 6.076,
+        "end": 7.496,
+        "text": "nunca cortar",
+        "focus": "nunca",
+        "layout": "camera-full",
+        "strength": 0.42,
+        "source": "inferred",
+        "timing": "words",
+        "reason": "Texto animado: texto (palavra-chave)",
+        "signals": [
+          {
+            "kind": "keyword",
+            "source": "inferred"
+          }
+        ]
+      },
+      {
+        "id": "m3",
+        "kind": "keyPoint",
+        "sourceStart": 14.04,
+        "sourceEnd": 17.06,
+        "start": 10.391,
+        "end": 13.411,
+        "text": "economiza 90%",
+        "focus": "90%",
+        "layout": "split",
+        "strength": 0.49,
+        "source": "inferred",
+        "timing": "words",
+        "reason": "Cartão explicativo: texto (número)",
+        "signals": [
+          {
+            "kind": "number",
+            "source": "inferred"
+          }
+        ],
+        "sfx": {
+          "kind": "whoosh",
+          "gainDb": -19,
+          "ducked": true
+        }
+      },
+      {
+        "id": "m4",
+        "kind": "punchIn",
+        "sourceStart": 19.78,
+        "sourceEnd": 21.38,
+        "start": 14.441,
+        "end": 16.041,
+        "focus": "importante",
+        "layout": "camera-full",
+        "strength": 0.42,
+        "scale": 1.123,
+        "source": "inferred",
+        "timing": "words",
+        "reason": "Aproximação: texto (palavra-chave)",
+        "signals": [
+          {
+            "kind": "keyword",
+            "source": "inferred"
+          }
+        ]
+      }
+    ]
+  }
+}

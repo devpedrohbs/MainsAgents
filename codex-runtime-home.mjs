@@ -6,6 +6,16 @@ import { shareCodexSecretKey } from './codex-shared-key.mjs';
 
 const connectionFiles = ['config.toml', 'auth.json', '.credentials.json'];
 const connectionDirectories = ['secrets', 'mcp-oauth-locks', 'skills', 'rules', 'plugins'];
+/** A standalone CLI must not inherit another Codex app's execution transports. */
+export function standaloneCodexEnvironment(source = process.env) {
+  const env = {...source};
+  const fromDesktop = Boolean(source.CODEX_INTERNAL_ORIGINATOR_OVERRIDE || source.CODEX_APP_TOOLS_PIPE_PATH);
+  for (const key of Object.keys(env)) {
+    if (key.startsWith('CODEX_') && !['CODEX_HOME', 'CODEX_API_KEY'].includes(key)
+      && !(key === 'CODEX_CLI_PATH' && !fromDesktop)) delete env[key];
+  }
+  return env;
+}
 const fingerprint = file => existsSync(file) ? createHash('sha256').update(readFileSync(file)).digest('hex') : null;
 const sameFile = (left, right) => {
   if (!existsSync(left) || !existsSync(right)) return false;
@@ -82,7 +92,7 @@ export function prepareCodexRuntimeHome({ home, sharedHome = process.env.CODEX_H
   timer.unref();
   return {
     home, sharedHome, sync,
-    env: { ...process.env, CODEX_HOME: home, CODEX_SQLITE_HOME: home },
+    env: { ...standaloneCodexEnvironment(), CODEX_HOME: home, CODEX_SQLITE_HOME: home },
     // CLI overrides also prevent a shared sqlite_home config from leaking history.
     args: ['-c', `sqlite_home=${JSON.stringify(home)}`],
     close() { clearInterval(timer); sync(); },

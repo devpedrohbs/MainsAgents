@@ -68,6 +68,8 @@ export interface EditorialState {
   artifacts:EditorialArtifact[]; approvals:EditorialApproval[];
   assets?:EditorialAsset[];
   publications?:PublicationDelivery[];
+  /** Reference library (F05). Validated on the server by editorial-inspiration.mjs. */
+  inspiration?:import('./inspiration').InspirationLibraryState;
 }
 export type PublicationStatus='draft'|'in-review'|'approved'|'sending'|'scheduled'|'published'|'failed';
 export interface PublicationMedia {assetId:string;versionId:string;sha256:string}
@@ -92,7 +94,7 @@ export {parseProviderJson,validateResearch,validateScriptOptions,researchPrompt,
 export interface SpecialistResult {summary:string;outputFiles:import('./assetModel').LocalAssetInspection[];blockers:string[]}
 export interface FileDelivery {summary:string;files:Array<{assetId:string;versionId:string;sha256:string;path:string;caption:string}>}
 export interface VideoMetadata {duration:number;width:number;height:number;hasAudio:boolean;videoCodec:string;audioCodec?:string}
-export interface MediaJob {id:string;workspaceId:string;contentId:string;assetId:string;versionId:string;inputPath:string;start:number;duration:number;status:'queued'|'running'|'succeeded'|'failed'|'interrupted'|'canceled';progress:number;error?:string;imported?:boolean;createdAt:string;updatedAt:string;result?:{file:import('./assetModel').LocalAssetInspection;metadata:VideoMetadata;assetId:string}}
+export interface MediaJob {id:string;workspaceId:string;contentId:string;assetId:string;versionId:string;inputPath:string;start:number;duration:number;status:'queued'|'running'|'succeeded'|'failed'|'interrupted'|'canceled';progress:number;error?:string;imported?:boolean;mode?:'advanced';planHash?:string;plan?:{segments:Array<{start:number;end:number}>};createdAt:string;updatedAt:string;result?:{file:import('./assetModel').LocalAssetInspection;metadata:VideoMetadata;assetId:string}}
 export interface WorkflowJob {
   id:string;workspaceId:string;targetId:string;topicId:string;contentId?:string;kind:WorkflowStage;
   agent:{id:string;name:string};sourceAgent?:{id:string;name:string};
@@ -101,4 +103,35 @@ export interface WorkflowJob {
   files:Array<{assetId:string;versionId:string;path:string;sha256:string;name:string}>;
   result?:ResearchProposal[]|ScriptOptions|SpecialistResult;history:Array<{attempt:number;output:string;error?:string}>;
   events?:Array<{type:string;detail:string;at:string}>;createdAt:string;updatedAt:string;
+}
+
+export interface EditRange {start:number;end:number}
+/** POST /api/content/media/review — read-only comparison of the raw recording and an automatic edit. */
+/** Editable motion plan of an automatic edit (editorial-motion-plan.mjs). Anchors are on the recording; start/end on the edited video. */
+export interface MotionCuePlan {id:string;kind:'punchIn'|'kineticText'|'keyPoint'|'explainer';explainer?:{visual:{type:string}&Record<string,unknown>;origin:'speech'|'user';quote?:string};sourceStart:number;sourceEnd:number;start:number;end:number;text?:string;focus?:string;layout:'camera-full'|'split'|'motion-focus';strength:number;scale?:number;source:'measured'|'inferred'|'mixed'|'user';timing:'words'|'estimated';reason:string;signals:Array<{kind:string;source:'measured'|'inferred'|'user';value?:number}>;sfx?:{kind:'whoosh'|'pop'|'tick';gainDb:number;ducked:boolean}}
+export interface MotionPlan {version:1;intensity:'off'|'subtle'|'balanced'|'intense';analysis:{wordTiming:'words'|'estimated'|'none';voice:'measured'|'unavailable';limitations:string[];measuredCandidates:number;inferredCandidates:number};cues:MotionCuePlan[];reframe?:MotionReframe}
+/** Framing focus (editorial-reframe.mjs): points anchored on the RECORDING timeline, x/y normalized 0..1. */
+export interface MotionReframe {mode:'fixed'|'manual'|'face';source:'default'|'user'|'detected';points:Array<{t:number;x:number;y:number;w?:number;h?:number}>}
+export interface EditReviewData {
+  revision:number;job:{id:string;planHash:string;createdAt:string};sourceCurrent:boolean;
+  source:{contentId:string;assetId:string;versionId:string;sha256:string;duration:number};
+  output:{assetId:string;versionId:string;duration:number}|null;subtitles:{assetId:string;name:string}|null;
+  plan:{segments:EditRange[];animations:Array<{id:string;kind:'title'|'lowerThird'|'cta';text:string;subtitle?:string;start:number;duration:number}>;format:'original'|'portrait';normalizeAudio:boolean;theme:'dark'|'light';motion?:MotionPlan;audio?:AudioTreatment};
+  kept:Array<EditRange&{outputStart:number}>;cuts:Array<EditRange&{id:string;duration:number;outputAt:number;basis:'audio'|'transcript'|'none';soundSeconds:number|null;speechSeconds:number;speech:string[]}>;silenceOptions:{thresholdDb:number;minDuration:number;padding:number}|null;silences:EditRange[]|null;
+  transcript:{origin:string;language?:string;timing:'words'|'sentences';segments:Array<EditRange&{text:string}>;words?:Array<EditRange&{text:string}>}|null;possibleRetakes:Array<EditRange&{id:string;label:string;reason:string}>;
+  /** Pause noise floor/levels measured locally (editorial-audio-cleanup); null until measured. */
+  audio?:AudioAssessment|null;
+  /** Speech suggestions (fillers, repetitions, retakes, self-corrections); never pre-selected. */
+  speechCandidates?:Array<EditRange&{id:string;kind:'filler'|'repetition'|'retake'|'selfCorrection';label:string;reason:string;confidence:'high'|'medium'|'low';evidence?:{text?:string;repeatedText?:string;timing?:string;boundary?:string;boundaryNote?:string}}>;
+}
+/** Opt-in voice treatment of an edit plan (editorial-smart-edit `plan.audio`). */
+export interface AudioTreatment {leveling:boolean;noiseReduction:false|{noiseFloorDb:number};smoothCuts:boolean}
+export interface AudioAssessment {stream:{channels:number;channelLayout:string|null;sampleRate:number;codec:string|null}|null;noiseFloorDb:number|null;speechLevelDb:number|null;measuredSeconds?:number;noiseReductionAvailable:boolean;reason:string;limitations:string[];measurement:{noiseFloorDb:number}|null}
+/** POST /api/content/media/preview — proxy of the reviewed plan for the Remotion Player (same cut, same processed audio, renderer props). */
+export interface EditPreviewData {
+  revision:number;planHash:string;outputDuration:number;
+  preview:{id:string;size:number;width:number;height:number;audio:'processed'|'processed-sfx'|'none';sfxSkipped:boolean};
+  composition:{width:number;height:number;fps:number;durationSeconds:number;durationInFrames:number};
+  props:Record<string,unknown>&{width:number;height:number;fps:number;durationSeconds:number;motion?:{cues:Array<{id:string;kind:string;startFrame:number;endFrame:number;text?:string}>;sfx:Array<{kind:string;at:number;gainDb:number}>}};
+  overlays:string[];
 }

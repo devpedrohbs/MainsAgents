@@ -1,0 +1,28 @@
+/* Reading mode is always dark with a fixed high-contrast pair (#f5f5f7 on #000 ≈ 19:1), independent of the app theme. */
+.teleprompter{position:fixed;inset:0;z-index:2000;display:flex;flex-direction:column;background:#000;color:#f5f5f7;color-scheme:dark;font-family:var(--font-body,system-ui,sans-serif)}
+.teleprompter-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;padding:10px 16px;border-bottom:1px solid #3a3a3c;background:#1c1c1e}
+.teleprompter button{min-height:44px;min-width:44px;padding:0 14px;border:1px solid #636366;border-radius:8px;background:#2c2c2e;color:#f5f5f7;font:600 14px/1 var(--font-body,system-ui,sans-serif);cursor:pointer}
+.teleprompter button:hover:not(:disabled){background:#3a3a3c}
+.teleprompter button:disabled{opacity:.55;cursor:not-allowed}
+.teleprompter button:focus-visible,.teleprompter-body:focus-visible,.teleprompter-mirror:focus-within{outline:3px solid #64b5ff;outline-offset:2px}
+.teleprompter-primary{background:#f5f5f7!important;color:#000!important;border-color:#f5f5f7!important}
+.teleprompter-close{margin-left:auto}
+.teleprompter-group{display:inline-flex;align-items:center;gap:6px}
+.teleprompter-group output{min-width:64px;text-align:center;font:600 14px/1 var(--font-body,system-ui,sans-serif);font-variant-numeric:tabular-nums}
+.teleprompter-mirror{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 6px;font-size:14px;border-radius:8px}
+.teleprompter-mirror input{width:20px;height:20px}
+.teleprompter-status,.teleprompter-note{margin:0;padding:8px 16px;font-size:14px;line-height:1.5;color:#c7c7cc}
+.teleprompter-scene{display:grid;gap:8px;padding:8px 16px;border-bottom:1px solid #3a3a3c;max-height:34vh;overflow-y:auto}
+.teleprompter-scene-current{display:flex;align-items:center;gap:10px}
+.teleprompter-scene-current p{margin:0;flex:1;font-size:18px;line-height:1.4;overflow-wrap:anywhere}
+.teleprompter-scene-current p span{color:#c7c7cc;font-size:14px;margin-right:8px}
+.teleprompter-scene-list{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px}
+.teleprompter-scene-list button{font-weight:500;text-align:left}
+.teleprompter button[aria-pressed=true]{background:#f5f5f7;color:#000;border-color:#f5f5f7}
+.teleprompter-scene-source{margin:0;font-size:13px;line-height:1.5;color:#c7c7cc}
+.teleprompter-body{flex:1;min-height:0;overflow-y:auto;padding:24px clamp(16px,8vw,160px);scroll-behavior:auto}
+.teleprompter-body[data-mirror=true] .teleprompter-text{transform:scaleX(-1)}
+.teleprompter-text{max-width:28em;margin:0 auto;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.5;font-weight:600}
+.teleprompter-end{height:60vh}
+.teleprompter-note{border-top:1px solid #3a3a3c}
+@media (max-width:640px){.teleprompter-bar{padding:8px 12px}.teleprompter-close{margin-left:0}}

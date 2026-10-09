@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { resolve, join, extname } from 'node:path';
 import assert from 'node:assert/strict';
 import {pathToFileURL} from 'node:url';
+import {captureReadyPng} from './ui-capture-ready.mjs';
 const root = resolve(import.meta.dirname, '..'), directory = mkdtempSync(join(tmpdir(), 'mains-native-ui-'));
 const runtimeRoot=process.env.MAINSAGENTS_TEST_ASAR?resolve(process.env.MAINSAGENTS_TEST_ASAR):root;
 const targetVersion=JSON.parse(readFileSync(resolve(root,'package.json'),'utf8')).version,previousVersion=targetVersion.replace(/\d+$/,value=>String(Math.max(0,Number(value)-1)));
@@ -89,7 +90,7 @@ app.whenReady().then(async () => {
     assert.deepEqual(store.read('account', 'tasks'), original.tasks);
     assert.deepEqual(store.read('account', 'canvas-workspaces'), canvas);
     assert.equal(await window.webContents.executeJavaScript("!!document.querySelector('.agent-nav[title=\"Editor de Vídeo\"]') && !!document.querySelector('.agent-nav[title=\"Linkedin Agent\"]')"), true);
-    writeFileSync(resolve(root, '.mainsagents-workspaces/native-persistence-ui.png'), (await window.webContents.capturePage()).toPNG());
+    writeFileSync(resolve(root, '.mainsagents-workspaces/native-persistence-ui.png'), await captureReadyPng(window.webContents));
     // Explicit profile changes remain isolated, and reopening the account keeps data.
     window.destroy(); store.selectProfile('default'); await open(0);
     assert.equal(store.read('default', 'agents').length, 0);

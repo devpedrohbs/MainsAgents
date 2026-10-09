@@ -1,0 +1,9 @@
+.provider-choice-fields{display:grid;gap:14px;padding:20px;font-size:13px;min-width:0}
+.provider-choice-fields p{margin:0;line-height:1.5;color:var(--muted);overflow-wrap:anywhere}
+.provider-choice-options{display:flex;flex-wrap:wrap;gap:8px}
+.provider-choice-options button[aria-pressed=true]{border-color:var(--accent);color:var(--accent)}
+.provider-choice-model label{display:grid;gap:6px;font-size:13px}
+.provider-choice-model p{font-size:12px;margin-top:6px;line-height:1.45;color:var(--muted);overflow-wrap:anywhere}
+.provider-choice-trigger{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px 8px;margin-bottom:8px;min-width:0;font-size:12px}
+.provider-choice-trigger button{min-height:30px;font-size:12px;max-width:100%;overflow-wrap:anywhere}
+.provider-choice-trigger span{color:var(--muted);font-size:11px}

@@ -84,3 +84,43 @@ test('edit previews reject stale content, expired approvals, unavailable account
 test('an expired scheduled edit fails before writing, and native approval rollback keeps its token usable',async()=>{
  const f=fixture();try{f.prepare();await f.execute();const input=editInput(f);input.draft.plannedAt=new Date(Date.now()+130000).toISOString();const {preview}=f.service.prepareChange('owner',input);f.advance(20000);await assert.rejects(f.service.change('owner',{...f.input(),changeId:preview.id,authorize:true}),/too close/);assert.equal(f.snap().state.publications[0].version,1);assert.equal(f.db.prepare('SELECT used FROM publication_changes WHERE id=?').get(preview.id).used,0);}finally{await f.close()}
 });
+
+import {createPublicationStatusRefresh,refreshCandidates} from '../publication-status-refresh.mjs';
+test('B10 automatic status refresh is read-only: keeps scheduled on network failure, writes only trusted published/failed receipts, never writes externally',async()=>{
+ const f=fixture();let refresher,active='owner';try{
+  f.prepare('schedule');await f.execute();let d=f.snap().state.publications[0];assert.deepEqual([d.status,d.operation.phase],['scheduled','confirmed']);
+  refresher=createPublicationStatusRefresh(f.db,{publishing:f.service,getCurrentProfile:()=>active,tickMs:3_600_000});
+  assert.deepEqual(refreshCandidates(f.snap().state.publications),[d.id]);
+  const writes=()=>[f.creates,f.cancels];const baseline=writes(),revision=f.snap().revision;
+  f.failRead();let s=await refresher.refresh('owner',{reason:'manual'});
+  assert.deepEqual(s.status.results.map(r=>[r.state,r.status]),[['unknown','scheduled']]);d=f.snap().state.publications[0];
+  assert.deepEqual([d.status,d.operation.phase,d.operation.error,f.snap().revision],['scheduled','confirmed',undefined,revision],'a failed read changes nothing (no false failure, no uncertain)');
+  f.online();s=await refresher.refresh('owner',{reason:'manual'});assert.equal(s.status.results[0].state,'unchanged');
+  const reads=f.reads;s=await refresher.refresh('owner',{reason:'open'});assert.equal(s.cached,true);assert.equal(f.reads,reads,'opening the screen again within a minute uses the cache');
+  // Externally moved back to draft: reported for attention, never written.
+  f.external={...f.external,status:'draft',posts:[{...f.external.posts[0],status:'draft'}]};s=await refresher.refresh('owner',{reason:'manual'});
+  assert.deepEqual([s.status.results[0].state,f.snap().state.publications[0].status,f.snap().revision],['attention','scheduled',revision]);
+  f.external={...f.external,status:'published',posts:[{...f.external.posts[0],status:'published',postedId:'urn:li:share:1'}]};
+  s=await refresher.refresh('owner',{reason:'manual'});d=f.snap().state.publications[0];
+  assert.deepEqual([s.status.results[0].state,d.status,d.receipt.status,d.receipt.platformPostId],['updated','published','published','urn:li:share:1']);
+  assert(s.status.notices.some(n=>n.state==='updated'&&n.status==='published'));assert.deepEqual(writes(),baseline,'no create/update/cancel from polling');
+  s=await refresher.refresh('owner',{reason:'manual'});assert.deepEqual(s.status.results,[],'published deliveries are no longer polled');
+  assert.throws(()=>refresher.configure('owner',{auto:true,intervalMinutes:7}),/intervalo/);assert.deepEqual(refresher.configure('owner',{auto:false,intervalMinutes:5}).settings,{auto:false,intervalMinutes:5});
+  assert.deepEqual(refresher.dismiss('owner').status.notices,[]);
+  f.profile('other');active='other';await assert.rejects(refresher.refresh('owner',{reason:'manual'}),/perfil/);
+ }finally{await refresher?.close();await f.close()}
+});
+
+test('B10 auto refresh runs only for the active profile while alive, respects the toggle and stops on close',async()=>{
+ const f=fixture();let active='owner',refresher;try{
+  f.prepare('schedule');await f.execute();
+  refresher=createPublicationStatusRefresh(f.db,{publishing:f.service,getCurrentProfile:()=>active,tickMs:20});
+  refresher.configure('owner',{auto:false,intervalMinutes:5});await new Promise(resolve=>setTimeout(resolve,120));assert.equal(refresher.snapshot('owner').status.lastRunAt,null,'auto off: no background read');
+  refresher.configure('owner',{auto:true,intervalMinutes:5});
+  const end=Date.now()+3000;while(refresher.snapshot('owner').status.lastReason!=='auto'&&Date.now()<end)await new Promise(resolve=>setTimeout(resolve,20));
+  assert.equal(refresher.snapshot('owner').status.lastReason,'auto');const reads=f.reads;
+  await new Promise(resolve=>setTimeout(resolve,150));assert.equal(f.reads,reads,'the interval bounds background reads');
+  active='other';const before=f.reads;await refresher.refresh('owner',{reason:'manual'}).catch(()=>{});assert.equal(f.reads,before,'another active profile never reads');
+  await refresher.close();active='owner';await assert.rejects(async()=>refresher.refresh('owner',{reason:'manual'}),/fechando/);
+ }finally{await refresher?.close();await f.close()}
+});

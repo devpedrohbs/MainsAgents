@@ -41,20 +41,30 @@ export interface ChatImageAttachment {
   dataUrl?:string;
 }
 
+export type ChatRunOutcome = 'completed' | 'interrupted' | 'error';
+
 export interface ChatActivityItem {
   id: string;
   type: 'activity';
   label: string;
   status: 'running' | 'done' | 'error';
+  /** 'run' = the single status line of one agent execution; tool steps stay out of the main feed. */
+  kind?: 'run';
+  startedAt?: string;
+  endedAt?: string;
+  outcome?: ChatRunOutcome;
 }
 
 export type ChatItem = ChatMessageItem | ChatActivityItem;
 
 export interface AgentSession {
   id: string;
-  responseTiming?: {id:string;startedAt:string;endedAt?:string;outcome?:'completed'|'interrupted'|'error'};
+  responseTiming?: {id:string;startedAt:string;endedAt?:string;outcome?:ChatRunOutcome};
   contentId?:string;
-  productionContext?:{id:string;stage:string;notionUrl?:string;recentResults:string[];deliveries?:Array<{platform:string;text:string;version:number;status:string}>};
+  /** Bounded, path-free snapshot of this session's own content/production (reference data for the chat agent). */
+  productionContext?:{id:string;stage:string;stageLabel?:string;title?:string;notionUrl?:string;entry?:{origin:'notion'|'text';video:string;context?:string;cardUrl?:string;truncated?:{shownChars:number;totalChars:number}};script?:{status:string;hook?:string;cta?:string;text?:string;truncated?:{shownChars:number;totalChars:number}};cardNotes?:string;cardNotesTruncated?:{shownChars:number;totalChars:number};materials?:{editedVideo:string;platforms?:string[];editPlan?:string};lastDecision?:{action:string;at:string;detail?:string};error?:string;recentResults:string[];deliveries?:Array<{platform:string;text:string;version:number;status:string}>};
+  /** Content title saved when a content session is created; used before any production exists. */
+  contentTitle?:string;
   topicId?:string;
   agentId: AgentId;
   providerId?: ProviderId;

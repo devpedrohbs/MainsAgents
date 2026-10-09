@@ -6,6 +6,7 @@ import {createServer} from 'node:http';
 import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
 import {resolve,extname} from 'node:path';
 import assert from 'node:assert/strict';
+import {captureReadyPng} from './ui-capture-ready.mjs';
 const root=resolve(import.meta.dirname,'..'),out=resolve(root,'.mainsagents-workspaces/handoff-ui-test');mkdirSync(out,{recursive:true});app.setPath('userData',resolve(out,'profile'));
 const now=new Date().toISOString(),workspaceId='my-workspace';
 const base={workspaceId,role:'Specialist',description:'Test specialist',instructions:'Follow the user request.',tools:['files'],status:'idle',createdAt:now,updatedAt:now};
@@ -43,7 +44,7 @@ const window=new BrowserWindow({show:false,width:1440,height:940,webPreferences:
 const errors=[];window.webContents.on('console-message',(event)=>{console.log('renderer:',event.message);if(/Uncaught|Maximum update depth|Cannot update a component/.test(event.message))errors.push(event.message);});
 const evaluate=code=>window.webContents.executeJavaScript(code);
 async function until(check,timeout=12000){const end=Date.now()+timeout;while(Date.now()<end){if(await check())return;await new Promise(resolve=>setTimeout(resolve,60));}throw new Error('UI assertion timed out');}
-async function screenshot(name){try{writeFileSync(resolve(out,name),(await window.webContents.capturePage()).toPNG());}catch{console.log('Screenshot unavailable:',name);}}
+async function screenshot(name){try{writeFileSync(resolve(out,name),await captureReadyPng(window.webContents));}catch{console.log('Screenshot unavailable:',name);}}
 try{
  await window.loadURL(`http://127.0.0.1:${server.address().port}/app.html#home`);
  console.log('Loaded test UI');

@@ -1,6 +1,6 @@
 import {parseProviderJson} from './editorial-protocol.mjs';
 import {localTimeToInstant,zonedDateTime} from './publication-time.mjs';
-export const productionStages=['writing','notion','recording','planning-edit','editing','video-review','platforms','preparing-package','generating-cover','package-review','schedule','scheduling','complete','paused','blocked','canceled'];
+export const productionStages=['writing','script-review','notion','recording','planning-edit','editing','video-review','platforms','preparing-package','generating-cover','covers-review','package-review','schedule','scheduling','complete','paused','blocked','canceled'];
 export function validateEditPlan(raw,metadata,preferences={}){
  const p=typeof raw==='string'?parseProviderJson(raw):raw;
  if(!p||!Number.isFinite(p.start)||p.start<0||!Number.isFinite(p.duration)||p.duration<.1||p.start+p.duration>metadata.duration+.05||!['original','portrait'].includes(p.format)||typeof p.normalizeAudio!=='boolean'||!Number.isFinite(p.fadeSeconds)||p.fadeSeconds<0||p.fadeSeconds>.8||p.fadeSeconds*2>p.duration)throw Error('O especialista não devolveu um plano de edição válido.');
@@ -29,4 +29,25 @@ export function productionChatIntent(text){
  if(/^(agende|agendar|schedule)\s+/.test(s))return {type:'schedule',text};
  if(/^(continuar|retomar|resume) (o |este |esse |this )?(fluxo|producao|production)[.!]?$/.test(s))return {type:'resume'};
  return null;
+}
+/** Automatic edit direction from the video editor agent. Detection, cuts and rendering stay local and validated. */
+export function validateSmartEditDirection(raw,{animate=false}={}){
+ const p=typeof raw==='string'?parseProviderJson(raw):raw;
+ const text=(value,max)=>value===undefined||value===null||value===''?undefined:typeof value==='string'&&value.trim()&&[...value.trim()].length<=max?value.trim():null;
+ const s=p?.silence??{},a=p?.animations??{};
+ if(!p||typeof p.removeSilences!=='boolean'||typeof p.normalizeAudio!=='boolean'||typeof s!=='object'||typeof a!=='object'||![undefined,'dark','light'].includes(p.theme))throw Error('O especialista não devolveu uma direção de edição automática válida.');
+ const silence={thresholdDb:s.thresholdDb??-35,minDuration:s.minDuration??0.6,padding:s.padding??0.2};
+ if(!Number.isFinite(silence.thresholdDb)||silence.thresholdDb<-60||silence.thresholdDb>-20||!Number.isFinite(silence.minDuration)||silence.minDuration<0.3||silence.minDuration>5||!Number.isFinite(silence.padding)||silence.padding<0.05||silence.padding>0.6)throw Error('Parâmetros de silêncio fora dos limites seguros.');
+ const title=text(a.title,80),cta=text(a.cta,80),name=text(a.lowerThird?.name,60),role=text(a.lowerThird?.role,80);
+ if([title,cta,name,role].includes(null))throw Error('Textos de animação devem ser curtos e simples.');
+ const highlights=(Array.isArray(p.highlights)?p.highlights:[]).map(item=>text(item,60)).filter(item=>item&&!/[<>{}`\\]|:\/\/|javascript:/i.test(item)).slice(0,6);
+ return {silence,removeSilences:p.removeSilences,normalizeAudio:p.normalizeAudio,theme:p.theme??'dark',highlights,animations:animate?{...(title?{title}:{}),...(name?{lowerThird:{name,...(role?{role}:{})}}:{}),...(cta?{cta}:{})}:{},summary:String(p.summary??'Edição automática').slice(0,2000)};
+}
+/** Default overlay windows on the edited timeline; windows that do not fit short videos are dropped. */
+export function smartEditAnimations(direction,outputDuration){
+ const list=[],a=direction.animations;
+ if(a.title&&outputDuration>=3.8)list.push({id:'title',kind:'title',text:a.title,start:0.3,duration:3});
+ if(a.lowerThird&&outputDuration>=6)list.push({id:'lower-third',kind:'lowerThird',text:a.lowerThird.name,...(a.lowerThird.role?{subtitle:a.lowerThird.role}:{}),start:1.2,duration:4});
+ if(a.cta&&outputDuration>=(list.length?7:3.5))list.push({id:'cta',kind:'cta',text:a.cta,start:Math.max(0,outputDuration-3),duration:3});
+ return list;
 }

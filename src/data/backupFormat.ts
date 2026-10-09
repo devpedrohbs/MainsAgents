@@ -1,5 +1,6 @@
 import {validateStudioDrafts} from '../features/content/studioDraftModel.ts';
 import {validateEditorialAssets} from '../../editorial-assets-validation.mjs';
+import {validateInspirationState} from '../../editorial-inspiration.mjs';
 import {validatePublications} from '../../publication-model.mjs';
 import {validateProductionFlows,mergeProductionFlows} from '../features/flows/flowModel.ts';
 export const dataKeys = ['workspaces', 'current-workspace', 'agents', 'sessions', 'active-sessions', 'tasks', 'canvas-workspaces', 'production-flows', 'language', 'focus-mode', 'text-scale', 'reduced-motion', 'welcome-dismissed', 'sidebar-width', 'inspector-width', 'default-codex-model', 'chat-presentation', 'chat-drafts', 'studio-drafts', 'chat-inbox', 'studio-view'] as const;
@@ -41,13 +42,14 @@ export function parseBackup(text:string):BackupFile {
   }
   if('chat-inbox' in parsed.data){const inbox=parsed.data['chat-inbox'];if(!isObject(inbox)||typeof inbox.muted!=='boolean'||typeof inbox.initialized!=='boolean'||!isObject(inbox.seen)||Object.values(inbox.seen).some(ids=>!Array.isArray(ids)||ids.some(id=>typeof id!=='string'))||('notified' in inbox&&(!Array.isArray(inbox.notified)||inbox.notified.some(id=>typeof id!=='string'))))throw new Error('Invalid chat inbox in backup.');}
   if('language' in parsed.data&&!['en-US','pt-BR'].includes(String(parsed.data.language)))throw new Error('Invalid language in backup.');
-  if('studio-view' in parsed.data&&!['studio','calendar'].includes(String(parsed.data['studio-view'])))throw new Error('Invalid Studio view in backup.');
+  if('studio-view' in parsed.data&&!['studio','calendar','references'].includes(String(parsed.data['studio-view'])))throw new Error('Invalid Studio view in backup.');
   if('production-flows' in parsed.data&&!validateProductionFlows(parsed.data['production-flows']))throw new Error('Invalid production flows in backup.');
   if('editorial' in parsed){
     const editorial=parsed.editorial;
     if(!isObject(editorial)||editorial.schemaVersion!==1||['topics','contents','runs','artifacts','approvals'].some((key)=>!Array.isArray(editorial[key])||(editorial[key] as unknown[]).some((item)=>!isObject(item)||typeof item.id!=='string'||!item.id)))throw new Error('Invalid editorial data in backup.');
     if(!validateEditorialAssets(editorial))throw new Error('Invalid content file library in backup.');
     if(!validatePublications(editorial))throw new Error('Invalid publication data in backup.');
+    if(!validateInspirationState(editorial))throw new Error('Invalid reference library in backup.');
   }
   if('execution' in parsed){const execution=parsed.execution;if(!isObject(execution)||['jobs','events','connections'].some(key=>!Array.isArray(execution[key])))throw new Error('Invalid execution data in backup.');}
   if(isObject(parsed.execution)){

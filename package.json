@@ -4,13 +4,13 @@
   "author": "devpedrohbs",
   "license": "MIT",
   "private": true,
-  "version": "0.3.54",
+  "version": "0.3.60",
   "type": "module",
   "scripts": {
     "dev": "node dev.mjs",
     "dev:web": "vite --open app.html",
     "codex:bridge": "node codex-bridge.mjs",
-    "build": "tsc -b && vite build && node scripts/build-preview.mjs",
+    "build": "tsc -b && vite build && node scripts/build-preview.mjs && node scripts/build-remotion-video.mjs && node scripts/prepare-whisper-tools.mjs",
     "desktop": "npm run build && electron .",
     "desktop:dist": "npm run build && electron-builder --win nsis --publish never && node scripts/check-desktop-release.mjs",
     "preview": "vite preview --open app.html",
@@ -20,9 +20,13 @@
   },
   "main": "desktop-main.mjs",
   "dependencies": {
+    "@remotion/bundler": "4.0.534",
+    "@remotion/player": "4.0.534",
+    "@remotion/renderer": "4.0.534",
     "@xyflow/react": "12.11.6",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "remotion": "4.0.534"
   },
   "devDependencies": {
     "@types/react": "19.3.0",
@@ -51,6 +55,7 @@
       "desktop-diagnostics.mjs",
       "desktop-preload.cjs",
       "codex-bridge.mjs",
+      "agent-file-access.mjs",
       "chat-image-artifacts.mjs",
       "codex-runtime-home.mjs",
       "codex-shared-key.mjs",
@@ -58,6 +63,7 @@
       "agent-delegation-runtime.mjs",
       "canvas-runtime-bridge.mjs",
       "claude-code-bridge.mjs",
+      "claude-usage.mjs",
       "claude-permission-mcp.mjs",
       "external-providers.mjs",
       "cloud-server.mjs",
@@ -91,6 +97,14 @@
       "editorial-publication-calendar.mjs",
       "publication-model.mjs",
       "editorial-media.mjs",
+      "editorial-smart-edit.mjs",
+      "editorial-animate.mjs",
+      "editorial-remotion.mjs",
+      "editorial-motion-plan.mjs",
+      "editorial-speech-edit.mjs",
+      "editorial-audio-cleanup.mjs",
+      "editorial-reframe.mjs",
+      "editorial-transcribe.mjs",
       "runtime-tool-policy.mjs",
       "notion-automation-policy.mjs",
       "editorial-file-deliveries.mjs",
@@ -101,14 +115,35 @@
       "production-protocol.mjs",
       "production-backup.mjs",
       "production-budget.mjs",
+      "production-preflight.mjs",
+      "production-import.mjs",
+      "production-runtime.mjs",
+      "production-script.mjs",
+      "production-covers.mjs",
+      "editorial-thumbnails.mjs",
+      "editorial-captions.mjs",
+      "production-captions.mjs",
+      "production-caption-words.mjs",
+      "publication-status-refresh.mjs",
+      "editor-inspiration-analysis.mjs",
+      "editorial-inspiration.mjs",
       "publication-time.mjs"
     ],
     "asarUnpack": [
-      "claude-permission-mcp.mjs"
+      "claude-permission-mcp.mjs",
+      "dist/remotion/**",
+      "node_modules/@remotion/compositor-*/**",
+      "node_modules/@remotion/renderer/**"
     ],
     "directories": {
       "output": "release"
     },
+    "extraResources": [
+      {
+        "from": "build-resources/whispercpp",
+        "to": "tools/whispercpp"
+      }
+    ],
     "win": {
       "icon": "public/images/brand/mainsagents-icon-black.ico",
       "target": "nsis",

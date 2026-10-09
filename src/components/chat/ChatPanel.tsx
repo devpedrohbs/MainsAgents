@@ -30,9 +30,14 @@ import {RuntimeActionApprovals} from './RuntimeActionApprovals';
 import {NativeDelegationWork} from './NativeDelegationWork';
 import {markChatSessionSeen} from '../../features/chat/chatInboxState';
 import {FileDeliveryReview} from './FileDeliveryReview';
-import {ResponseTimer} from './ResponseTimer';
+import {RunStatusLine} from './ResponseTimer';
+import {chatFeed} from '../../features/chat/responseTiming';
 import {ComparisonLauncher} from './ComparisonLauncher';
+import {ProviderChoice, choiceStatus} from './ProviderChoice';
 import {MessageMarkdown} from './MessageMarkdown';
+import {ContentSessionCard} from './ContentSessionCard';
+import {RecordedEntry} from '../production/RecordedEntry';
+import {contentBinding,contentSessionSummary,linkedRun,sessionListLabel} from '../../features/chat/contentSessions';
 
 type ChatTab = 'chat' | 'sessions' | 'context';
 const stateLabels: Record<ChatRunState, string> = {
@@ -77,7 +82,7 @@ export function ChatPanel({
   const { getWorkspaceById } = useWorkspaces();
   const { agents } = useAgents();
   const { locale, t, reducedMotion } = useLanguage();
-  const {state:editorialState}=useContentWorkflow();
+  const editorial=useContentWorkflow(),editorialState=editorial.state;
   const production=useProduction();
   const [productionOpen,setProductionOpen]=useState(false),[productionText,setProductionText]=useState<string>();
   const [reviewRequest,setReviewRequest]=useState<{artifacts:EditorialArtifact[];selectedId:string;decision:'approve'|'rejected'|'revision-requested';notes:string;confirmedTarget:boolean}|null>(null);
@@ -90,6 +95,8 @@ export function ChatPanel({
   const [composerOptionsOpen, setComposerOptionsOpen] = useState(false);
   const [handoffBrief, setHandoffBrief] = useState<{text:string;sessionId:string}|null>(null);
   const [comparisonBrief,setComparisonBrief]=useState<string|null>(null);
+  const [providerChoiceOpen,setProviderChoiceOpen]=useState(false);
+  const [sameAgentModels,setSameAgentModels]=useState<{codexModelId?:string;claudeModelId?:string}|null>(null);
   const composerOptionsRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     setComposerOptionsOpen(false);
@@ -138,7 +145,22 @@ export function ChatPanel({
   const agentSessions = getAgentSessions(agent.id);
   const activeSession = sessionId?sessions.find(item=>item.id===sessionId&&item.agentId===agent.id):getActiveSession(agent.id);
   const pairedComparison=activeSession?.comparison,comparisonAvailable=comparisons.some(pair=>pair.id===pairedComparison?.id);
-  const linkedProduction=production.runs.find(run=>run.workspaceId===agent.workspaceId&&(run.sourceSession.id===activeSession?.id||run.editorSession.id===activeSession?.id||run.publisherSession?.id===activeSession?.id));
+  const comparisonModelLocked=pairedComparison?.mode==='same-agent';
+  // A content session only ever shows and commands its own content's production (validated by workspace + contentId + sessionId).
+  const binding=contentBinding(activeSession,{workspaceId:agent.workspaceId,contents:editorialState.contents,runs:production.runs});
+  const linkedProduction=binding.kind==='invalid'?undefined:binding.kind==='content'?binding.run:linkedRun(production.runs,activeSession,agent.workspaceId);
+  const contentSummary=contentSessionSummary(binding,editorialState.assets??[],locale==='pt-BR');
+  const [recordedOpen,setRecordedOpen]=useState(false),[newContentOpen,setNewContentOpen]=useState(false),[newContentTitle,setNewContentTitle]=useState(''),[creatingContent,setCreatingContent]=useState(false);
+  useEffect(()=>{setRecordedOpen(false);},[activeSession?.id]);
+  const startContentSession=async()=>{
+    const title=newContentTitle.trim();if(!title||creatingContent)return;setCreatingContent(true);
+    try{
+      // Own content + own session: never adopts a filled generic chat, the "new" draft or another content's remote thread.
+      const content=await editorial.createSessionContent(agent.workspaceId,title);
+      createSession(agent.id,title,agent.providerId??'codex',agent.modelId,{contentId:content.id,topicId:content.topicId,contentTitle:content.title});
+      setNewContentOpen(false);setTab('chat');onToast(locale==='pt-BR'?`Conteúdo “${title}” criado em ${agent.name}`:`Content “${title}” created in ${agent.name}`);
+    }catch(error){onToast(error instanceof Error?error.message:String(error));}finally{setCreatingContent(false);}
+  };
   useEffect(()=>{if(activeSession&&tab==='chat'&&document.visibilityState==='visible')markChatSessionSeen(activeSession);},[activeSession,tab]);
   const linkedHandoffs=handoffs.filter(item=>item.sourceSessionId===activeSession?.id||item.targetSessionId===activeSession?.id);
   const lastMessage = activeSession?.messages[activeSession.messages.length - 1];
@@ -146,7 +168,7 @@ export function ChatPanel({
   const lastRunError = activeSession?.messages
     .slice()
     .reverse()
-    .find((item) => item.type === 'activity' && item.status === 'error');
+    .find((item) => item.type === 'activity' && item.kind !== 'run' && item.status === 'error');
   const draft = useChatDraft(agent.id, activeSession?.id);
   const message = draft.text;
   const selectedSkill = draft.skill;
@@ -278,7 +300,7 @@ export function ChatPanel({
     onToast(locale === 'pt-BR' ? `Nova conversa com ${agent.name}` : `New conversation with ${agent.name}`);
   };
 
-  const changeModel = (modelId: string) => setSessionModel(ensureSession().id, modelId || undefined);
+  const changeModel = (modelId: string) => {if(!comparisonModelLocked)setSessionModel(ensureSession().id, modelId || undefined);};
   const changeEffort = (effort: string) =>
     setSessionReasoningEffort(ensureSession().id, effort as ReasoningEffort);
   const chooseSkill = (skill: string) => {
@@ -441,7 +463,6 @@ export function ChatPanel({
         </nav>
       </div>
 
-      {tab === 'chat' && activeSession && <ResponseTimer timing={activeSession.responseTiming}/>}
       {tab === 'chat' && activeSession && <div className="chat-approval-dock"><RuntimeActionApprovals sessionId={activeSession.id}/></div>}
       {tab === 'chat' && (
         <div
@@ -460,7 +481,8 @@ export function ChatPanel({
               {!sessionId&&<button onClick={() => setTab('sessions')}>{t('All sessions')}</button>}
             </div>
           )}
-          <div className="production-summary"><span>{linkedProduction?productionStageLabel(linkedProduction.stage,locale==='pt-BR'):(locale==='pt-BR'?'Ideia → vídeo → publicação':'Idea → video → publication')}</span><button className="text-link" onClick={()=>{setProductionText(undefined);setProductionOpen(true)}}>{locale==='pt-BR'?'Ver produção':'View production'}</button></div>
+          {contentSummary?<ContentSessionCard summary={contentSummary} pt={locale==='pt-BR'} onProduction={()=>{setProductionText(undefined);setProductionOpen(true)}} onScript={()=>{setProductionText(undefined);setProductionOpen(true)}} onRecorded={()=>setRecordedOpen(true)}/>
+          :<div className="production-summary"><span>{linkedProduction?productionStageLabel(linkedProduction.stage,locale==='pt-BR'):(locale==='pt-BR'?'Ideia → vídeo → publicação':'Idea → video → publication')}</span><button className="text-link" onClick={()=>{setProductionText(undefined);setProductionOpen(true)}}>{locale==='pt-BR'?'Ver produção':'View production'}</button></div>}
           {activeSession&&<NativeDelegationWork sessionId={activeSession.id}/>}
           {(!activeSession || activeSession.messages.length === 0) && (
             <div className="chat-empty">
@@ -473,8 +495,10 @@ export function ChatPanel({
               <p>{agent.description || (locale==='pt-BR'?'Envie uma ideia, peça uma pesquisa ou traga referências do Canvas.':'Share an idea, ask for research, or bring references from the Canvas.')}</p>
             </div>
           )}
-          {activeSession?.messages.map((item) =>
-            item.type === 'activity' ? (
+          {chatFeed(activeSession?.messages ?? []).map((entry) => {
+            if (entry.kind === 'run') return <RunStatusLine key={entry.run.id} run={entry.run} steps={entry.steps}/>;
+            const item = entry.item;
+            return item.type === 'activity' ? (
               <div className={`tool-activity ${item.status}`} key={item.id}>
                 <span className="activity-symbol" aria-hidden="true">{item.status==='done'?'✓':item.status==='error'?'!':<Icon name="spark"/>}</span>
                 <span>{item.label}</span>
@@ -540,8 +564,8 @@ export function ChatPanel({
                   </div>
                 )}
               </article>
-            ),
-          )}
+            );
+          })}
           {linkedHandoffs.map(item=><div className={`handoff-card ${item.status}`} key={item.id}>
             <div><span>{agents.find(candidate=>candidate.id===item.sourceAgentId)?.name??'Agent'} → {agents.find(candidate=>candidate.id===item.targetAgentId)?.name??'Agent'}</span><small>{locale==='pt-BR'?({running:'Trabalhando',completed:'Concluído',error:'Erro',cancelled:'Interrompido',interrupted:'Interrompido ao fechar o app'}[item.status]):item.status}</small></div>
             <b>{item.title}</b>
@@ -549,11 +573,7 @@ export function ChatPanel({
             {item.error&&<p>{item.error}</p>}
             <button onClick={()=>showCollaboration(item.id)}>{locale==='pt-BR'?'Ver os dois chats':'View both chats'}</button>
           </div>)}
-          {runState === 'thinking' && (
-            <div className="thinking-row">
-              <Icon name="spark"/> {t('Thinking')}…
-            </div>
-          )}
+          {busy && !activeSession?.messages.some(item => item.type === 'activity' && item.kind === 'run' && !item.endedAt) && <RunStatusLine/>}
           {runState === 'error' && (
             <div className="chat-error" role="alert">
               <b>{t('Could not finish this response.')}</b>
@@ -577,11 +597,22 @@ export function ChatPanel({
                 {locale === 'pt-BR' ? 'conversas independentes' : 'independent conversations'}
               </span>
             </div>
-            <button className="soft-button" onClick={startSession}>
-              <Icon name="plus" />
-              {t('New')}
-            </button>
+            <div className="sessions-heading-actions">
+              <button className="soft-button" disabled={comparisonMode} onClick={()=>{setNewContentTitle('');setNewContentOpen(true)}}>
+                <Icon name="plus" />
+                {locale==='pt-BR'?'Novo conteúdo':'New content'}
+              </button>
+              <button className="soft-button" onClick={startSession}>
+                <Icon name="plus" />
+                {t('New')}
+              </button>
+            </div>
           </div>
+          {newContentOpen&&<form className="new-content-session" onSubmit={event=>{event.preventDefault();void startContentSession();}}>
+            <label>{locale==='pt-BR'?'Nome do conteúdo':'Content name'}<input autoFocus aria-label={locale==='pt-BR'?'Nome do novo conteúdo':'New content name'} value={newContentTitle} maxLength={120} disabled={creatingContent} onChange={event=>setNewContentTitle(event.target.value)} onKeyDown={event=>{if(event.key==='Escape'){event.preventDefault();setNewContentOpen(false);}}} placeholder={locale==='pt-BR'?'Ex.: Tutorial de automação no Excel':'E.g. Excel automation tutorial'}/></label>
+            <small>{locale==='pt-BR'?`Nova conversa com ${agent.name}, com as mesmas skills e o mesmo fluxo. Conversa, arquivos e produção ficam separados por conteúdo.`:`New chat with ${agent.name}, same skills and flow. Chat, files and production stay separate per content.`}</small>
+            <div><button type="button" className="text-link" disabled={creatingContent} onClick={()=>setNewContentOpen(false)}>{t('Cancel')}</button><button type="submit" className="primary-button" disabled={creatingContent||!newContentTitle.trim()}>{creatingContent?(locale==='pt-BR'?'Criando…':'Creating…'):(locale==='pt-BR'?'Criar conteúdo':'Create content')}</button></div>
+          </form>}
           <div className="panel-sessions">
             {agentSessions.map((session) => (
               <article
@@ -610,6 +641,7 @@ export function ChatPanel({
                   >
                     <span>
                       <b>{session.title}</b>
+                      {(()=>{const label=sessionListLabel(contentBinding(session,{workspaceId:agent.workspaceId,contents:editorialState.contents,runs:production.runs}),locale==='pt-BR');return label&&<small className="session-content-label">{label}</small>;})()}
                       <small>
                         {countMessages(session.messages.length, locale)} ·{' '}
                         {formatSessionDate(session.updatedAt, locale)}
@@ -622,6 +654,7 @@ export function ChatPanel({
                   <div className="session-actions">
                     {confirmDeleteId === session.id ? (
                       <>
+                        {session.contentId&&<small className="session-delete-note">{locale==='pt-BR'?'Remove só esta conversa. Conteúdo, arquivos e produção continuam salvos no Estúdio.':'Removes only this chat. Content, files and production stay saved in Studio.'}</small>}
                         <button onClick={() => setConfirmDeleteId(null)}>{t('Cancel')}</button>
                         <button
                           className="danger"
@@ -734,6 +767,7 @@ export function ChatPanel({
             </button>
           )}
           <div className="composer">
+            {!comparisonMode&&!sessionId&&<div className="provider-choice-trigger"><button className="soft-button" data-od-id="generate-with" disabled={busy} onClick={()=>setProviderChoiceOpen(true)}>{locale==='pt-BR'?'Gerar com':'Generate with'}: {providerId==='claude'?'Claude':providerId==='codex'?'Codex':'Gemini'}{selectedModelId?` · ${selectedModelId}`:''}</button><span>{choiceStatus(connection,locale==='pt-BR')}</span></div>}
             {skillMenuOpen && (
               <div
                 className="skill-command-menu"
@@ -860,12 +894,13 @@ export function ChatPanel({
                 {composerOptionsOpen && <div className="composer-options-popover" aria-label={locale==='pt-BR'?'Opções da mensagem':'Message options'}>
                 <h3>{locale==='pt-BR'?'Como o agente responde':'How the agent responds'}</h3>
               <div className="chat-model-picker">
+                {comparisonModelLocked&&<span className="composer-draft-warning">{locale==='pt-BR'?'Modelo definido nesta comparação. Inicie outra consulta para mudar.':'Model fixed for this comparison. Start another consultation to change it.'}</span>}
                 <span>{t('Model')}</span>
                 <SelectMenu
                   className="chat-select model-select"
                   ariaLabel={t('Model')}
                   value={selectedModelId}
-                  disabled={busy || modelsLoading || models.length === 0}
+                  disabled={comparisonModelLocked || busy || modelsLoading || models.length === 0}
                   placement="top"
                   onChange={changeModel}
                   options={[
@@ -935,8 +970,10 @@ export function ChatPanel({
       )}
       {handoffBrief!==null&&<AgentHandoffDialog agent={agent} sessionId={handoffBrief.sessionId} initialBriefing={handoffBrief.text} context={contextNodes} onClose={()=>setHandoffBrief(null)}/>}
       {!comparisonMode&&pairedComparison&&!comparisonAvailable&&<p className="comparison-unavailable" role="status">{locale==='pt-BR'?'Não é possível reabrir: um agente ou uma sessão do par foi excluído ou está indisponível. Esta conversa continua disponível.':'Cannot reopen: an agent or paired session was deleted or is unavailable. This chat remains available.'}</p>}
-      {comparisonBrief!==null&&<ComparisonLauncher workspaceId={agent.workspaceId} agentId={agent.id} briefing={comparisonBrief} context={contextNodes} onClose={()=>{setComparisonBrief(null);requestAnimationFrame(()=>composerRef.current?.focus())}}/>}
+      {providerChoiceOpen&&<ProviderChoice agentName={agent.name} currentProvider={providerId} currentModel={selectedModelId} busy={busy} onClose={()=>setProviderChoiceOpen(false)} onCreate={(provider,model)=>{const session=createSession(agent.id,undefined,provider,model);writeChatDraft(agent.id,session.id,structuredClone(draft));setProviderChoiceOpen(false);setTab('chat');onToast(locale==='pt-BR'?'Nova conversa preparada. Revise o rascunho antes de enviar.':'New chat prepared. Review the draft before sending.');requestAnimationFrame(()=>composerRef.current?.focus())}} onBoth={models=>{if(missingContext.length){onToast(locale==='pt-BR'?'Revise as referências de contexto ausentes antes de consultar ambos.':'Review missing context references before consulting both.');return;}setProviderChoiceOpen(false);setSameAgentModels(models);setComparisonBrief(message)}}/>}
+      {comparisonBrief!==null&&<ComparisonLauncher workspaceId={agent.workspaceId} agentId={agent.id} briefing={comparisonBrief} context={contextNodes} mode={sameAgentModels?'same-agent':'agents'} initialModels={sameAgentModels??undefined} onClose={()=>{setComparisonBrief(null);setSameAgentModels(null);requestAnimationFrame(()=>composerRef.current?.focus())}}/>}
       {productionOpen&&<ProductionDialog workspaceId={agent.workspaceId} sessionId={activeSession?.id} agentId={agent.id} initialText={productionText} onSelectAgent={onSelectAgent} onClose={()=>setProductionOpen(false)}/>}
+      {recordedOpen&&activeSession&&binding.kind==='content'&&!binding.run&&<RecordedEntry agent={agent} session={activeSession} content={binding.content} onClose={()=>setRecordedOpen(false)} onStarted={()=>{setRecordedOpen(false);onToast(locale==='pt-BR'?'Edição iniciada neste conteúdo. Acompanhe a próxima etapa aqui.':'Editing started for this content. Follow the next step here.');}}/>}
       {reviewRequest&&(reviewRequest.confirmedTarget?(reviewRequest.artifacts.find(item=>item.id===reviewRequest.selectedId)?.type==='file-delivery'?<FileDeliveryReview artifact={reviewRequest.artifacts.find(item=>item.id===reviewRequest.selectedId)!} initialDecision={reviewRequest.decision} initialNotes={reviewRequest.notes} onClose={()=>setReviewRequest(null)}/>:<ScriptDeliveryReview artifact={reviewRequest.artifacts.find(item=>item.id===reviewRequest.selectedId)!} initialDecision={reviewRequest.decision} initialNotes={reviewRequest.notes} onClose={()=>setReviewRequest(null)}/>):<FlowDialog title={locale==='pt-BR'?'Qual roteiro você quer revisar?':'Which script do you want to review?'} onClose={()=>setReviewRequest(null)}><div className="delivery-review-fields"><SelectMenu ariaLabel={locale==='pt-BR'?'Roteiro para revisar':'Script to review'} value={reviewRequest.selectedId} onChange={selectedId=>setReviewRequest({...reviewRequest,selectedId})} options={reviewRequest.artifacts.map(item=>({value:item.id,label:`${editorialState.contents.find(content=>content.id===item.contentId)?.title} · v${item.version}`}))}/><button className="primary-button" onClick={()=>setReviewRequest({...reviewRequest,confirmedTarget:true})}>{locale==='pt-BR'?'Revisar esta versão':'Review this version'}</button></div></FlowDialog>)}
     </div>
   );

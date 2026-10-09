@@ -3,6 +3,7 @@ import { mkdirSync } from 'node:fs';
 import { dirname,join } from 'node:path';
 import { createEditorialJobs } from './editorial-jobs.mjs';
 import {validateEditorialAssets} from './editorial-assets-validation.mjs';
+import {validateInspirationState} from './editorial-inspiration.mjs';
 import {createEditorialWorkflowQueue} from './editorial-workflow-queue.mjs';
 import {createChatDeliveries} from './editorial-chat-deliveries.mjs';
 import {createRuntimeActionApprovals,actionHash} from './runtime-action-approvals.mjs';
@@ -13,6 +14,9 @@ import {createPublicationExecution} from './editorial-publication-execution.mjs'
 import {createPublicationCalendar} from './editorial-publication-calendar.mjs';
 import {createCalendarCredentials} from './publication-calendar-credentials.mjs';
 import {createProductionCoordinator} from './production-coordinator.mjs';
+import {createPublicationStatusRefresh} from './publication-status-refresh.mjs';
+import {createInspirationAnalysis} from './editor-inspiration-analysis.mjs';
+import {inspectLocalAsset} from './editorial-local-files.mjs';
 
 const emptyState = () => ({ schemaVersion: 1, topics: [], contents: [], runs: [], artifacts: [], approvals: [] });
 const profilePattern = /^[a-zA-Z0-9_-]{1,120}$/;
@@ -33,7 +37,7 @@ async function readBody(request) {
   return JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
 }
 
-export function createContentWorkflowBridge({ dbPath, getConnector, getPublicationConnector, getCalendarConnector, secureStorage, suggestConnection = () => '',getRuntime,getChatRuntime,getAgents,getFlows,getSessions,getCurrentProfile,inspect,timeoutMs,mediaOptions }) {
+export function createContentWorkflowBridge({ dbPath, getConnector, getPublicationConnector, getCalendarConnector, secureStorage, suggestConnection = () => '',getRuntime,getChatRuntime,getProviderStatus,getAgents,getFlows,getSessions,getCurrentProfile,inspect,timeoutMs,mediaOptions }) {
   mkdirSync(dirname(dbPath), { recursive: true });
   const db = new DatabaseSync(dbPath);
   db.exec('PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000; CREATE TABLE IF NOT EXISTS editorial_state (profile_id TEXT PRIMARY KEY, revision INTEGER NOT NULL, state_json TEXT NOT NULL, updated_at TEXT NOT NULL)');
@@ -47,9 +51,11 @@ export function createContentWorkflowBridge({ dbPath, getConnector, getPublicati
   const publications=createEditorialPublications(db);
   const publishing=createPublicationExecution(db,{getConnector:getPublicationConnector,getCurrentProfile});
   const calendar=createPublicationCalendar(db,{getConnector:getCalendarConnector,getCurrentProfile});
+  const statusRefresh=createPublicationStatusRefresh(db,{publishing,getCurrentProfile});
   const calendarCredentials=createCalendarCredentials(db,secureStorage);
   const media=createEditorialMedia(db,{directory:join(dirname(dbPath),'media'),getCurrentProfile,...mediaOptions});
-  production=createProductionCoordinator(db,{getRuntime,getAgents,getFlows,getSessions,getCurrentProfile,getNotion:getConnector,jobs,media,publications,publishing,directory:join(dirname(dbPath),'production-media'),inspect,...mediaOptions});
+  const analyses=createInspirationAnalysis(db,{media,getRuntime,getChatRuntime,getProviderStatus,getAgents,getCurrentProfile,inspect:inspect??inspectLocalAsset,...(mediaOptions?.thumbnails?{thumbnails:mediaOptions.thumbnails}:{})});
+  production=createProductionCoordinator(db,{getBriefings:(profile,topicId,options)=>analyses.briefingsFor(profile,topicId,options),getRuntime,getChatRuntime,getProviderStatus,getAgents,getFlows,getSessions,getCurrentProfile,getNotion:getConnector,jobs,media,publications,publishing,directory:join(dirname(dbPath),'production-media'),inspect,...mediaOptions});
   const binding=(threadId,sessionId,provider='codex')=>{
     if(!getAgents||!getSessions||!getCurrentProfile)return null;
     const profileId=getCurrentProfile(),session=[...(getSessions(profileId)??[]),...delegations.shadows(profileId)].find(item=>sessionId?item.id===sessionId:item.codexThreadId===threadId||item.remoteSessionId===threadId);
@@ -68,12 +74,29 @@ export function createContentWorkflowBridge({ dbPath, getConnector, getPublicati
     try {
       if(getCurrentProfile&&getCurrentProfile()!==profileId){send(response,409,{error:'The active profile changed. Reopen the workspace.'});return true;}
       if(url.pathname==='/api/content/productions'){if(request.method==='GET'){send(response,200,{productions:production.list(profileId)});return true;}if(request.method==='POST'){send(response,200,{production:production.start(profileId,await readBody(request))});return true;}}
+      if(url.pathname==='/api/content/productions/import-card'&&request.method==='POST'){try{send(response,200,{card:await production.readImportCard(profileId,await readBody(request))});}catch(error){send(response,error.status??500,{error:error.message});}return true;}
+      if(url.pathname==='/api/content/productions/preflight'&&request.method==='POST'){const input=await readBody(request);send(response,200,{preflight:await production.preflight(profileId,input,{probeMedia:input.probeMedia===true})});return true;}
+      const coverRoute=url.pathname.match(/^\/api\/content\/productions\/([^/]+)\/cover$/);
+      if(coverRoute&&request.method==='GET'){try{const file=await production.coverFile(profileId,decodeURIComponent(coverRoute[1]),url.searchParams.get('assetId')??'',url.searchParams.get('versionId')??'');response.writeHead(200,{'content-type':file.type,'content-length':file.bytes.length,'cache-control':'no-store','x-content-type-options':'nosniff'});response.end(file.bytes);}catch(error){send(response,error.status??500,{error:error.message});}return true;}
+      if(url.pathname==='/api/content/productions/captions-capabilities'&&request.method==='GET'){send(response,200,await production.captionCapabilities());return true;}
+      const framesRoute=url.pathname.match(/^\/api\/content\/productions\/([^/]+)\/frames$/);
+      if(framesRoute&&request.method==='GET'){try{send(response,200,await production.coverCandidates(profileId,decodeURIComponent(framesRoute[1])));}catch(error){send(response,error.status??500,{error:error.message});}return true;}
+      const frameRoute=url.pathname.match(/^\/api\/content\/productions\/([^/]+)\/frame$/);
+      if(frameRoute&&request.method==='GET'){const abort=new AbortController();response.on('close',()=>{if(!response.writableFinished)abort.abort();});try{const file=await production.coverFrame(profileId,decodeURIComponent(frameRoute[1]),{timestampSeconds:url.searchParams.get('t'),versionId:url.searchParams.get('versionId')??'',sha256:url.searchParams.get('sha256')??''},abort.signal);if(abort.signal.aborted)return true;response.writeHead(200,{'content-type':file.type,'content-length':file.bytes.length,'cache-control':'no-store','x-content-type-options':'nosniff','x-frame-timestamp':String(file.timestampSeconds)});response.end(file.bytes);}catch(error){if(!response.headersSent&&!abort.signal.aborted)send(response,error.status??500,{error:error.message});}return true;}
       const productionRoute=url.pathname.match(/^\/api\/content\/productions\/([^/]+)$/);
       if(productionRoute&&request.method==='POST'){send(response,200,{production:await production.command(profileId,{...await readBody(request),id:decodeURIComponent(productionRoute[1])})});return true;}
       if(url.pathname==='/api/content/calendar'&&request.method==='GET'){send(response,200,calendar.snapshot(profileId,url.searchParams.get('workspace')));return true;}
       if(url.pathname==='/api/content/calendar/refresh'&&request.method==='POST'){send(response,200,calendar.configureRefresh(profileId,await readBody(request)));return true;}
       if(url.pathname==='/api/content/calendar/accounts'&&request.method==='POST'){const input=await readBody(request);send(response,200,await calendar.accounts(profileId,input.workspaceId,input.provider));return true;}
       if(url.pathname==='/api/content/calendar/sync'&&request.method==='POST'){try{send(response,200,await calendar.sync(profileId,await readBody(request)))}catch{send(response,502,{error:'Calendar query failed. Previous data was preserved. Check MCP authentication and supported tools.'})}return true;}
+      // B10: read-only status refresh (open/manual/auto) and its local, bounded settings.
+      // B09: analyses of accessible references (server-owned; one authorized AI turn each) and briefing links.
+      if(url.pathname==='/api/content/inspiration/analyses'&&request.method==='GET'){send(response,200,{analyses:analyses.list(profileId)});return true;}
+      if(url.pathname==='/api/content/inspiration/analyses'&&request.method==='POST'){const {action:verb,...rest}=await readBody(request);if(!['analyze','cancel','link','unlink'].includes(verb)){send(response,400,{error:'Ação de análise desconhecida.'});return true;}send(response,200,{analysis:await analyses[verb](profileId,rest),analyses:analyses.list(profileId)});return true;}
+      if(url.pathname==='/api/content/publishing/status'&&request.method==='GET'){send(response,200,statusRefresh.snapshot(profileId));return true;}
+      if(url.pathname==='/api/content/publishing/status'&&request.method==='POST'){const input=await readBody(request);send(response,200,await statusRefresh.refresh(profileId,{reason:input.reason}));return true;}
+      if(url.pathname==='/api/content/publishing/status/settings'&&request.method==='POST'){send(response,200,statusRefresh.configure(profileId,await readBody(request)));return true;}
+      if(url.pathname==='/api/content/publishing/status/dismiss'&&request.method==='POST'){send(response,200,statusRefresh.dismiss(profileId));return true;}
       if(url.pathname==='/api/content/publishing/accounts'&&request.method==='POST'){send(response,200,await publishing.accounts(profileId,await readBody(request)));return true;}
       if(url.pathname==='/api/content/publishing/options'&&request.method==='POST'){send(response,200,await publishing.options(profileId,await readBody(request)));return true;}
       const publishingRoute=url.pathname.match(/^\/api\/content\/publishing\/(prepare|execute|reconcile|cancel|prepareChange|change|continue)$/);
@@ -102,6 +125,18 @@ export function createContentWorkflowBridge({ dbPath, getConnector, getPublicati
       if(url.pathname==='/api/content/publications'&&request.method==='POST'){send(response,200,publications.command(profileId,await readBody(request)));return true;}
       if(url.pathname==='/api/content/media/capabilities'&&request.method==='GET'){send(response,200,await media.capabilities());return true;}
       if(url.pathname==='/api/content/media/inspect'&&request.method==='POST'){send(response,200,await media.inspect(profileId,await readBody(request)));return true;}
+      if(url.pathname==='/api/content/media/analyze'&&request.method==='POST'){send(response,200,await media.analyze(profileId,await readBody(request)));return true;}
+      if(url.pathname==='/api/content/media/file'&&['GET','HEAD'].includes(request.method)){try{await media.streamVideo(profileId,url,request,response);}catch(error){if(!response.headersSent)send(response,error.status??404,{error:error.message});else response.destroy();}return true;}
+      if(url.pathname==='/api/content/media/review'&&request.method==='POST'){send(response,200,await media.review(profileId,await readBody(request)));return true;}
+      if(url.pathname==='/api/content/media/subtitles'&&request.method==='POST'){send(response,200,await media.subtitles(profileId,await readBody(request)));return true;}
+      if(url.pathname==='/api/content/media/transcribe'&&request.method==='POST'){send(response,200,await media.transcribe(profileId,await readBody(request)));return true;}
+      if(url.pathname==='/api/content/media/plan'&&request.method==='POST'){send(response,200,await media.plan(profileId,await readBody(request)));return true;}
+      if(url.pathname==='/api/content/media/motion'&&request.method==='POST'){send(response,200,await media.motion(profileId,await readBody(request)));return true;}
+      if(url.pathname==='/api/content/media/snap'&&request.method==='POST'){send(response,200,await media.snap(profileId,await readBody(request)));return true;}
+      if(url.pathname==='/api/content/media/audio'&&request.method==='POST'){send(response,200,await media.audio(profileId,await readBody(request)));return true;}
+      if(url.pathname==='/api/content/media/preview'&&request.method==='POST'){send(response,200,await media.preview(profileId,await readBody(request)));return true;}
+      if(url.pathname==='/api/content/media/preview-cancel'&&request.method==='POST'){send(response,200,media.cancelPreview());return true;}
+      if(url.pathname==='/api/content/media/preview-file'&&['GET','HEAD'].includes(request.method)){try{await media.streamPreview(profileId,url,request,response);}catch(error){if(!response.headersSent)send(response,error.status??404,{error:error.message});else response.destroy();}return true;}
       if(url.pathname==='/api/content/media'&&request.method==='POST'){send(response,200,media.enqueue(profileId,await readBody(request)));return true;}
       const mediaRoute=url.pathname.match(/^\/api\/content\/media\/([^/]+)\/(retry|cancel)$/);
       if(mediaRoute&&request.method==='POST'){send(response,200,await media[mediaRoute[2]](profileId,decodeURIComponent(mediaRoute[1])));return true;}
@@ -129,7 +164,7 @@ export function createContentWorkflowBridge({ dbPath, getConnector, getPublicati
       if (request.method === 'PUT') {
         const input = await readBody(request);
         const state = input.state;
-        if (!Number.isSafeInteger(input.revision) || input.revision < 0 || state?.schemaVersion !== 1 || !['topics', 'contents', 'runs', 'artifacts', 'approvals'].every((key) => Array.isArray(state[key])) || !validateEditorialAssets(state)||!validatePublications(state)) {
+        if (!Number.isSafeInteger(input.revision) || input.revision < 0 || state?.schemaVersion !== 1 || !['topics', 'contents', 'runs', 'artifacts', 'approvals'].every((key) => Array.isArray(state[key])) || !validateEditorialAssets(state)||!validatePublications(state)||!validateInspirationState(state)) {
           send(response, 400, { error: 'Invalid editorial state.' }); return true;
         }
         const current = read.get(profileId);
@@ -153,5 +188,5 @@ export function createContentWorkflowBridge({ dbPath, getConnector, getPublicati
     }
   }
 
-  return { handle, production,jobs, work, deliveries, publications,publishing,calendar,calendarCredentials,media,actions,binding,claudeBinding:remoteSessionId=>binding(remoteSessionId,undefined,'claude'),delegations,agents:()=>getAgents?.(getCurrentProfile?.())??[], close: async () => {await production.close();actions.close();await calendar.close();await publishing.close();await media.close();await delegations.close();await work.close();await jobs.close();db.close();} };
+  return { handle, production,jobs, work, deliveries, publications,publishing,statusRefresh,analyses,calendar,calendarCredentials,media,actions,binding,claudeBinding:remoteSessionId=>binding(remoteSessionId,undefined,'claude'),delegations,agents:()=>getAgents?.(getCurrentProfile?.())??[], close: async () => {await statusRefresh.close();await analyses.close();await production.close();actions.close();await calendar.close();await publishing.close();await media.close();await delegations.close();await work.close();await jobs.close();db.close();} };
 }

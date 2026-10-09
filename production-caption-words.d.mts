@@ -1,0 +1,4 @@
+import type {CaptionSegment} from './editorial-captions.mjs';
+export const WORD_CAPTION_DEFAULTS: Readonly<{maxWords: number; maxSeconds: number; maxChars: number; gapBreak: number; bridgeGap: number}>;
+/** Word-by-word captions (1–3 words) from whisper word timings. Warnings: whisper-approximate, word-timing, text-sanitized (only { } \ or control characters removed), or the sentence fallback warnings + no-word-timing. */
+export function captionsFromWords(transcript: {words?: Array<{start: number; end: number; text: string}>; segments?: Array<{start: number; end: number; text: string}>; timing?: string} | null, durationSeconds: number, options?: Partial<{maxWords: number; maxSeconds: number; maxChars: number; gapBreak: number; bridgeGap: number}>): {segments: CaptionSegment[]; warnings: string[]};

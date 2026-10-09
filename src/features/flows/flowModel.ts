@@ -3,7 +3,9 @@ import type {Agent} from '../agents/model/Agent';
 export type FlowBoxKind='content-agent'|'video-input'|'video-agent'|'publishing-agent';
 export interface FlowBox {id:string;kind:FlowBoxKind;title:string;position:{x:number;y:number};agentId?:string;sessionId?:string}
 export interface FlowLink {id:string;source:string;target:string;kind:'sequence'|'context'}
-export interface ProductionFlow {id:string;workspaceId:string;name:string;contentId?:string;nodes:FlowBox[];edges:FlowLink[];createdAt:string;updatedAt:string}
+export interface ProductionFlow {id:string;workspaceId:string;name:string;contentId?:string;
+ /** B07: last mode chosen at start for this flow (a starting point; every start still shows and sends it explicitly). Absent = Notion. */
+ scriptMode?:'notion'|'local';nodes:FlowBox[];edges:FlowLink[];createdAt:string;updatedAt:string}
 export interface ProductionFlows {schemaVersion:1;flows:ProductionFlow[];activeByWorkspace:Record<string,string>}
 export const boxKinds:FlowBoxKind[]=['content-agent','video-input','video-agent','publishing-agent'];
 export const boxTitle=(kind:FlowBoxKind,pt=true)=>({
@@ -70,4 +72,44 @@ export function mergeProductionFlows(current:ProductionFlows,incoming:Production
   const flows=[...saved.values()],activeByWorkspace={...incoming.activeByWorkspace,...current.activeByWorkspace};
   for(const [workspace,key] of Object.entries(activeByWorkspace))if(!flows.some(flow=>flow.id===key&&flow.workspaceId===workspace))delete activeByWorkspace[workspace];
   return {schemaVersion:1,flows,activeByWorkspace};
+}
+
+/**
+ * How the semi-automatic production really reads a flow. The coordinator picks the FIRST saved box of each kind
+ * (content, video editor, publishing — the publisher falls back to the content agent) and always runs the fixed order
+ * script/Notion → recording → editing → package → scheduling. Connections never reorder, skip or trigger those stages;
+ * outside it, the manual briefing send still follows `sequence` links (upstreamFlowBox). Pure: no AI, no storage, no runtime.
+ */
+export type FlowExecutionStatus='supported'|'missing'|'unsupported'|'ambiguous'|'custom-layout';
+export type FlowExecutionIssueCode='missing-box'|'missing-agent'|'unsupported-provider'|'ambiguous-role'|'publisher-fallback'|'custom-layout'|'context-links';
+export interface FlowExecutionIssue {code:FlowExecutionIssueCode;level:'error'|'warning'|'info';boxIds:string[];message:string;fix:string}
+export interface FlowExecutionRole {kind:'content-agent'|'video-agent'|'publishing-agent';boxId?:string;agentId?:string;agentName?:string;fallback?:boolean}
+export interface FlowExecutionSemantics {status:FlowExecutionStatus;roles:FlowExecutionRole[];issues:FlowExecutionIssue[];stages:string[]}
+type SemanticsAgent=Pick<Agent,'id'|'name'|'workspaceId'>&{providerId?:string};
+export const executionStageLabels=(pt=true)=>pt?['Roteiro (e card no Notion, se ativado)','Gravação (você envia o vídeo)','Edição do vídeo','Capas e legendas por rede','Agendamento autorizado']:['Script (and Notion card, if enabled)','Recording (you add the video)','Video editing','Covers and captions per network','Authorized scheduling'];
+export function flowExecutionSemantics(flow:ProductionFlow,agents:readonly SemanticsAgent[],pt=true):FlowExecutionSemantics{
+ const issues:FlowExecutionIssue[]=[],issue=(code:FlowExecutionIssueCode,level:FlowExecutionIssue['level'],boxIds:string[],message:string,fix:string)=>issues.push({code,level,boxIds,message,fix});
+ const label=(kind:FlowBoxKind)=>boxTitle(kind,pt).toLowerCase();
+ const roles:FlowExecutionRole[]=[];
+ for(const kind of ['content-agent','video-agent','publishing-agent'] as const){
+  const boxes=flow.nodes.filter(node=>node.kind===kind),used=boxes[0];
+  if(!used){
+   if(kind==='publishing-agent'){const content=roles[0];roles.push({kind,boxId:content?.boxId,agentId:content?.agentId,agentName:content?.agentName,fallback:true});issue('publisher-fallback','info',[],pt?'Sem caixa de publicação: o agente de conteúdo prepara capas e legendas.':'No publishing box: the content agent prepares covers and captions.',pt?'Adicione uma caixa “Preparar publicação” se quiser outro agente nessa etapa.':'Add a “Prepare publication” box to use another agent for that stage.');continue;}
+   roles.push({kind});issue('missing-box','error',[],pt?`Falta uma caixa de ${label(kind)}; a produção não pode iniciar.`:`A ${label(kind)} box is missing; production cannot start.`,pt?`Use “Adicionar caixa” e escolha ${boxTitle(kind,pt)}.`:`Use “Add box” and choose ${boxTitle(kind,pt)}.`);continue;
+  }
+  const agent=agents.find(item=>item.id===used.agentId&&item.workspaceId===flow.workspaceId);
+  roles.push({kind,boxId:used.id,agentId:agent?.id,agentName:agent?.name});
+  if(boxes.length>1)issue('ambiguous-role','warning',boxes.map(box=>box.id),pt?`${boxes.length} caixas de ${label(kind)}: a produção usa somente “${used.title}” (a primeira na lista salva deste fluxo), independentemente das conexões.`:`${boxes.length} ${label(kind)} boxes: production only uses “${used.title}” (the first in this flow’s saved list), regardless of connections.`,pt?'Remova as caixas extras ou coloque o agente desejado na caixa usada.':'Remove the extra boxes or set the intended agent on the box that is used.');
+  if(!agent)issue('missing-agent','error',[used.id],pt?`“${used.title}” não tem um agente deste workspace.`:`“${used.title}” has no agent from this workspace.`,pt?'Selecione a caixa e escolha um agente Codex.':'Select the box and choose a Codex agent.');
+  else if((agent.providerId??'codex')!=='codex')issue('unsupported-provider','error',[used.id],pt?`“${agent.name}” usa ${agent.providerId==='claude'?'Claude':agent.providerId}; a produção semiautomática executa somente agentes Codex. O agente continua disponível no chat.`:`“${agent.name}” uses ${agent.providerId==='claude'?'Claude':agent.providerId}; semi-automatic production only runs Codex agents. The agent stays available in chat.`,pt?'Escolha um agente Codex nesta caixa para produzir; use o outro agente na conversa ou na comparação.':'Choose a Codex agent in this box to produce; use the other agent in chat or comparison.');
+ }
+ // The drawing is "standard" when its sequence links form exactly the fixed chain between the boxes in use.
+ const chain=[flow.nodes.find(n=>n.kind==='content-agent'),flow.nodes.find(n=>n.kind==='video-input'),flow.nodes.find(n=>n.kind==='video-agent'),flow.nodes.find(n=>n.kind==='publishing-agent')].filter((n):n is FlowBox=>!!n);
+ const expected=new Set(chain.slice(1).map((node,index)=>`${chain[index].id}>${node.id}`)),sequence=flow.edges.filter(edge=>edge.kind==='sequence');
+ const extraBoxes=flow.nodes.length>chain.length,custom=extraBoxes||sequence.length!==expected.size||sequence.some(edge=>!expected.has(`${edge.source}>${edge.target}`));
+ if(custom)issue('custom-layout','info',[],pt?'Este desenho difere da ordem padrão. Na produção semiautomática, as conexões não mudam a execução: ela segue sempre roteiro/Notion → gravação → edição → pacote → agendamento. O envio manual de briefing pela caixa de vídeos continua usando as conexões “Próxima etapa”.':'This drawing differs from the standard order. In semi-automatic production, connections do not change execution: it always follows script/Notion → recording → editing → package → scheduling. The manual briefing send from the videos box still follows “Next stage” connections.',pt?'Mantenha o desenho se ele ajuda a organizar; para a produção semiautomática, confira os agentes das caixas usadas.':'Keep the drawing if it helps you organize; for semi-automatic production, check the agents in the boxes that are used.');
+ const context=flow.edges.filter(edge=>edge.kind==='context');
+ if(context.length)issue('context-links','info',[...new Set(context.flatMap(edge=>[edge.source,edge.target]))],pt?'Conexões de contexto não enviam dados automaticamente; na produção semiautomática o contexto vem do roteiro, do card Notion e dos arquivos aprovados.':'Context connections do not send data automatically; in semi-automatic production, context comes from the script, the Notion card and approved files.',pt?'Para compartilhar algo a mais, use a conversa do agente.':'To share anything else, use the agent’s chat.');
+ const status:FlowExecutionStatus=issues.some(i=>i.code==='missing-box'||i.code==='missing-agent')?'missing':issues.some(i=>i.code==='unsupported-provider')?'unsupported':issues.some(i=>i.code==='ambiguous-role')?'ambiguous':custom?'custom-layout':'supported';
+ return {status,roles,issues,stages:executionStageLabels(pt)};
 }

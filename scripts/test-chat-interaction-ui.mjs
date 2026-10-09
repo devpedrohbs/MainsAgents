@@ -5,6 +5,7 @@ import {createServer} from 'node:http';
 import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
 import {resolve,extname} from 'node:path';
 import assert from 'node:assert/strict';
+import {captureReadyPng} from './ui-capture-ready.mjs';
 const root=resolve(import.meta.dirname,'..'),out=resolve(root,'.mainsagents-workspaces/chat-interaction-ui-test');mkdirSync(out,{recursive:true});app.setPath('userData',resolve(out,'profile'));
 const now=new Date().toISOString(),workspaceId='my-workspace';
 const imageBytes=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jZ9sAAAAASUVORK5CYII=','base64');
@@ -48,7 +49,7 @@ const window=new BrowserWindow({show:false,width:1440,height:940,webPreferences:
 const errors=[];window.webContents.on('console-message',(event)=>{console.log('renderer:',event.message);if(/Uncaught|Maximum update depth|Cannot update a component/.test(event.message))errors.push(event.message);});
 const evaluate=code=>window.webContents.executeJavaScript(code);
 async function until(check,timeout=12000){const end=Date.now()+timeout;while(Date.now()<end){if(await check())return;await new Promise(resolve=>setTimeout(resolve,60));}throw new Error('UI assertion timed out');}
-async function screenshot(name){try{writeFileSync(resolve(out,name),(await window.webContents.capturePage()).toPNG());}catch{console.log('Screenshot unavailable:',name);}}
+async function screenshot(name){try{writeFileSync(resolve(out,name),await captureReadyPng(window.webContents));}catch{console.log('Screenshot unavailable:',name);}}
 async function draft(text,caret=text.length){
  await evaluate(`(()=>{const input=document.querySelector('.composer textarea');input.focus();Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(input,${JSON.stringify(text)});input.setSelectionRange(${caret},${caret});input.dispatchEvent(new Event('input',{bubbles:true}));document.dispatchEvent(new Event('selectionchange'));})()`);
 }

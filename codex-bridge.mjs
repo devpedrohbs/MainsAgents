@@ -13,6 +13,7 @@ import {diagnoseCodex} from './runtime-capabilities.mjs';
 import { prepareCodexRuntimeHome, importLegacyCodexThread } from './codex-runtime-home.mjs';
 import { createChatImageArtifacts, isImageGenerationItem, imageGenerationInstructions } from './chat-image-artifacts.mjs';
 import {notionAutomationInstructions} from './notion-automation-policy.mjs';
+import {agentFileAccess} from './agent-file-access.mjs';
 
 export function codexLaunch({platform=process.platform,cliPath=process.env.CODEX_CLI_PATH,nodePath=process.execPath,appData=process.env.APPDATA??''}={}) {
   const cli=cliPath??(platform==='win32'?join(appData,'npm','node_modules','@openai','codex','bin','codex.js'):'codex');
@@ -27,7 +28,7 @@ class AppServerClient {
     this.pending = new Map();
     this.listeners = new Set();
     this.closed=false;
-    const {command,args,cli,javascript}=codexLaunch();
+    const {command,args,cli,javascript}=codexLaunch({cliPath:process.env.MAINSAGENTS_CODEX_CLI_PATH || runtime.env.CODEX_CLI_PATH || null});
     if(process.platform==='win32'&&!existsSync(cli))throw new Error('Codex CLI not found. Install @openai/codex or set CODEX_CLI_PATH.');
     const env=process.versions.electron&&javascript?{...runtime.env,ELECTRON_RUN_AS_NODE:'1'}:runtime.env;
     this.process=spawn(command,[...args,...runtime.args],{cwd,stdio:['pipe','pipe','pipe'],windowsHide:true,env});
@@ -258,7 +259,8 @@ export async function startCodexBridge({ port = 8787, cwd = process.cwd(), runti
         const skillsContext = Array.isArray(config.skills) && config.skills.length
           ? `\n\nThis agent may use only these associated skills:\n${config.skills.map(name=>`${name}: ${config.skillFiles?.[name]??config.skillsDirectory??'path not configured'}`).join('\n')}. Read the relevant skill Markdown file before using it (a standalone .md or SKILL.md). Do not use unrelated skills.`
           : '';
-        const params = { cwd,historyMode:'legacy',config:await chatActionConfig(client), ...(config.modelId||process.env.MAINSAGENTS_CODEX_MODEL?{model:config.modelId||process.env.MAINSAGENTS_CODEX_MODEL}:{}), approvalPolicy: chatApprovalPolicy, sandbox: 'read-only', developerInstructions: `You are ${config.agentName ?? 'a MainsAgents specialist'}. ${config.instructions ?? ''}${skillsContext}\n\n${imageGenerationInstructions}`.trim(), serviceName: 'mainsagents', dynamicTools:[delegateTool] };
+        const fileAccess=agentFileAccess(config,cwd);
+        const params = { cwd:fileAccess.cwd,historyMode:'legacy',config:{...await chatActionConfig(client),...fileAccess.config}, ...(config.modelId||process.env.MAINSAGENTS_CODEX_MODEL?{model:config.modelId||process.env.MAINSAGENTS_CODEX_MODEL}:{}), approvalPolicy: chatApprovalPolicy, sandbox:fileAccess.sandbox, developerInstructions: `You are ${config.agentName ?? 'a MainsAgents specialist'}. ${config.instructions ?? ''}${skillsContext}\n\n${fileAccess.instructions}\n\n${imageGenerationInstructions}`.trim(), serviceName: 'mainsagents', dynamicTools:[delegateTool] };
         if (input.threadId) {
           if (activeThreadWriters.has(input.threadId)) return json(response, 409, { error: activeWriterMessage });
           importLegacyCodexThread(runtime, input.threadId);
@@ -288,7 +290,7 @@ export async function startCodexBridge({ port = 8787, cwd = process.cwd(), runti
         const delegationPrompt=catalog.length?`\n\nMainsAgents agent catalog (current workspace): ${JSON.stringify(catalog)}. Use mainsagents_delegate when this requested workflow needs one of these specialists. Send a complete briefing, approved decisions, and absolute local file paths. The tool waits and returns the specialist result. Do not substitute a built-in temporary Codex subagent for these configured agents. Do not invent approval or publish. Respect scope and limit each response to at most 4 handoffs.`:'\n\nMainsAgents delegation is disabled for this turn. Do not call mainsagents_delegate.';
         const connected=catalog.find(agent=>agent.id===delegation?.connectedAgentId);
         const connectionPrompt=connected?`\n\nThe user enabled a persistent connection to ${connected.name} (${connected.id}). Delegate relevant parts of the user's requests to this agent with mainsagents_delegate; formulate useful instructions and include the relevant context. The application reuses the connected agent's existing session. Use sessionMode: "continue" by default. Only use sessionMode: "new" when the user explicitly asks to open another session for the connected agent. Its configured role, instructions and skills remain unchanged. Answer ordinary questions directly when they do not require that specialist. Wait for its actual result before reporting completion.`:'';
-        const text = `${input.content}${context?`\n\nWorkspace context:\n${context}`:''}${delegationPrompt}${connectionPrompt}${notionAutomationInstructions(binding?.agent)}\n\nMainsAgents image delivery policy: ${imageGenerationInstructions}`;
+        const text = `${input.content}${context?`\n\nWorkspace context:\n${context}`:''}${delegationPrompt}${connectionPrompt}${notionAutomationInstructions(binding?.agent)}\n${agentFileAccess(binding?.agent,cwd).instructions}\n\nMainsAgents image delivery policy: ${imageGenerationInstructions}`;
         const lockToken = `pending-${randomBytes(12).toString('hex')}`;
         activeThreadWriters.set(threadId, lockToken);
         try {
@@ -300,7 +302,8 @@ export async function startCodexBridge({ port = 8787, cwd = process.cwd(), runti
               return json(response, 409, { error: 'Another Codex window is still finishing a response in this session. Wait for it to finish, then send again.' });
             }
           }
-          const turnConfig = { threadId, input: [{ type: 'text', text }], approvalPolicy: chatApprovalPolicy, sandboxPolicy: { type: 'readOnly' }, ...(typeof input.modelId === 'string' && input.modelId ? { model: input.modelId } : {}), ...(['low','medium','high','xhigh'].includes(input.reasoningEffort) ? { effort: input.reasoningEffort } : {}) };
+          const turnFileAccess=agentFileAccess(binding?.agent,cwd);
+          const turnConfig = { threadId, cwd:turnFileAccess.cwd,input: [{ type: 'text', text }], approvalPolicy: chatApprovalPolicy, sandboxPolicy:turnFileAccess.sandboxPolicy, ...(typeof input.modelId === 'string' && input.modelId ? { model: input.modelId } : {}), ...(['low','medium','high','xhigh'].includes(input.reasoningEffort) ? { effort: input.reasoningEffort } : {}) };
           let result;
           try {
             result = await client.request('turn/start', turnConfig);

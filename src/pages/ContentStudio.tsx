@@ -1,3 +1,6 @@
+import {InspirationLibrary} from '../components/content/InspirationLibrary';
+import {ReferenceAnalysisPanel,useReferenceAnalyses} from '../components/content/ReferenceAnalysis';
+import {parseInspirationState} from '../features/content/inspiration';
 import {useStudioDraftField,studioDraftKey,clearStudioDraft} from '../features/content/studioDrafts';
 import {CarouselReview} from '../components/content/CarouselReview';
 import {carouselScript} from '../../editorial-protocol.mjs';
@@ -60,11 +63,12 @@ export function ContentStudio({
   const { currentWorkspaceId, currentWorkspace } = useWorkspaces();
   const { locale } = useLanguage();
   const pt = locale === 'pt-BR';
-  const [view,setView]=usePersistentState<'studio'|'calendar'>('studio-view','studio');
+  const [view,setView]=usePersistentState<'studio'|'calendar'|'references'>('studio-view','studio');
   const [reviewArtifact,setReviewArtifact]=useState<EditorialArtifact|null>(null);
   useEffect(()=>{const open=()=>setView('calendar');window.addEventListener('mainsagents:publication-calendar',open);return()=>window.removeEventListener('mainsagents:publication-calendar',open)},[]);
   useEffect(()=>{if(selectedContentId||requestedTopicId)setView('studio')},[selectedContentId,requestedTopicId]);
   const { agents: allAgents } = useAgents();
+  const referenceAnalyses=useReferenceAnalyses();
   const {
     state,
     ready,
@@ -75,7 +79,7 @@ export function ContentStudio({
     decideTopic,
     runScript,
     approveScript,
-    jobs,getNotionConnection,configureNotion,retryJob,setProductionStage,
+    jobs,getNotionConnection,configureNotion,retryJob,setProductionStage,saveInspiration,
   } = useContentWorkflow();
   const {allNodes,addNode,updateNodeData}=useCanvas();
   const agents = allAgents.filter((agent) => agent.workspaceId === currentWorkspaceId);
@@ -274,14 +278,14 @@ useEffect(() => {
       <header className="page-head">
         <div>
           <p className="eyebrow">{currentWorkspace.name}</p>
-          <h1 data-od-id="studio-heading">{view==='calendar'?(pt?'Calendário de postagens':'Publishing calendar'):(pt ? 'Estúdio de conteúdo' : 'Content Studio')}</h1>
+          <h1 data-od-id="studio-heading">{view==='references'?(pt?'Biblioteca de referências':'Reference library'):view==='calendar'?(pt?'Calendário de postagens':'Publishing calendar'):(pt ? 'Estúdio de conteúdo' : 'Content Studio')}</h1>
           <p>
             {view==='calendar'?(pt?'Conteúdo, canais e horários. Tudo no mesmo lugar.':'Content, channels and timing. All in one place.'):pt
               ? 'Da ideia à publicação: pesquisa, decisão, roteiro e entregas por rede.'
               : 'From idea to publication: research, decisions, scripts and channel deliverables.'}
           </p>
         </div>
-      <div className="studio-page-actions"><div className="editorial-segment content-studio-tabs" aria-label={pt?'Visão do Estúdio':'Studio view'}><button type="button" aria-pressed={view==='studio'} onClick={()=>setView('studio')}>{pt?'Produção':'Production'}</button><button type="button" aria-pressed={view==='calendar'} onClick={()=>setView('calendar')}>{pt?'Calendário':'Calendar'}</button></div>{view==='studio'&&<button className="primary-button" onClick={()=>{document.querySelector<HTMLTextAreaElement>('.editorial-intake textarea')?.focus();document.querySelector('.editorial-intake')?.scrollIntoView({block:'nearest',behavior:'smooth'});}}><Icon name="plus"/>{pt?'Nova pauta':'New topic'}</button>}</div></header>
+      <div className="studio-page-actions"><div className="editorial-segment content-studio-tabs" aria-label={pt?'Visão do Estúdio':'Studio view'}><button type="button" aria-pressed={view==='studio'} onClick={()=>setView('studio')}>{pt?'Produção':'Production'}</button><button type="button" aria-pressed={view==='calendar'} onClick={()=>setView('calendar')}>{pt?'Calendário':'Calendar'}</button><button type="button" aria-pressed={view==='references'} onClick={()=>setView('references')}>{pt?'Referências':'References'}</button></div>{view==='studio'&&<button className="primary-button" onClick={()=>{document.querySelector<HTMLTextAreaElement>('.editorial-intake textarea')?.focus();document.querySelector('.editorial-intake')?.scrollIntoView({block:'nearest',behavior:'smooth'});}}><Icon name="plus"/>{pt?'Nova pauta':'New topic'}</button>}</div></header>
       {storageError && (
         <p className="editorial-alert" role="alert">
           {storageError}
@@ -293,7 +297,11 @@ useEffect(() => {
         </p>
       )}
 
-      {view==='calendar'?<PublicationCalendar key={currentWorkspaceId} workspaceId={currentWorkspaceId}/>:<>
+      {view==='references'?<InspirationLibrary key={currentWorkspaceId} renderAnalysis={reference=><ReferenceAnalysisPanel reference={reference} analyses={referenceAnalyses.analyses} act={referenceAnalyses.act} agents={allAgents.filter(agent=>agent.workspaceId===currentWorkspaceId)} topics={(state.topics??[]).filter(topic=>topic.workspaceId===currentWorkspaceId)} pt={pt}/>} workspaceId={currentWorkspaceId} state={parseInspirationState(state.inspiration)} onChange={saveInspiration} assets={(state.assets??[]).filter(asset=>asset.workspaceId===currentWorkspaceId&&asset.kind==='video').map(asset=>({id:asset.id,workspaceId:asset.workspaceId,name:asset.name,kind:asset.kind}))} onUseAsBriefing={briefing=>{
+        // Fills the new-topic briefing only; nothing is sent until the user submits the topic.
+        setInputKind('text');setInput(briefing.text);setView('studio');setFeedback(pt?'Referência copiada para a nova pauta. Revise e envie quando quiser; nada foi enviado.':'Reference copied into the new topic. Review and submit when ready; nothing was sent.');
+        requestAnimationFrame(()=>{document.querySelector<HTMLTextAreaElement>('.editorial-intake textarea')?.focus();document.querySelector('.editorial-intake')?.scrollIntoView({block:'nearest'});});
+      }}/>:view==='calendar'?<PublicationCalendar key={currentWorkspaceId} workspaceId={currentWorkspaceId}/>:<>
 
       <form className="editorial-card editorial-intake" aria-label={pt?"Nova pauta":"New topic"} onSubmit={submit}>
             <h2>{pt ? 'Nova pauta' : 'New topic'}</h2>

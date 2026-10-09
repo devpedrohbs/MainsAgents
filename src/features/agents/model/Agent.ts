@@ -15,6 +15,7 @@ export interface Agent {
   providerId?: AgentProviderId;
   mcpPermissions?:Array<'read'|'write'|'schedule'|'publish'|'delete'|'unknown'>;
   notionAutomation?:{enabled:boolean;dataSourceId:string};
+  fileAccess?:{enabled:boolean;outputDirectory:string};
   modelId?: string;
   avatarImage?: string;
   skillsDirectory?: string;
@@ -39,7 +40,7 @@ export const agentToolDetails: Record<AgentTool, { label: string; description: s
   subagents: { label: 'Agent collaboration', description: 'Send briefings to agents in this workspace and follow both chats.' },
 };
 
-export type AgentEditorValues = Pick<Agent, 'name' | 'role' | 'description' | 'instructions' | 'workspaceId' | 'tools' | 'skillsDirectory' | 'skills' | 'skillFiles' | 'disabledSkills' | 'skillsInstallKey' | 'providerId' | 'modelId' | 'avatarImage'|'mcpPermissions'|'notionAutomation'>;
+export type AgentEditorValues = Pick<Agent, 'name' | 'role' | 'description' | 'instructions' | 'workspaceId' | 'tools' | 'skillsDirectory' | 'skills' | 'skillFiles' | 'disabledSkills' | 'skillsInstallKey' | 'providerId' | 'modelId' | 'avatarImage'|'mcpPermissions'|'notionAutomation'|'fileAccess'>;
 
 export function getAgentInitials(agent: Pick<Agent, 'name'>): string {
   return agent.name

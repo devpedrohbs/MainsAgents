@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import {createContentWorkflowBridge} from '../content-workflow-bridge.mjs';
 import {registerEditorialFilesIpc} from '../editorial-files-ipc.mjs';
 import {inspectLocalAsset} from '../editorial-local-files.mjs';
+import {captureReadyPng} from './ui-capture-ready.mjs';
 
 const root=resolve(import.meta.dirname,'..'),out=resolve(root,'.mainsagents-workspaces/editorial-assets-ui-test');mkdirSync(out,{recursive:true});
 app.setPath('userData',resolve(out,`profile-${Date.now()}`));
@@ -53,10 +54,10 @@ app.whenReady().then(async()=>{
     await until(()=>evaluate("Boolean(document.querySelector('[data-status=unchecked]'))"));assert.equal(saved().assets[0].versions.length,2);
     await clickText('Verificar arquivos');await until(()=>evaluate("Boolean(document.querySelector('[data-status=available]'))"));
     await evaluate("document.querySelector('.content-asset-versions').open=true;document.querySelector('.content-assets').scrollIntoView({block:'center'})");
-    writeFileSync(resolve(out,'library-light.png'),(await window.webContents.capturePage()).toPNG());
+    writeFileSync(resolve(out,'library-light.png'),await captureReadyPng(window.webContents));
     window.setSize(840,800);await evaluate("document.documentElement.dataset.appearance='dark';document.querySelector('.content-assets').scrollIntoView({block:'center'})");await new Promise(resolve=>setTimeout(resolve,120));
     assert.equal(await evaluate("(()=>{const el=document.querySelector('.content-assets');return el.scrollWidth<=el.clientWidth+1;})()"),true);
-    writeFileSync(resolve(out,'library-dark-compact.png'),(await window.webContents.capturePage()).toPNG());
+    writeFileSync(resolve(out,'library-dark-compact.png'),await captureReadyPng(window.webContents));
 
     const dropped=resolve(out,'reference.md');writeFileSync(dropped,'REAL_DROPPED_REFERENCE');
     await evaluate("(()=>{const input=document.createElement('input');input.type='file';input.id='native-drop-test';document.body.append(input)})()");

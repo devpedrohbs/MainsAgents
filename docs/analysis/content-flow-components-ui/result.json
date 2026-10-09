@@ -1,0 +1,133 @@
+{
+  "passed": true,
+  "total": 31,
+  "failed": [],
+  "results": [
+    {
+      "name": "F05 empty state, labelled, count 0",
+      "ok": true
+    },
+    {
+      "name": "F05 add form opens with focus in link field; Esc-free cancel keeps library intact",
+      "ok": true
+    },
+    {
+      "name": "F05 invalid link shows localized inline error (not native browser bubble) and nothing is saved",
+      "ok": true
+    },
+    {
+      "name": "F05 add via keyboard (Enter submits), tags/author/notes saved, list shows honest state",
+      "ok": true
+    },
+    {
+      "name": "F05 duplicate link in same workspace is rejected",
+      "ok": true
+    },
+    {
+      "name": "F05 persistence failure surfaces an error, keeps the form values and does not change state",
+      "ok": true
+    },
+    {
+      "name": "F05 edit keeps id, bumps revision, tags filter + search + clear",
+      "ok": true
+    },
+    {
+      "name": "F05 briefing action returns attribution context and does not publish/send",
+      "ok": true
+    },
+    {
+      "name": "F05 remove is reversible: undo and restore from removed list",
+      "ok": true
+    },
+    {
+      "name": "F05 workspace isolation: other workspace empty, only own videos selectable",
+      "ok": true
+    },
+    {
+      "name": "F05 keyboard order reaches every action; focus is visible",
+      "ok": true
+    },
+    {
+      "name": "F05 layout + contrast desktop/zoom/dark/en",
+      "ok": true
+    },
+    {
+      "name": "F02 gate \"none\" blocks package and import",
+      "ok": true
+    },
+    {
+      "name": "F02 gate \"unapproved\" blocks package and import",
+      "ok": true
+    },
+    {
+      "name": "F02 gate \"stale\" blocks package and import",
+      "ok": true
+    },
+    {
+      "name": "F02 gate \"notion\" blocks package and import",
+      "ok": true
+    },
+    {
+      "name": "F02 current approved script shows package; checklist via keyboard; progress; does not block recording",
+      "ok": true
+    },
+    {
+      "name": "F02 suggestions are labelled editable text; editing reports and does not invent facts",
+      "ok": true
+    },
+    {
+      "name": "F02 import is an explicit click; busy disables import and checklist",
+      "ok": true
+    },
+    {
+      "name": "F02 script edited -> new approved version resets checklist and suggestion edits",
+      "ok": true
+    },
+    {
+      "name": "F02 layout + contrast: en, 900x640 zoom 1.25, dark",
+      "ok": true
+    },
+    {
+      "name": "F04 three concepts, concept-only badge, distinct from final cover; export blocked without title",
+      "ok": true
+    },
+    {
+      "name": "F04 select -> approve disabled until exported; export is explicit (adjust never exports)",
+      "ok": true
+    },
+    {
+      "name": "F04 export -> exported cover (mock image) separate from concept, approve enabled and applied",
+      "ok": true
+    },
+    {
+      "name": "F04 editing title/kicker/frame/framing makes export stale and withdraws approval",
+      "ok": true
+    },
+    {
+      "name": "F04 whitespace-only edit is not stale; format switch shows no artifact for other format",
+      "ok": true
+    },
+    {
+      "name": "F04 new source version blocks approval; stale-source late result ignored",
+      "ok": true
+    },
+    {
+      "name": "F04 export failure shows alert; busy disables inputs and actions",
+      "ok": true
+    },
+    {
+      "name": "F04 timestamp beyond video duration is rejected for export",
+      "ok": true
+    },
+    {
+      "name": "F04 keyboard: radios, selection and approve reachable by Tab",
+      "ok": true
+    },
+    {
+      "name": "F04 layout + contrast: en, 900x640 zoom 1.25, dark",
+      "ok": true
+    }
+  ],
+  "contrastFindings": [],
+  "consoleErrors": []
+}

@@ -1,0 +1,150 @@
+{
+  "version": 1,
+  "intensity": "balanced",
+  "analysis": {
+    "wordTiming": "words",
+    "voice": "unavailable",
+    "limitations": [
+      "voiceUnavailable"
+    ],
+    "measuredCandidates": 0,
+    "inferredCandidates": 7
+  },
+  "cues": [
+    {
+      "id": "m1",
+      "kind": "kineticText",
+      "sourceStart": 1.1,
+      "sourceEnd": 2.76,
+      "start": 1.1,
+      "end": 2.76,
+      "text": "pessoal hoje a",
+      "focus": "hoje",
+      "layout": "camera-full",
+      "strength": 0.42,
+      "source": "inferred",
+      "timing": "words",
+      "reason": "Texto animado: texto (palavra-chave)",
+      "signals": [
+        {
+          "kind": "keyword",
+          "source": "inferred"
+        }
+      ]
+    },
+    {
+      "id": "m2",
+      "kind": "kineticText",
+      "sourceStart": 6.01,
+      "sourceEnd": 7.67,
+      "start": 6.01,
+      "end": 7.67,
+      "text": "pessoal hoje a",
+      "focus": "hoje",
+      "layout": "camera-full",
+      "strength": 0.42,
+      "source": "inferred",
+      "timing": "words",
+      "reason": "Texto animado: texto (palavra-chave)",
+      "signals": [
+        {
+          "kind": "keyword",
+          "source": "inferred"
+        }
+      ]
+    },
+    {
+      "id": "m3",
+      "kind": "explainer",
+      "sourceStart": 11.68,
+      "sourceEnd": 15.92,
+      "start": 11.68,
+      "end": 15.92,
+      "layout": "split",
+      "strength": 0.8,
+      "source": "inferred",
+      "timing": "words",
+      "reason": "Explicativo (números): estrutura dita na fala",
+      "signals": [
+        {
+          "kind": "structure",
+          "source": "inferred"
+        },
+        {
+          "kind": "number",
+          "source": "inferred"
+        }
+      ],
+      "sfx": {
+        "kind": "whoosh",
+        "gainDb": -22,
+        "ducked": true
+      },
+      "explainer": {
+        "visual": {
+          "type": "stat",
+          "chart": "bar",
+          "values": [
+            {
+              "label": "Vendas",
+              "value": 30,
+              "unit": "%"
+            },
+            {
+              "label": "Custos",
+              "value": 12,
+              "unit": "%"
+            }
+          ]
+        },
+        "origin": "speech",
+        "quote": "vendas subiram 30% e os custos caíram 12%.",
+        "quoteStart": 11.76,
+        "quoteEnd": 14.72,
+        "reveal": [
+          12.52,
+          14.42
+        ],
+        "revealAt": [
+          12.52,
+          14.42
+        ]
+      }
+    },
+    {
+      "id": "m4",
+      "kind": "kineticText",
+      "sourceStart": 19.6,
+      "sourceEnd": 21.26,
+      "start": 19.6,
+      "end": 21.26,
+      "text": "pessoal hoje a",
+      "focus": "hoje",
+      "layout": "camera-full",
+      "strength": 0.42,
+      "source": "inferred",
+      "timing": "words",
+      "reason": "Texto animado: texto (palavra-chave)",
+      "signals": [
+        {
+          "kind": "keyword",
+          "source": "inferred"
+        }
+      ]
+    }
+  ],
+  "reframe": {
+    "mode": "manual",
+    "source": "user",
+    "points": [
+      {
+        "t": 0,
+        "x": 0.5,
+        "y": 0.3,
+        "w": 0.1593,
+        "h": 0.1698,
+        "at": 0
+      }
+    ]
+  }
+}

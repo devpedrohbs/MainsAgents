@@ -1,0 +1,128 @@
+{
+  "version": 1,
+  "intensity": "intense",
+  "analysis": {
+    "wordTiming": "words",
+    "voice": "unavailable",
+    "limitations": [
+      "voiceUnavailable"
+    ],
+    "measuredCandidates": 0,
+    "inferredCandidates": 6
+  },
+  "cues": [
+    {
+      "id": "m1",
+      "kind": "kineticText",
+      "sourceStart": 1.1,
+      "sourceEnd": 2.76,
+      "start": 1.1,
+      "end": 2.76,
+      "text": "pessoal hoje a",
+      "focus": "hoje",
+      "layout": "camera-full",
+      "strength": 0.42,
+      "source": "inferred",
+      "timing": "words",
+      "reason": "Texto animado: texto (palavra-chave)",
+      "signals": [
+        {
+          "kind": "keyword",
+          "source": "inferred"
+        }
+      ]
+    },
+    {
+      "id": "m2",
+      "kind": "explainer",
+      "sourceStart": 5.63,
+      "sourceEnd": 14.34,
+      "start": 5.63,
+      "end": 14.34,
+      "layout": "motion-focus",
+      "strength": 0.8,
+      "source": "inferred",
+      "timing": "words",
+      "reason": "Explicativo (processo): estrutura dita na fala",
+      "signals": [
+        {
+          "kind": "structure",
+          "source": "inferred"
+        }
+      ],
+      "sfx": {
+        "kind": "whoosh",
+        "gainDb": -19,
+        "ducked": true
+      },
+      "explainer": {
+        "visual": {
+          "type": "process",
+          "nodes": [
+            "Você grava",
+            "O app transcreve",
+            "Corta os silêncios",
+            "Exporta o vídeo"
+          ]
+        },
+        "origin": "speech",
+        "quote": "Primeiro você grava. Depois o app transcreve. Em seguida corta os silêncios. Por fim exporta o vídeo.",
+        "quoteStart": 5.71,
+        "quoteEnd": 13.14,
+        "reveal": [
+          5.71,
+          7.2,
+          9.45,
+          11.7
+        ],
+        "revealAt": [
+          5.71,
+          7.2,
+          9.45,
+          11.7
+        ]
+      }
+    },
+    {
+      "id": "u1",
+      "kind": "explainer",
+      "sourceStart": 19.52,
+      "sourceEnd": 23.52,
+      "start": 19.52,
+      "end": 23.52,
+      "layout": "split",
+      "strength": 0.8,
+      "source": "user",
+      "timing": "words",
+      "reason": "Material escolhido por você",
+      "signals": [
+        {
+          "kind": "user",
+          "source": "user"
+        }
+      ],
+      "explainer": {
+        "visual": {
+          "type": "image",
+          "assetId": "material",
+          "caption": "Seu material (exemplo sintético)"
+        },
+        "origin": "user"
+      }
+    }
+  ],
+  "reframe": {
+    "mode": "manual",
+    "source": "user",
+    "points": [
+      {
+        "t": 0,
+        "x": 0.3,
+        "y": 0.38,
+        "w": 0.1593,
+        "h": 0.2407,
+        "at": 0
+      }
+    ]
+  }
+}

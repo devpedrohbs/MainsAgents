@@ -1,0 +1,57 @@
+.thumbnail-gallery{--q-muted:#4f5560;--q-ok:#0e6b33;--q-warn:#7a4f00;--q-danger:#b42318}
+:root[data-appearance=dark] .thumbnail-gallery{--q-muted:var(--muted);--q-ok:var(--success);--q-warn:var(--warn);--q-danger:var(--danger)}
+.thumbnail-gallery{display:grid;gap:14px;padding:16px;border:1px solid var(--border);border-radius:10px;background:var(--surface);min-width:0;color:var(--fg)}
+.thumbnail-gallery h3,.thumbnail-gallery h4{margin:0}
+.thumbnail-gallery h3{font-size:15px}
+.thumbnail-gallery h4{font-size:13px}
+.thumbnail-gallery-head{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:8px 16px}
+.thumbnail-gallery-formats{display:flex;flex-wrap:wrap;gap:6px 14px;margin:0;padding:0;border:0;font-size:12px}
+.thumbnail-gallery-formats legend{padding:0;margin-bottom:4px;font-weight:600}
+.thumbnail-gallery-formats label{display:flex;align-items:center;gap:6px;min-height:28px}
+.thumbnail-gallery-note{margin:0;font-size:12px;line-height:1.5;color:var(--q-muted)}
+.thumbnail-gallery-error{margin:0;font-size:12px;line-height:1.5;color:var(--q-danger)}
+.thumbnail-gallery-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin:0;padding:0;list-style:none}
+.thumbnail-gallery-card{display:grid;gap:10px;align-content:start;padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);min-width:0}
+.thumbnail-gallery-card[data-selected=true]{border-color:var(--accent)}
+.thumbnail-gallery-card[data-approved=true]{border-color:var(--q-ok)}
+.thumbnail-gallery-card-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.thumbnail-gallery-badge{font-size:11px;padding:2px 8px;border:1px solid var(--line-strong);border-radius:999px;color:var(--q-muted)}
+.thumbnail-gallery-badge[data-kind=approved],.thumbnail-gallery-badge[data-kind=fresh]{border-color:var(--q-ok);color:var(--q-ok)}
+.thumbnail-gallery-badge[data-kind=stale]{border-color:var(--q-warn);color:var(--q-warn)}
+.thumbnail-gallery-concept{position:relative;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end;gap:2px;padding:10px;border:1px dashed var(--line-strong);border-radius:6px;background:var(--surface)}
+.thumbnail-gallery-focus{position:absolute;width:28%;aspect-ratio:1;border:2px dashed var(--accent);border-radius:50%;opacity:.6}
+.thumbnail-gallery-kicker{position:relative;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--q-muted);overflow-wrap:anywhere}
+.thumbnail-gallery-title{position:relative;font-size:15px;line-height:1.2;overflow-wrap:anywhere}
+.thumbnail-gallery-exported{position:relative;display:grid;place-items:center;border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.thumbnail-gallery-exported[data-stale=true] .thumbnail-gallery-img{opacity:.45}
+.thumbnail-gallery-img{width:100%;height:100%;object-fit:contain;display:block}
+.thumbnail-gallery-stale{position:absolute;left:6px;bottom:6px;padding:2px 8px;font-size:11px;border-radius:4px;background:var(--bg);border:1px solid var(--q-warn);color:var(--q-warn)}
+.thumbnail-gallery-fields{display:grid;gap:4px}
+.thumbnail-gallery-fields label{font-size:12px;color:var(--q-muted)}
+.thumbnail-gallery-fields input:not([type=range]){min-height:32px;padding:0 8px;font:inherit;font-size:13px;color:var(--fg);background:var(--surface);border:1px solid var(--border);border-radius:6px;min-width:0}
+.thumbnail-gallery-fields input[aria-invalid=true]{border-color:var(--q-danger)}
+.thumbnail-gallery-range{display:grid;gap:2px}
+.thumbnail-gallery-actions{display:flex;flex-wrap:wrap;gap:6px}
+.thumbnail-gallery-actions button{min-height:34px;padding:0 12px;font:inherit;font-size:12px;color:var(--fg);background:var(--surface);border:1px solid var(--line-strong);border-radius:8px;cursor:pointer}
+.thumbnail-gallery-actions button[aria-pressed=true]{border-color:var(--accent)}
+.thumbnail-gallery-approve:not(:disabled){background:var(--accent);border-color:var(--accent);color:var(--accent-on,#fff)}
+.thumbnail-gallery-actions button:disabled{opacity:.5;cursor:not-allowed}
+.thumbnail-gallery :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media (max-width:520px){.thumbnail-gallery{padding:12px}.thumbnail-gallery-list{grid-template-columns:1fr}}
+/* B03: the real frame under the concept preview (approximate crop in CSS; the export uses the engine crop). */
+.thumbnail-gallery-frame{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.9}
+.thumbnail-gallery-concept:has(.thumbnail-gallery-frame) .thumbnail-gallery-title,.thumbnail-gallery-concept:has(.thumbnail-gallery-frame) .thumbnail-gallery-kicker{color:#fff;text-shadow:0 1px 3px rgb(0 0 0/.85)}
+.cover-frame-picker{display:grid;gap:10px;padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--surface);min-width:0}
+.cover-frame-picker h4{margin:0;font-size:14px}
+.cover-frame-picker-concepts{display:flex;flex-wrap:wrap;gap:6px 14px;margin:0;padding:0;border:0;font-size:12px}
+.cover-frame-picker-concepts legend{padding:0;margin-bottom:4px;font-weight:600}
+.cover-frame-picker-concepts label{display:flex;align-items:center;gap:6px;min-height:28px}
+.cover-frame-picker-player{max-width:420px;border-radius:8px;overflow:hidden;background:#000}
+.cover-frame-picker-player video{display:block;width:100%;max-height:360px}
+.cover-frame-picker-candidates{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;margin:0;padding:0;list-style:none}
+.cover-frame-picker-candidates button{display:grid;gap:4px;width:100%;padding:4px;font:inherit;font-size:11px;color:var(--fg);background:var(--bg);border:1px solid var(--border);border-radius:8px;cursor:pointer}
+.cover-frame-picker-candidates button[aria-pressed=true]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.cover-frame-picker-candidates button:disabled{opacity:.5;cursor:not-allowed}
+.cover-frame-picker-candidates img{width:100%;aspect-ratio:16/9;object-fit:contain;background:#000;border-radius:4px}
+.cover-frame-picker :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.cover-frame-picker .cover-frame-picker-concepts label{display:flex;grid-template-columns:none}

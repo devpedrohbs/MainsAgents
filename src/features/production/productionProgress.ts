@@ -7,25 +7,27 @@ export interface ProductionProgressView {state:ProgressState;phases:ProgressPhas
 
 /** Ordered phases over the coordinator's linear stages (production-protocol.mjs). */
 const phases:Array<{id:string;pt:string;en:string;stages:string[]}>=[
- {id:'script',pt:'Roteiro',en:'Script',stages:['writing','notion']},
+ {id:'script',pt:'Roteiro',en:'Script',stages:['writing','script-review','notion']},
  {id:'recording',pt:'Gravação',en:'Recording',stages:['recording']},
  {id:'editing',pt:'Edição',en:'Editing',stages:['planning-edit','editing','video-review']},
- {id:'package',pt:'Capas e legendas',en:'Covers and captions',stages:['platforms','preparing-package','generating-cover','package-review']},
+ {id:'package',pt:'Capas e legendas',en:'Covers and captions',stages:['platforms','preparing-package','generating-cover','covers-review','package-review']},
  {id:'schedule',pt:'Agendamento',en:'Scheduling',stages:['schedule','scheduling']},
  {id:'complete',pt:'Concluído',en:'Done',stages:['complete']},
 ];
 const phaseOf=(stage?:string)=>stage?phases.findIndex(phase=>phase.stages.includes(stage)):-1;
-const userStages=['recording','video-review','platforms','package-review','schedule'];
+const userStages=['script-review','recording','video-review','platforms','covers-review','package-review','schedule'];
 
 const actions:Record<string,[string,string]>={
  writing:['Aguarde: o agente está estruturando o roteiro.','Wait: the agent is structuring the script.'],
- notion:['Aguarde: o roteiro está sendo registrado no Notion.','Wait: the script is being saved to Notion.'],
+ 'script-review':['Escolha hook, CTA e caminho, edite o roteiro e aprove a versão para liberar o Notion e a gravação.','Choose hook, CTA and path, edit the script and approve the version to release Notion and recording.'],
+ notion:['Aguarde: o roteiro aprovado está sendo registrado no Notion.','Wait: the approved script is being saved to Notion.'],
  recording:['Grave o vídeo e envie a gravação para a edição básica.','Record the video and send it for basic editing.'],
  'planning-edit':['Aguarde: o editor está preparando o plano de edição.','Wait: the editor is preparing the editing plan.'],
  editing:['Aguarde: o vídeo está sendo editado neste PC.','Wait: the video is being edited on this PC.'],
  'video-review':['Revise o vídeo editado e aprove ou peça um ajuste.','Review the edited video, then approve it or request a revision.'],
  platforms:['Escolha as plataformas onde deseja publicar.','Choose the platforms to publish on.'],
  'preparing-package':['Aguarde: as legendas por rede estão sendo preparadas.','Wait: per-network captions are being prepared.'],
+ 'covers-review':['Exporte as três capas locais por formato, compare e aprove uma por rede. Nenhuma IA é usada.','Export the three local covers per format, compare them and approve one per network. No AI is used.'],
  'generating-cover':['Aguarde: as capas estão sendo geradas.','Wait: covers are being generated.'],
  'package-review':['Revise capas e legendas de cada rede e aprove ou peça uma nova versão.','Review each network\'s covers and captions, then approve or request a new version.'],
  schedule:['Escolha o horário e as contas para agendar.','Choose the time and accounts to schedule.'],
@@ -38,6 +40,7 @@ function lastRecordedStage(run:ProductionRun){
  for(const event of [...(run.events??[])].reverse()){
   if(phaseOf(event.action)>=0&&event.action!=='complete')return event.action;
   if(event.action==='idea-approved')return 'writing'; // creation starts at writing without a stage event
+  if(event.action==='recorded-import')return 'planning-edit'; // recorded entry starts at edit planning
  }
 }
 /** Where a paused/blocked/canceled run stopped; undefined when the evidence is missing. */
@@ -56,13 +59,15 @@ export function productionProgress(run:ProductionRun,pt=true):ProductionProgress
  const events=(run.events??[]).filter(event=>phaseOf(event.action)>=0);
  // Linear order alone is not evidence: without an audit event an earlier phase stays unconfirmed.
  const evidenced=(index:number)=>events.some(event=>phaseOf(event.action)===index)||(index===0&&events.some(event=>phaseOf(event.action)>0));
+ // A recorded entry never had a script or recording phase in the app: they are omitted, not shown as pending/unconfirmed.
+ const skipped=run.entry?.kind==='recorded'?['script','recording']:[];
  const list=phases.map((phase,index):ProgressPhase=>{
   const label=pt?phase.pt:phase.en;
   if(state==='complete')return {id:phase.id,label,status:'completed'};
   if(current<0||index>current)return {id:phase.id,label,status:'upcoming'};
   if(index===current)return {id:phase.id,label,status:halted?'stopped':'current',stageLabel:at?productionStageLabel(at,pt):undefined};
   return {id:phase.id,label,status:evidenced(index)?'completed':'unconfirmed'};
- });
+ }).filter(phase=>!skipped.includes(phase.id));
  const where=at&&phaseOf(at)>=0?productionStageLabel(at,pt):undefined;
  const reason=run.error?.trim()||undefined;
  let nextAction:string;

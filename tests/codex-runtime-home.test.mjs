@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, renameSync, statSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { prepareCodexRuntimeHome, importLegacyCodexThread } from '../codex-runtime-home.mjs';
+import { prepareCodexRuntimeHome, importLegacyCodexThread, standaloneCodexEnvironment } from '../codex-runtime-home.mjs';
 import { codexSecretCredentialTarget } from '../codex-shared-key.mjs';
 
 function fixture(t) {
@@ -14,6 +14,14 @@ function fixture(t) {
   t.after(() => rmSync(root, { recursive: true, force: true }));
   return { sharedHome, home, runtime };
 }
+
+test('standalone CLI drops inherited desktop executor settings without changing login or system paths', () => {
+ const source={PATH:'tools',APPDATA:'appdata',CODEX_HOME:'shared',CODEX_API_KEY:'test',CODEX_CLI_PATH:'desktop.exe',CODEX_INTERNAL_ORIGINATOR_OVERRIDE:'desktop',CODEX_MCP_NODE_PATH:'locked.exe',CODEX_APP_TOOLS_PIPE_PATH:'foreign-pipe',CODEX_PERMISSION_PROFILE:'foreign',CODEX_THREAD_ID:'foreign-thread'};
+ const env=standaloneCodexEnvironment(source);
+ assert.deepEqual(env,{PATH:'tools',APPDATA:'appdata',CODEX_HOME:'shared',CODEX_API_KEY:'test'});
+ assert.equal(source.CODEX_CLI_PATH,'desktop.exe');
+ assert.equal(standaloneCodexEnvironment({CODEX_CLI_PATH:'custom-cli.exe'}).CODEX_CLI_PATH,'custom-cli.exe');
+});
 
 test('Windows Codex encrypted-store credential uses the canonical home namespace', () => {
   assert.equal(codexSecretCredentialTarget('\\\\?\\C:\\Users\\pacas\\.codex'), 'secrets|e9a89c38818f7d2d.codex');

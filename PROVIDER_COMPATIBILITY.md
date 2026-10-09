@@ -1,4 +1,4 @@
-# Compatibilidade de provedores — 24/09/2026
+# Compatibilidade de provedores — 24/09/2026 (revisado em 07/10/2026)
 
 O login do MainsAgents, quando existir, será independente do login da IA. O app não deve ler tokens ou arquivos de sessão de CLIs. A pessoa controla suas próprias credenciais e sua cobrança.
 
@@ -15,3 +15,16 @@ O login do MainsAgents, quando existir, será independente do login da IA. O app
 - Para Claude Code, executar o binário publicado pela Anthropic, deixar a pessoa autenticar diretamente por `claude auth login` e não ler nem intermediar tokens ou arquivos da CLI. O processo fica restrito às ferramentas selecionadas no MainsAgents; a distribuição pública ainda depende dos termos comerciais aplicáveis.
 - Validar novamente estes termos no lançamento público. Uso comercial, taxas e disponibilidade de modelos podem mudar.
 - Para o Codex, expor diagnóstico de instalação, autenticação e limites usando os métodos oficiais do app-server. O endpoint de saúde atual verifica somente que o processo está ativo.
+
+## Estado verificado no código (07/10/2026)
+
+| Capacidade | Codex | Claude Code | Evidência |
+| --- | --- | --- | --- |
+| Chat e retomada | sim, via app-server | sim, `claude -p` stream-json com `--session-id`/`--resume` | `claude-code-bridge.mjs`, `codex-bridge.mjs`; testes simulados |
+| MCP | com aprovação por chamada | só pelo portão local (`--permission-prompt-tool`); sem portão, `mcp__*` negado | `tests/claude-mcp-approvals.test.mjs` |
+| Modelos | do runtime | lista do app, `modelsVerified: false` | `claude-code-bridge.mjs` |
+| Comparação | sim, par explícito no mesmo workspace | sim | [task-07-comparison-state](docs/analysis/task-07-comparison-state.md), [task-07-comparison-ui](docs/analysis/task-07-comparison-ui.md) |
+
+- Escolha de provedor/modelo antes de cada execução e consulta a ambos com o mesmo agente (D13) estão entregues para **chat e ideias**, validadas localmente com endpoints simulados: nova conversa sem envio, revisão antes de duas consultas, conversas antigas preservadas, padrão explícito por provedor, resposta escolhida só vira rascunho e o modo legado de dois agentes continua. A geração editorial persistente e a produção semiautomática continuam somente Codex; não há equivalência de ferramentas entre os provedores.
+- Testes usam CLIs e endpoints simulados. Nenhuma execução real autenticada ou paga foi comprovada para esta revisão.
+- Claude: o uso do binário oficial, sem modificação, é descrito no [modo headless](https://code.claude.com/docs/en/headless); termos e distribuição em [Legal and compliance](https://code.claude.com/docs/en/legal-and-compliance). Este projeto não coleta nem lê OAuth; não afirmamos proibição absoluta de executar o binário intacto, apenas que a distribuição pública deve conferir os termos vigentes.

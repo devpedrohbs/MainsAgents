@@ -6,6 +6,7 @@ import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
 import {resolve,extname,sep} from 'node:path';
 import assert from 'node:assert/strict';
 import {createContentWorkflowBridge} from '../content-workflow-bridge.mjs';
+import {captureReadyPng} from './ui-capture-ready.mjs';
 
 const root=resolve(import.meta.dirname,'..'),out=resolve(root,'.mainsagents-workspaces/editorial-flow-ui-test');mkdirSync(out,{recursive:true});
 app.setPath('userData',resolve(out,`profile-${Date.now()}`));
@@ -58,7 +59,7 @@ app.whenReady().then(async()=>{
     const db=new DatabaseSync(dbPath);const saved=JSON.parse(db.prepare('SELECT state_json FROM editorial_state WHERE profile_id=?').get(profile).state_json);db.close();
     assert.equal(saved.contents[0].productionStage,'editing');assert.equal(saved.artifacts.filter(item=>item.type==='script').length,1);
     assert.equal(state['canvas-workspaces'][workspaceId].nodes[0].data.contentId,'content');assert.deepEqual(errors,[]);
-    writeFileSync(resolve(out,'content-studio.png'),(await window.webContents.capturePage()).toPNG());
+    writeFileSync(resolve(out,'content-studio.png'),await captureReadyPng(window.webContents));
     console.log('PASS: approval, failed connection, explicit retry, deduplication, restart, edited script, production stage and linked Canvas. No AI tokens or remote writes.');
     writeFileSync(resolve(out,'result.json'),JSON.stringify({passed:true,calls,duplicateJobs:false,restart:true,linkedCanvas:true}));
     window.destroy();await bridge.close();server.close();app.exit(0);

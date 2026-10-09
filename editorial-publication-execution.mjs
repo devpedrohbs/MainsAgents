@@ -87,6 +87,27 @@ export function createPublicationExecution(db,{getConnector,getCurrentProfile,cl
         live.operation.phase='requesting';delete live.operation.error;});
       return submit(profile,input.id,provider,structuredClone(current(profile,input.id).operation),files);
     });},
+    /**
+     * B10 read-only status check of a confirmed scheduled delivery. Never creates/updates/cancels externally and never
+     * marks anything uncertain: a network/verification failure keeps the known `scheduled` state. Only a trusted, verified
+     * receipt of `published`/`failed` is written, and only if the delivery is byte-identical to the snapshot read before the call.
+     */
+    async observe(profile,id){
+      if(closing)return {id,state:'stopped'};if(locks.has(`${profile}:${id}`))return {id,state:'busy'};
+      return exclusive(profile,id,async()=>{
+        const before=current(profile,id),op=before?.operation;
+        if(!before||before.status!=='scheduled'||op?.phase!=='confirmed'||typeof op.externalId!=='string')return {id,state:'skipped'};
+        const snapshot=artifactHash(before);let result;
+        try{const provider=connector(op.provider,profile);result=verify(provider,await provider.read(op.externalId),op);}
+        catch(error){active(profile);return {id,state:'unknown',status:'scheduled',error:String(error?.message??error).slice(0,300)};}
+        active(profile);
+        if(result.status==='scheduled')return {id,state:'unchanged',status:'scheduled'};
+        if(!['published','failed'].includes(result.status))return {id,state:'attention',status:'scheduled',external:result.status};
+        try{mutate(profile,id,live=>{if(artifactHash(live)!==snapshot)throw Error('changed');live.status=result.status;live.receipt={id:op.externalId,provider:op.provider,version:live.version,checkedAt:new Date(clock()).toISOString(),...result};});}
+        catch{return {id,state:'skipped',reason:'changed'};}
+        return {id,state:'updated',status:result.status};
+      });
+    },
     async reconcile(profile,input){return exclusive(profile,input.id,async()=>{
       const delivery=current(profile,input.id);matching(delivery,input);const op=delivery.operation;
       if(!op||op.phase==='preview')throw Error('No submitted provider operation to check.');

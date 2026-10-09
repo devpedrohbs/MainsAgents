@@ -62,11 +62,24 @@ export function mcpRows(data:CodexDiagnostics,pt:boolean,locale:string):Capabili
  });
 }
 
-export function mediaRow(media:{ffmpeg:boolean;ffprobe:boolean}|null,checked:boolean,pt:boolean):CapabilityRow{
+/** Shape of GET /api/content/media/capabilities. `transcribe`/`animate` (and their reasons) are optional: older answers omit them. */
+export interface MediaCapabilities {ffmpeg:boolean;ffprobe:boolean;transcribe?:boolean;animate?:boolean;transcribeReasons?:string[];animateReasons?:string[]}
+export function mediaRow(media:MediaCapabilities|null,checked:boolean,pt:boolean):CapabilityRow{
  const t=(a:string,b:string)=>pt?a:b;
- const facts=(['ffmpeg','ffprobe'] as const).map(name=>fact(name,!checked?t('Ainda não verificado','Not checked yet'):!media?t('Não foi possível verificar','Could not check'):media[name]?t('Instalado','Installed'):t('Não encontrado','Not found'),!checked?'unchecked':!media?'unknown':media[name]?'yes':'no'));
- const missing=facts.some(item=>item.state==='no'||item.state==='unknown');
- return row(pt,{id:'media',kind:'media',title:t('Edição de vídeo local','Local video editing'),level:!checked?'unchecked':missing?'attention':'ready',facts,next:missing?{text:t('Instale o FFmpeg (inclui ffprobe) neste PC e verifique de novo.','Install FFmpeg (includes ffprobe) on this PC, then check again.')}:undefined});
+ const state=(value:boolean|undefined):FactState=>!checked?'unchecked':!media||value===undefined?'unknown':value?'yes':'no';
+ const text=(value:boolean|undefined,yes:string,no:string)=>!checked?t('Ainda não verificado','Not checked yet'):!media||value===undefined?t('Não foi possível verificar','Could not check'):value?yes:no;
+ const facts=(['ffmpeg','ffprobe'] as const).map(name=>fact(name,text(media?.[name],t('Instalado','Installed'),t('Não encontrado','Not found')),state(media?.[name])));
+ // Whisper and the animation browser are reported by the same local endpoint; shown only when it answered with them.
+ const optional=media&&('transcribe' in media||'animate' in media);
+ if(optional||!media){
+  if(!media||'transcribe' in media)facts.push(fact(t('Transcrição (Whisper)','Transcription (Whisper)'),text(media?.transcribe,t('Disponível','Available'),t('Indisponível','Unavailable')),state(media?.transcribe)));
+  if(!media||'animate' in media)facts.push(fact(t('Animações (Remotion + navegador)','Animations (Remotion + browser)'),text(media?.animate,t('Disponível','Available'),t('Indisponível','Unavailable')),state(media?.animate)));
+ }
+ const failed=facts.filter(item=>item.state==='no'||item.state==='unknown');
+ const toolsMissing=failed.some(item=>item.label==='ffmpeg'||item.label==='ffprobe');
+ const reasons=[...(media?.transcribeReasons??[]),...(media?.animateReasons??[])].filter(Boolean);
+ const next:NextAction|undefined=!failed.length?undefined:{text:[toolsMissing||!media?t('Instale o FFmpeg (inclui ffprobe) neste PC e verifique de novo.','Install FFmpeg (includes ffprobe) on this PC, then check again.'):'',media&&(media.transcribe===false||media.animate===false)?t(`Recursos locais opcionais indisponíveis${reasons.length?`: ${reasons.join('; ')}`:''}. Reinstale o app ou verifique de novo.`,`Optional local features unavailable${reasons.length?`: ${reasons.join('; ')}`:''}. Reinstall the app or check again.`):''].filter(Boolean).join(' ')};
+ return row(pt,{id:'media',kind:'media',title:t('Edição de vídeo local','Local video editing'),level:!checked?'unchecked':failed.length?'attention':'ready',facts,next});
 }
 
 export function diagnosticsSummary(rows:CapabilityRow[],pt:boolean){

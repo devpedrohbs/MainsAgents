@@ -6,13 +6,15 @@ import { createChatImageArtifacts } from './chat-image-artifacts.mjs';
 import { createClaudeCodeBridge } from './claude-code-bridge.mjs';
 import { createCanvasRuntimeBridge } from './canvas-runtime-bridge.mjs';
 import { createContentWorkflowBridge } from './content-workflow-bridge.mjs';
+import { createRemotionAnimator } from './editorial-animate.mjs';
+import { createWhisperTranscriber } from './editorial-transcribe.mjs';
 import { createNotionEditorialConnector } from './notion-editorial-connector.mjs';
 import {createCalendarConnector} from './publication-calendar-connector.mjs';
 import {createPublicationConnector} from './publication-connector.mjs';
 
 const claudeBridge = createClaudeCodeBridge({getApprovals:()=>({actions:contentWorkflowBridge.actions,claudeBinding:contentWorkflowBridge.claudeBinding})});
 const canvasRuntimeBridge = createCanvasRuntimeBridge({ cwdRoot: join(process.cwd(), '.mainsagents-workspaces') });
-const contentWorkflowBridge = createContentWorkflowBridge({ dbPath: join(process.cwd(), '.mainsagents-workspaces', 'editorial.sqlite'),getConnector:()=>bridge?.isAlive()?createNotionEditorialConnector(()=>bridge.notionMcp):null,getRuntime:()=>bridge?.isAlive()?bridge.workflow:null,getPublicationConnector:()=>bridge?.isAlive()?createPublicationConnector(()=>bridge.publicationMcp):null,getCalendarConnector:provider=>bridge?.isAlive()?createCalendarConnector(()=>bridge.publicationMcp,provider):null });
+const contentWorkflowBridge = createContentWorkflowBridge({ dbPath: join(process.cwd(), '.mainsagents-workspaces', 'editorial.sqlite'),mediaOptions:{...createRemotionAnimator(),transcriber:createWhisperTranscriber()},getConnector:()=>bridge?.isAlive()?createNotionEditorialConnector(()=>bridge.notionMcp):null,getRuntime:()=>bridge?.isAlive()?bridge.workflow:null,getChatRuntime:provider=>provider==='claude'?claudeBridge.runtime:null,getProviderStatus:provider=>provider==='claude'?claudeBridge.status():undefined,getPublicationConnector:()=>bridge?.isAlive()?createPublicationConnector(()=>bridge.publicationMcp):null,getCalendarConnector:provider=>bridge?.isAlive()?createCalendarConnector(()=>bridge.publicationMcp,provider):null });
 const codexOptions = { port: 0, runtimeHome: join(process.cwd(), '.mainsagents-workspaces', 'codex-runtime'), imagesDirectory:join(process.cwd(),'.mainsagents-workspaces','images') };
 const images=createChatImageArtifacts(codexOptions.imagesDirectory);
 

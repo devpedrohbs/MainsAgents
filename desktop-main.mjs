@@ -18,6 +18,8 @@ import { createClaudeCodeBridge } from './claude-code-bridge.mjs';
 import { createCanvasRuntimeBridge } from './canvas-runtime-bridge.mjs';
 import { createAccountServer } from './cloud-server.mjs';
 import { openDesktopEditorialBridge } from './desktop-editorial-storage.mjs';
+import { createRemotionAnimator } from './editorial-animate.mjs';
+import { createWhisperTranscriber } from './editorial-transcribe.mjs';
 import { createNotionEditorialConnector } from './notion-editorial-connector.mjs';
 import {createPublicationConnector} from './publication-connector.mjs';
 import {createCalendarConnector} from './publication-calendar-connector.mjs';
@@ -184,6 +186,7 @@ ipcMain.handle('skills:select-directory', async (event) => {
   const directory = result.filePaths[0];
   return { directory, skills: findSkills(directory) };
 });
+ipcMain.handle('file-access:select-directory',async event=>{assertTrustedSender(event);const result=await dialog.showOpenDialog(mainWindow,{title:'Selecionar pasta autorizada para arquivos de saída',properties:['openDirectory','createDirectory']});return result.canceled?null:result.filePaths[0]??null;});
 
 ipcMain.handle('skills:refresh-directory', (event, directory) => {
   assertTrustedSender(event);
@@ -329,8 +332,11 @@ async function createWindow() {
   desktopStateStore=await openDesktopWorkspaceStore(app.getPath('home'),app.getPath('userData'),app.getVersion());
   logStartup(`Storage profile=${desktopStateStore.currentProfile()??'default'}; version=${app.getVersion()}; data=${desktopStorageDirectory(app.getPath('home'))}`);
   contentWorkflowBridge=openDesktopEditorialBridge(app.getPath('home'),app.getPath('userData'),{
+    mediaOptions:{...createRemotionAnimator(app.isPackaged?{bundleDir:join(process.resourcesPath,'app.asar.unpacked','dist','remotion')}:{}),transcriber:createWhisperTranscriber({directories:[join(app.getPath('userData'),'tools','whispercpp'),...(app.isPackaged?[join(process.resourcesPath,'tools','whispercpp')]:[])]})},
     getRuntime:()=>codexBridge?.isAlive()?codexBridge.workflow:null,
     getChatRuntime:provider=>provider==='claude'?claudeCodeBridge.runtime:codexBridge?.isAlive()?codexBridge.chatRuntime:null,
+    // Local `claude auth status` only (no inference): lets production preflight separate availability from sign-in.
+    getProviderStatus:provider=>provider==='claude'?claudeCodeBridge.status():undefined,
     getAgents:profile=>desktopStateStore.read(profile,'agents')??[],
     getFlows:profile=>desktopStateStore.read(profile,'production-flows'),
     getSessions:profile=>desktopStateStore.read(profile,'sessions')??[],

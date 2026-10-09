@@ -5,6 +5,7 @@ interface Window {
   mainsAgentsSaveNow?: () => Promise<void>;
   mainsAgentsHideSplash?: () => void;
   mainsAgentsDesktop?: {
+    selectOutputDirectory?:()=>Promise<string|null>;
     notify?(title:string,body:string):Promise<boolean>;
     canvasBrowser?: boolean;
     files?: {

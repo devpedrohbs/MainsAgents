@@ -6,6 +6,7 @@ import {tmpdir} from 'node:os';
 import {resolve,extname,sep,join} from 'node:path';
 import assert from 'node:assert/strict';
 import {createContentWorkflowBridge} from '../content-workflow-bridge.mjs';
+import {waitForCaptureReady} from './ui-capture-ready.mjs';
 const root=resolve(import.meta.dirname,'..'),dist=resolve(process.env.MAINSAGENTS_TEST_DIST??join(root,'dist')),out=process.env.MAINSAGENTS_TEST_OUT??mkdtempSync(join(tmpdir(),'agent-comparison-ui-'));
 mkdirSync(out,{recursive:true});app.setPath('userData',join(out,'electron'));app.on('window-all-closed',()=>{});
 const at=new Date().toISOString(),workspaceId='comparison-fixture';
@@ -40,7 +41,7 @@ async function click(selector){await until(()=>js(`Boolean(document.querySelecto
 async function button(text,scope='document'){await until(()=>js(`Array.from(${scope}.querySelectorAll('button')).some(b=>b.textContent.trim()===${JSON.stringify(text)}&&!b.disabled&&b.getClientRects().length)`));await js(`Array.from(${scope}.querySelectorAll('button')).find(b=>b.textContent.trim()===${JSON.stringify(text)}&&!b.disabled&&b.getClientRects().length).click()`)}
 async function text(selector,value){await js(`(()=>{const el=document.querySelector(${JSON.stringify(selector)});Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(el,${JSON.stringify(value)});el.dispatchEvent(new Event('input',{bubbles:true}))})()`)}
 async function finish(send,reply,error){await until(()=>streams.has(send.id));const stream=streams.get(send.id);if(error)stream.end(JSON.stringify({type:'execution.failed',executionId:send.id,message:error,code:'fixture',retryable:false})+'\n');else stream.end(JSON.stringify({type:'message.completed',executionId:send.id,content:reply})+'\n'+JSON.stringify({type:'execution.completed',executionId:send.id})+'\n');streams.delete(send.id)}
-async function shot(name){win.webContents.invalidate();await new Promise(r=>setTimeout(r,250));writeFileSync(join(out,`${name}.png`),(await win.webContents.capturePage({x:0,y:0,width:win.getContentBounds().width,height:win.getContentBounds().height})).toPNG())}
+async function shot(name){await waitForCaptureReady(win.webContents);win.webContents.invalidate();const {width,height}=win.getContentBounds();writeFileSync(join(out,`${name}.png`),(await win.webContents.capturePage({x:0,y:0,width,height})).toPNG())}
 async function geometry(){assert.equal(await js('(()=>{const r=document.querySelector(".comparison-window").getBoundingClientRect();return r.top>=0&&r.left>=0&&r.bottom<=innerHeight+1&&r.right<=innerWidth+1})()'),true);}
 async function open(){win=new BrowserWindow({show:false,width:1440,height:1000,webPreferences:{preload:join(root,'tests/fixtures/assets-ui-preload.cjs'),contextIsolation:true,sandbox:true,offscreen:true,backgroundThrottling:false}});win.webContents.on('console-message',event=>{if(/Uncaught|Maximum update depth|Cannot update a component/.test(event.message))errors.push(event.message)});await win.loadURL(`http://127.0.0.1:${server.address().port}/app.html#agents`);await until(()=>js('Boolean(document.querySelector(\'.agent-nav[title="Codex Fixture"]\'))'));await click('.agent-nav[title="Codex Fixture"]');await until(()=>js('Boolean(document.querySelector(".chat-compose textarea"))'))}
 app.whenReady().then(async()=>{try{

@@ -4,6 +4,7 @@ import {createServer} from 'node:http';
 import {mkdirSync,readFileSync,writeFileSync} from 'node:fs';
 import {resolve,sep,extname} from 'node:path';
 import assert from 'node:assert/strict';
+import {captureReadyPng} from './ui-capture-ready.mjs';
 const root=resolve(import.meta.dirname,'..'),out=resolve(root,'.mainsagents-workspaces/refined-ui-test');
 mkdirSync(out,{recursive:true});app.setPath('userData',resolve(out,`profile-${Date.now()}`));
 const at=new Date().toISOString(),space='my-workspace',profile='handoff-test';
@@ -27,7 +28,7 @@ let win;const errors=[];
 const js=code=>win.webContents.executeJavaScript(code);
 async function until(check){const end=Date.now()+10000;while(Date.now()<end){if(await check())return;await new Promise(resolve=>setTimeout(resolve,40))}throw Error('Refined UI timed out')}
 async function click(selector){await until(()=>js(`Boolean(document.querySelector(${JSON.stringify(selector)}))`));await js(`document.querySelector(${JSON.stringify(selector)}).click()`)}
-async function screenshot(name){await new Promise(resolve=>setTimeout(resolve,240));writeFileSync(resolve(out,`${name}.png`),(await win.webContents.capturePage()).toPNG())}
+async function screenshot(name){writeFileSync(resolve(out,`${name}.png`),await captureReadyPng(win.webContents))}
 app.whenReady().then(async()=>{try{
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
  win=new BrowserWindow({show:false,width:1440,height:1000,webPreferences:{preload:resolve(root,'tests/fixtures/assets-ui-preload.cjs'),contextIsolation:true,sandbox:true,offscreen:true,backgroundThrottling:false}});
@@ -37,7 +38,7 @@ app.whenReady().then(async()=>{try{
  assert.equal(await js('getComputedStyle(document.querySelector(".sidebar")).width'),'244px');
  assert.equal(await js('getComputedStyle(document.documentElement).getPropertyValue("--accent").trim()'),'#3557f5');
  await js('document.fonts.ready');assert(await js('document.fonts.check("500 13px Geist")'));
- await screenshot('overview-light');await click('[data-od-id="nav-calendar"]');
+ await screenshot('overview-light');await js('document.documentElement.dataset.appearance="dark"');await screenshot('overview-dark');await js('document.documentElement.dataset.appearance="light"');await click('[data-od-id="nav-calendar"]');
  await until(()=>js('Boolean(document.querySelector(".publishing-grid"))'));
  await click('[data-od-id="calendar-view-week"]');assert.equal(await js('document.querySelectorAll(".publishing-day").length'),7);
  await click('[data-od-id="calendar-view-agenda"]');assert.equal(await js('getComputedStyle(document.querySelector(".publishing-agenda")).display'),'block');

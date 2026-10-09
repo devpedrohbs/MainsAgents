@@ -7,7 +7,8 @@ import {storageProfile} from '../../data/IndexedDbStateStore';
 import type {AgentSession} from '../chat/model/Chat';
 import {initialProductionFlows,type ProductionFlows} from '../flows/flowModel';
 import {mergeProductionSessions,type ProductionRun} from './model';
-interface ProductionContext {runs:ProductionRun[];ready:boolean;error:string;flows:ProductionFlows;refresh:()=>Promise<void>;start:(input:Record<string,unknown>)=>Promise<ProductionRun>;command:(run:ProductionRun,action:string,data?:Record<string,unknown>)=>Promise<ProductionRun>}
+import type {PreflightReport} from '../../../production-preflight.mjs';
+interface ProductionContext {runs:ProductionRun[];ready:boolean;error:string;flows:ProductionFlows;refresh:()=>Promise<void>;start:(input:Record<string,unknown>)=>Promise<ProductionRun>;command:(run:ProductionRun,action:string,data?:Record<string,unknown>)=>Promise<ProductionRun>;preflight:(input:Record<string,unknown>)=>Promise<PreflightReport>}
 const Context=createContext<ProductionContext|null>(null);
 const profile=()=>window.mainsAgentsDesktop?.state?storageProfile():localStorage.getItem('mainsagents-profile')||'default';
 export function ProductionProvider({children}:PropsWithChildren){
@@ -20,6 +21,8 @@ export function ProductionProvider({children}:PropsWithChildren){
  useEffect(()=>{live.current=true;void refresh();const timer=setInterval(()=>void refresh(),1000);return()=>{live.current=false;clearInterval(timer)}},[]);
  async function submit(path:string,input:Record<string,unknown>){await saveNow();const fingerprint=JSON.stringify({path,input}),requestId=requests.current.get(fingerprint)??crypto.randomUUID();requests.current.set(fingerprint,requestId);const result=await request(path,{...input,requestId});requests.current.delete(fingerprint);await refresh();return result.production as ProductionRun;}
  async function start(input:Record<string,unknown>){const run=await submit('',input);updatePersistentValue<Record<string,string>>('active-sessions',{},current=>({...current,[run.sourceSession.agentId]:run.sourceSession.id,[run.editorSession.agentId]:run.editorSession.id,...(run.publisherSession?{[run.publisherSession.agentId]:run.publisherSession.id}:{})}));updatePersistentValue<ProductionFlows>('production-flows',flows,current=>({...current,activeByWorkspace:{...current.activeByWorkspace,[run.workspaceId]:run.flowId},flows:current.flows.map(flow=>flow.id===run.flowId?{...flow,contentId:run.contentId,nodes:flow.nodes.map(node=>({...node,sessionId:node.kind==='content-agent'?run.sourceSession.id:node.kind==='video-agent'?run.editorSession.id:node.kind==='publishing-agent'?(run.publisherSession??run.sourceSession).id:node.sessionId}))}:flow)}));return run;}
- return <Context.Provider value={{runs,ready,error,flows,refresh,start,command:(run,action,data={})=>submit(`/${encodeURIComponent(run.id)}`,{revision:run.revision,action,...data})}}>{children}</Context.Provider>;
+ /** Read-only server check; never creates a run. */
+ async function preflight(input:Record<string,unknown>){await saveNow();const result=await request('/preflight',input);if(!result.preflight)throw Error('O serviço não confirmou a verificação.');return result.preflight as PreflightReport;}
+ return <Context.Provider value={{runs,ready,error,flows,refresh,start,preflight,command:(run,action,data={})=>submit(`/${encodeURIComponent(run.id)}`,{revision:run.revision,action,...data})}}>{children}</Context.Provider>;
 }
 export function useProduction(){const context=useContext(Context);if(!context)throw Error('ProductionProvider unavailable');return context;}

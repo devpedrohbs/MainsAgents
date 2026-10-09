@@ -33,3 +33,6 @@ DESIGN-MANIFEST.json
 *.pem
 *.pfx
 *.p12
+
+# Staged local tools for packaging (scripts/prepare-whisper-tools.mjs)
+build-resources/
