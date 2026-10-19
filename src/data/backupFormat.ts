@@ -1,9 +1,14 @@
 import {validateStudioDrafts} from '../features/content/studioDraftModel.ts';
+import {withoutPaperAutomation} from '../../paper-design.mjs';
+import {withoutPublishingAutomation} from '../../publishing-automation.mjs';
+import {validateAgentDrafts,reindexAgentDrafts,agentDraftStorageKey,agentDraftsProblem,type AgentDraftMap} from '../features/agents/agentDrafts.ts';
 import {validateEditorialAssets} from '../../editorial-assets-validation.mjs';
 import {validateInspirationState} from '../../editorial-inspiration.mjs';
 import {validatePublications} from '../../publication-model.mjs';
 import {validateProductionFlows,mergeProductionFlows} from '../features/flows/flowModel.ts';
-export const dataKeys = ['workspaces', 'current-workspace', 'agents', 'sessions', 'active-sessions', 'tasks', 'canvas-workspaces', 'production-flows', 'language', 'focus-mode', 'text-scale', 'reduced-motion', 'welcome-dismissed', 'sidebar-width', 'inspector-width', 'default-codex-model', 'chat-presentation', 'chat-drafts', 'studio-drafts', 'chat-inbox', 'studio-view'] as const;
+import {validateContentScopes,mergeContentScopes} from '../features/chat/contentScopes.ts';
+import {validDraftKey} from '../features/chat/chatDraftModel.ts';
+export const dataKeys = ['workspaces', 'current-workspace', 'agents', 'sessions', 'active-sessions', 'tasks', 'canvas-workspaces', 'production-flows', 'language', 'focus-mode', 'text-scale', 'reduced-motion', 'welcome-dismissed', 'sidebar-width', 'inspector-width', 'default-codex-model', 'chat-presentation', 'chat-drafts', 'studio-drafts', 'agent-drafts', 'chat-inbox', 'studio-view', 'content-scopes'] as const;
 const collectionKeys = new Set(['workspaces', 'agents', 'sessions', 'tasks']);
 export interface BackupFile { format:'mainsagents-backup'; version:1; exportedAt:string; data:Record<string, unknown>; editorial?:Record<string,unknown>; execution?:Record<string,unknown>; recovery?:boolean; fileManifest?:Array<{agentId:string;directory?:string;skills:unknown}> }
 export type ImportMode = 'replace' | 'merge';
@@ -31,13 +36,13 @@ export function parseBackup(text:string):BackupFile {
   const sessions=parsed.data.sessions;if(Array.isArray(sessions)&&sessions.some((session)=>!isObject(session)||typeof session.agentId!=='string'||typeof session.title!=='string'||!Array.isArray(session.messages)))throw new Error('Invalid sessions in backup.');
   const tasks=parsed.data.tasks;if(Array.isArray(tasks)&&tasks.some((task)=>!isObject(task)||typeof task.agentId!=='string'||typeof task.workspaceId!=='string'||typeof task.title!=='string'))throw new Error('Invalid tasks in backup.');
   for(const key of ['active-sessions','canvas-workspaces'])if(key in parsed.data && !isObject(parsed.data[key]))throw new Error(`Invalid ${key} data in backup.`);
+  if('content-scopes' in parsed.data&&!validateContentScopes(parsed.data['content-scopes']))throw new Error('Invalid content spaces in backup.');
   if ('studio-drafts' in parsed.data&&!validateStudioDrafts(parsed.data['studio-drafts']))throw new Error('Invalid Studio drafts in backup.');
+  if (agentDraftStorageKey in parsed.data){const problem=agentDraftsProblem(parsed.data[agentDraftStorageKey]);if(problem)throw new Error(`Invalid agent drafts in backup: ${problem}.`);}
   if ('chat-drafts' in parsed.data) {
     const drafts = parsed.data['chat-drafts'];
     if (!isObject(drafts) || Object.entries(drafts).some(([key, value]) => {
-      let identity: unknown;
-      try { identity = JSON.parse(key); } catch { return true; }
-      return !Array.isArray(identity) || identity.length !== 2 || typeof identity[0] !== 'string' || (identity[1] !== null && typeof identity[1] !== 'string') || !isObject(value) || typeof value.text !== 'string' || (value.skill !== null && typeof value.skill !== 'string') || ('context' in value && (!Array.isArray(value.context) || value.context.some(ref => !isObject(ref) || typeof ref.workspaceId !== 'string' || typeof ref.nodeId !== 'string' || typeof ref.label !== 'string')));
+      return !validDraftKey(key) || !isObject(value) || typeof value.text !== 'string' || (value.skill !== null && typeof value.skill !== 'string') || ('context' in value && (!Array.isArray(value.context) || value.context.some(ref => !isObject(ref) || typeof ref.workspaceId !== 'string' || typeof ref.nodeId !== 'string' || typeof ref.label !== 'string')));
     })) throw new Error('Invalid chat drafts in backup.');
   }
   if('chat-inbox' in parsed.data){const inbox=parsed.data['chat-inbox'];if(!isObject(inbox)||typeof inbox.muted!=='boolean'||typeof inbox.initialized!=='boolean'||!isObject(inbox.seen)||Object.values(inbox.seen).some(ids=>!Array.isArray(ids)||ids.some(id=>typeof id!=='string'))||('notified' in inbox&&(!Array.isArray(inbox.notified)||inbox.notified.some(id=>typeof id!=='string'))))throw new Error('Invalid chat inbox in backup.');}
@@ -84,21 +89,42 @@ function mergeCanvas(current:unknown,incoming:unknown):unknown {
   return merged;
 }
 
-export function composeImport(current:Record<string,unknown>,file:BackupFile,mode:ImportMode):Record<string,unknown> {
-  const incoming=safeData(file.data);
+/** Local drafts the editor could open (a corrupted local entry would fall back anyway and is not carried into the merge). */
+const usableDrafts=(value:unknown):AgentDraftMap=>isObject(value)?Object.fromEntries(Object.entries(value).filter(([key,entry])=>validateAgentDrafts({[key]:entry}))) as AgentDraftMap:{};
+/** Agent-editor drafts follow the importing profile and only keep drafts of workspaces/agents present after the import. */
+function scopeAgentDrafts(result:Record<string,unknown>,incoming:unknown,preferred:unknown,profile?:string):Record<string,unknown>{
+  if(!validateAgentDrafts(incoming)){if(validateAgentDrafts(preferred))return result;const {[agentDraftStorageKey]:_dropped,...rest}=result;return rest;}
+  const ids=(key:string)=>new Set((Array.isArray(result[key])?result[key] as unknown[]:[]).flatMap(item=>isObject(item)&&typeof item.id==='string'?[item.id]:[]));
+  return {...result,[agentDraftStorageKey]:reindexAgentDrafts(incoming,{profile,workspaceIds:ids('workspaces'),agentIds:ids('agents'),preferred:usableDrafts(preferred)})};
+}
+
+/** A backup never brings back the no-repeat Paper or scheduling grants (agents or editor drafts): they are re-enabled only in this app. */
+const withoutGrants=(agent:unknown)=>withoutPublishingAutomation(withoutPaperAutomation(agent));
+function withoutImportedAutomation(data:Record<string,unknown>):Record<string,unknown>{
+  const result={...data};
+  if(Array.isArray(result.agents))result.agents=result.agents.map(withoutGrants);
+  const drafts=result[agentDraftStorageKey];
+  if(isObject(drafts))result[agentDraftStorageKey]=Object.fromEntries(Object.entries(drafts).map(([key,entry])=>[key,isObject(entry)?{...entry,values:withoutGrants(entry.values)}:entry]));
+  return result;
+}
+
+export function composeImport(current:Record<string,unknown>,file:BackupFile,mode:ImportMode,{profile}:{profile?:string}={}):Record<string,unknown> {
+  const incoming=withoutImportedAutomation(safeData(file.data));
   if(mode==='replace'){
     const retained=Object.fromEntries(Object.entries(current).filter(([key])=>!dataKeys.includes(key as typeof dataKeys[number])));
-    return {...retained,...incoming};
+    return scopeAgentDrafts({...retained,...incoming},incoming[agentDraftStorageKey],undefined,profile);
   }
   const merged={...current};
   for(const [key,value] of Object.entries(incoming)) {
     if(key==='production-flows'&&validateProductionFlows(current[key])&&validateProductionFlows(value))merged[key]=mergeProductionFlows(current[key],value);
     else if(collectionKeys.has(key))merged[key]=mergeRows(current[key],value);
     else if(key==='canvas-workspaces')merged[key]=mergeCanvas(current[key],value);
+    else if(key==='content-scopes')merged[key]=mergeContentScopes(current[key],value);
     else if(key==='active-sessions'||key==='chat-drafts'||key==='studio-drafts')merged[key]={...(isObject(value)?value:{}),...(isObject(current[key])?current[key]:{})};
+    else if(key===agentDraftStorageKey)continue;
     else if(!(key in current))merged[key]=value;
   }
-  return merged;
+  return agentDraftStorageKey in incoming?scopeAgentDrafts(merged,incoming[agentDraftStorageKey],current[agentDraftStorageKey],profile):merged;
 }
 
 export function describeBackup(file:BackupFile):string {

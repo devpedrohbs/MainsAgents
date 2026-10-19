@@ -2,6 +2,8 @@ import React from 'react';
 import {Easing, OffthreadVideo, interpolate, useCurrentFrame, useVideoConfig} from 'remotion';
 import type {OverlayVideoProps, TimedWindow} from './types';
 import {CameraLayer, MotionLayers} from './Motion';
+import {StoryboardVideo} from './Storyboard';
+import {PairVideo} from './Screen';
 
 // Somente fontes do sistema e formas CSS: sem imagens, fontes remotas ou JS fornecido pelo usuário.
 const FONT = '"Segoe UI", "Helvetica Neue", Arial, system-ui, sans-serif';
@@ -83,7 +85,11 @@ export const OverlayVideo: React.FC<OverlayVideoProps> = (props) => {
   const unit = Math.min(width, height) / 100;
   return (
     <div style={{position: 'relative', width, height, background: '#000', overflow: 'hidden'}}>
-      {props.motion ? (
+      {props.storyboard ? (
+        <StoryboardVideo sb={props.storyboard} src={props.src} assets={props.assets} reframe={props.motion?.reframe} screen={props.screen} screenSrc={props.screenSrc} />
+      ) : props.screen && props.screenSrc ? (
+        <PairVideo screen={props.screen} screenSrc={props.screenSrc} src={props.src} />
+      ) : props.motion ? (
         <>
           <MotionLayers props={props} part="backdrop" />
           <CameraLayer src={props.src} motion={props.motion} />

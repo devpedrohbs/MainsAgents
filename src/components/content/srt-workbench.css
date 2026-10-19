@@ -1,0 +1,47 @@
+/* SRT separado do MP4 (CapCut). Usa os tokens do tema (claro/escuro) e quebra bem em telas estreitas. */
+.srt-workbench{display:grid;gap:12px;min-width:0}
+.srt-workbench h3{margin:0 0 4px;font-size:15px}
+.srt-workbench-head p{margin:0}
+.srt-workbench-steps{display:flex;flex-wrap:wrap;gap:6px 14px;margin:0;padding:0;list-style:none;counter-reset:srt-step;font-size:12px;color:var(--muted)}
+.srt-workbench-steps li{counter-increment:srt-step;display:flex;align-items:center;gap:6px}
+.srt-workbench-steps li::before{content:counter(srt-step);display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;border:1px solid var(--border);font-weight:600;color:var(--fg)}
+.srt-workbench-steps li[data-done=true]{color:var(--fg)}
+.srt-workbench-steps li[data-done=true]::before{content:'✓';background:var(--accent);border-color:var(--accent);color:var(--accent-on,#fff)}
+.srt-workbench-start,.srt-workbench-tools,.srt-workbench-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px;min-width:0}
+.srt-workbench-start .select-trigger{max-width:100%}
+.srt-workbench-file{position:relative;display:inline-flex;align-items:center;cursor:pointer}
+.srt-workbench-file input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%}
+.srt-workbench-file:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+.srt-workbench-doc{display:grid;gap:4px;font-size:12px;max-width:420px}
+.srt-workbench-status{margin:0;font-size:13px}
+.srt-workbench-version{margin:0;font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.srt-workbench-warnings li[data-kind=estimated-timing],.srt-workbench-warnings li[data-kind=alignment-low]{font-weight:600}
+.srt-workbench-player{display:grid;gap:6px;max-width:420px}
+.srt-workbench-player video{display:block;width:100%;max-height:360px;border-radius:8px;background:#000}
+.srt-workbench-live{margin:0;min-height:1.4em;padding:6px 10px;border:1px dashed var(--border);border-radius:8px;font-size:14px;font-weight:600;color:var(--fg);background:var(--surface)}
+.srt-workbench-rows{display:grid;gap:6px;margin:0;padding:0;list-style:none;max-height:520px;overflow:auto;min-width:0}
+.srt-workbench-row{display:grid;gap:4px;padding:8px;border:1px solid var(--border);border-radius:8px;background:var(--bg);min-width:0}
+.srt-workbench-row[data-live=true]{border-color:var(--accent)}
+.srt-workbench-row[data-invalid=true]{border-color:var(--danger,#b42318)}
+.srt-workbench-times{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;font-size:12px;min-width:0}
+.srt-workbench-index{min-width:22px;font-weight:600;color:var(--muted);font-variant-numeric:tabular-nums}
+.srt-workbench-times input{width:88px;min-height:30px;padding:0 6px;font:inherit;font-variant-numeric:tabular-nums;color:var(--fg);background:var(--surface);border:1px solid var(--border);border-radius:6px}
+.srt-workbench-timing{padding:1px 8px;border-radius:999px;border:1px solid var(--border);color:var(--muted);font-size:11px}
+.srt-workbench-row[data-timing=estimated] .srt-workbench-timing{border-color:var(--warn,#7a4f00);color:var(--fg)}
+.srt-workbench-row textarea{width:100%;min-width:0;box-sizing:border-box;font:inherit;font-size:14px;color:var(--fg);background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:6px 8px;resize:vertical;min-height:34px}
+.srt-workbench-times input[aria-invalid=true],.srt-workbench-row textarea[aria-invalid=true]{border-color:var(--danger,#b42318)}
+.srt-workbench-row-actions{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px}
+.srt-workbench-receipt{display:grid;gap:4px;padding:10px;border:1px solid var(--success,#0e6b33);border-radius:8px;min-width:0}
+.srt-workbench-receipt p{margin:0;font-size:12px;overflow-wrap:anywhere}
+.srt-workbench-history{font-size:12px}
+.srt-workbench-history ul{margin:6px 0 0;padding-left:18px;display:grid;gap:4px}
+.srt-workbench--embedded{padding:0}
+/* Burn antigo: só por escolha explícita, recolhido. */
+.caption-review-legacy{border:1px solid var(--border);border-radius:8px;padding:8px 10px}
+.caption-review-legacy>summary{cursor:pointer;font-size:13px;color:var(--muted)}
+.caption-review-legacy[open]>summary{margin-bottom:10px}
+@media (max-width:520px){.srt-workbench-player{max-width:100%}.srt-workbench-times input{width:76px}.srt-workbench-start>*{flex:1 1 100%}}
+/* Dentro do diálogo da produção, ".production-section label" vira grade cinza; o botão de importar continua botão. */
+.srt-workbench label.srt-workbench-file.primary-button{display:inline-flex;align-items:center;color:var(--accent-on,#fff);font-size:inherit}
+.production-section .srt-workbench-times label{display:inline;font-size:12px}
+.production-section .srt-workbench-times input{width:88px;padding:4px 6px;min-height:30px}

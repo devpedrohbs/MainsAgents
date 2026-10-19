@@ -7,7 +7,7 @@ import {FlowDialog} from '../common/FlowDialog';
 import {SelectMenu} from '../common/SelectMenu';
 import {ChoiceModel,useChoiceCatalogs,choiceStatus} from './ProviderChoice';
 
-export function ComparisonLauncher({workspaceId,agentId,briefing,context,onClose,mode='agents',initialModels}:{workspaceId:string;agentId:string;briefing:string;context:ChatContextReference[];onClose:()=>void;mode?:'agents'|'same-agent';initialModels?:{codexModelId?:string;claudeModelId?:string}}){
+export function ComparisonLauncher({workspaceId,agentId,briefing,context,onClose,mode='agents',initialModels,link}:{workspaceId:string;agentId:string;briefing:string;context:ChatContextReference[];link?:import('../../features/chat/agentComparison').ComparisonContentLink;onClose:()=>void;mode?:'agents'|'same-agent';initialModels?:{codexModelId?:string;claudeModelId?:string}}){
   const {agents}=useAgents(),{startComparison}=useChat(),{locale}=useLanguage(),pt=locale==='pt-BR';
   const available=agents.filter(a=>a.workspaceId===workspaceId),codex=available.filter(a=>(a.providerId??'codex')==='codex'),claude=available.filter(a=>a.providerId==='claude');
   const source=available.find(a=>a.id===agentId),same=mode==='same-agent',catalogs=useChoiceCatalogs();
@@ -22,7 +22,7 @@ export function ComparisonLauncher({workspaceId,agentId,briefing,context,onClose
       {context.length>0&&<label><input type="checkbox" checked={includeContext} onChange={event=>setIncludeContext(event.target.checked)}/>{pt?'Incluir o mesmo contexto selecionado nos dois chats':'Include the same selected context in both chats'} ({context.length})</label>}
       <p className="editorial-hint">{pt?'Esta ação inicia duas execuções e consome uso nos dois provedores. Abrir ou reabrir a comparação não envia mensagens. Revise o briefing antes de iniciar.':'This action starts two executions and consumes usage on both providers. Opening or reopening a comparison sends no messages. Review the brief before starting.'}</p>
       {error&&<p className="delivery-error" role="alert">{error}</p>}
-      <button className="primary-button" data-od-id="start-two-consultations" disabled={!valid} onClick={async()=>{setError('');setStarting(true);try{await startComparison(same?{mode:'same-agent',agentId,codexModelId:models.codex,claudeModelId:models.claude,briefing:text,context:includeContext?context:[]}:{codexAgentId:codexId,claudeAgentId:claudeId,briefing:text,context:includeContext?context:[]});onClose()}catch(failure){setError((failure as Error).message);setStarting(false);}}}>{pt?'Iniciar duas consultas':'Start two consultations'}</button>
+      <button className="primary-button" data-od-id="start-two-consultations" disabled={!valid} onClick={async()=>{setError('');setStarting(true);try{await startComparison(same?{mode:'same-agent',agentId,codexModelId:models.codex,claudeModelId:models.claude,briefing:text,context:includeContext?context:[],link}:{codexAgentId:codexId,claudeAgentId:claudeId,briefing:text,context:includeContext?context:[],link});onClose()}catch(failure){setError((failure as Error).message);setStarting(false);}}}>{pt?'Iniciar duas consultas':'Start two consultations'}</button>
     </div>
   </FlowDialog>;
 }

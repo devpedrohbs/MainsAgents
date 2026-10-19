@@ -1,0 +1,474 @@
+{
+  "id": "juros-editorial-16x9",
+  "subject": "juros",
+  "format": "original",
+  "treatment": "editorial",
+  "summary": "5 cenas (Editorial (calmo, revista)), 8 camadas: text, process, image, counter, compare; 1 SFX.",
+  "timings": {
+    "stillsSeconds": 5.583,
+    "excerptSeconds": 7.564,
+    "finalSeconds": 50.991
+  },
+  "final": {
+    "width": 1280,
+    "height": 720,
+    "fps": 30,
+    "durationSeconds": 23.8,
+    "audio": {
+      "mode": "mixed-sfx",
+      "codec": "aac",
+      "channels": 2,
+      "sampleRate": 48000
+    }
+  },
+  "excerpt": {
+    "frameRange": [
+      327,
+      417
+    ],
+    "startSeconds": 10.9,
+    "durationSeconds": 3.033
+  },
+  "qa": {
+    "ok": true,
+    "errors": [],
+    "warnings": [],
+    "checks": {
+      "layers": 8,
+      "textLayers": 7,
+      "minTextUnits": 3.2,
+      "minContrast": 4.513,
+      "scenes": 5
+    }
+  },
+  "manifest": {
+    "engine": "remotion-storyboard",
+    "version": 1,
+    "treatment": "editorial",
+    "scenes": [
+      {
+        "id": "abertura",
+        "name": "Abertura",
+        "start": 0,
+        "end": 3.433,
+        "camera": {
+          "layout": "full",
+          "from": "full",
+          "zoomKeyframes": 2
+        },
+        "transition": "none",
+        "background": "none",
+        "layers": [
+          {
+            "id": "kicker",
+            "type": "text",
+            "start": 0.1,
+            "end": 3.3,
+            "placement": "box",
+            "source": "speech",
+            "effects": [
+              "enter:fade",
+              "exit:fade",
+              "kinetic:static"
+            ]
+          },
+          {
+            "id": "titulo",
+            "type": "text",
+            "start": 1.4,
+            "end": 3.367,
+            "placement": "box",
+            "source": "speech",
+            "effects": [
+              "enter:rise",
+              "exit:fade",
+              "mask:wipeRight",
+              "kinetic:lines"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "mecanica",
+        "name": "Como funciona",
+        "start": 3.433,
+        "end": 10.1,
+        "camera": {
+          "layout": "split-right",
+          "from": "full",
+          "zoomKeyframes": 0
+        },
+        "transition": "fade 0.5s",
+        "background": "gradient",
+        "layers": [
+          {
+            "id": "processo",
+            "type": "process",
+            "start": 3.633,
+            "end": 9.933,
+            "placement": "panel",
+            "source": "speech",
+            "effects": [
+              "enter:none",
+              "exit:fade",
+              "reveal:3"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "exemplo",
+        "name": "Exemplo na planilha",
+        "start": 10.1,
+        "end": 16.167,
+        "camera": {
+          "layout": "pip",
+          "from": "split-right",
+          "zoomKeyframes": 0
+        },
+        "transition": "slide 0.5s",
+        "background": "solid",
+        "layers": [
+          {
+            "id": "print",
+            "type": "image",
+            "start": 10.2,
+            "end": 16.067,
+            "placement": "box",
+            "source": "user",
+            "effects": [
+              "enter:rise",
+              "exit:fade",
+              "kenBurns"
+            ],
+            "assetId": "planilha"
+          },
+          {
+            "id": "taxa",
+            "type": "text",
+            "start": 10.5,
+            "end": 16.067,
+            "placement": "box",
+            "source": "speech",
+            "effects": [
+              "enter:fade",
+              "exit:fade",
+              "kinetic:static"
+            ]
+          },
+          {
+            "id": "valor",
+            "type": "counter",
+            "start": 13,
+            "end": 16.067,
+            "placement": "box",
+            "source": "brief",
+            "effects": [
+              "enter:rise",
+              "exit:fade"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "comparacao",
+        "name": "Simples x compostos",
+        "start": 16.167,
+        "end": 19.767,
+        "camera": {
+          "layout": "split-right",
+          "from": "pip",
+          "zoomKeyframes": 0
+        },
+        "transition": "wipe 0.45s",
+        "background": "gradient",
+        "layers": [
+          {
+            "id": "compare",
+            "type": "compare",
+            "start": 16.367,
+            "end": 19.667,
+            "placement": "panel",
+            "source": "brief",
+            "effects": [
+              "enter:none",
+              "exit:fade",
+              "reveal:2"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "conselho",
+        "name": "Conselho",
+        "start": 19.767,
+        "end": 23.767,
+        "camera": {
+          "layout": "full",
+          "from": "split-right",
+          "zoomKeyframes": 2
+        },
+        "transition": "fade 0.5s",
+        "background": "none",
+        "layers": [
+          {
+            "id": "quote",
+            "type": "text",
+            "start": 20.367,
+            "end": 23.733,
+            "placement": "box",
+            "source": "speech",
+            "effects": [
+              "enter:rise",
+              "exit:fade",
+              "kinetic:words"
+            ]
+          }
+        ]
+      }
+    ],
+    "assets": [
+      {
+        "id": "planilha",
+        "kind": "image",
+        "role": "screenshot",
+        "sha256": "6520e457e987c9357678266ed67f2bf697ab5a4ceb48f5da4e53d0735f35e245",
+        "verified": true
+      }
+    ],
+    "sfx": [
+      {
+        "kind": "tick",
+        "at": 13,
+        "gainDb": -26
+      }
+    ],
+    "dropped": [],
+    "qa": {
+      "ok": true,
+      "errors": [],
+      "warnings": [],
+      "checks": {
+        "layers": 8,
+        "textLayers": 7,
+        "minTextUnits": 3.2,
+        "minContrast": 4.513,
+        "scenes": 5
+      }
+    },
+    "counts": {
+      "scenes": 5,
+      "layers": 8,
+      "transitions": 4,
+      "sfx": 1
+    },
+    "source": {
+      "sha256": "0fe1102eab0bf932aaf3696a8eaaece268cdc485e97db09fbd73e4b7fe99b57f",
+      "fps": 30,
+      "width": 1280,
+      "height": 720,
+      "rotation": 0,
+      "colorTransfer": null
+    },
+    "compositionSha256": "dd7fc21ebb51346e9440061d74487c10ce55ac323163aa2b0e160acd95f72458"
+  },
+  "finalFrames": [
+    "final-0027.jpg",
+    "final-0051.jpg",
+    "final-0097.jpg",
+    "final-0133.jpg",
+    "final-0203.jpg",
+    "final-0297.jpg",
+    "final-0330.jpg",
+    "final-0394.jpg",
+    "final-0479.jpg",
+    "final-0515.jpg",
+    "final-0539.jpg",
+    "final-0587.jpg",
+    "final-0635.jpg",
+    "final-0653.jpg",
+    "final-0707.jpg"
+  ],
+  "stills": [
+    {
+      "sceneId": "abertura",
+      "moment": "entrada",
+      "frame": 27,
+      "position": "in",
+      "seconds": 0.9,
+      "path": "juros-editorial-16x9\\stills\\still-000.png",
+      "tags": {
+        "storyboard": "juros-editorial-16x9",
+        "segmentsHash": "c6fcb845"
+      }
+    },
+    {
+      "sceneId": "abertura",
+      "moment": "meio",
+      "frame": 51,
+      "position": "mid",
+      "seconds": 1.7,
+      "path": "juros-editorial-16x9\\stills\\still-001.png",
+      "tags": {
+        "storyboard": "juros-editorial-16x9",
+        "segmentsHash": "c6fcb845"
+      }
+    },
+    {
+      "sceneId": "abertura",
+      "moment": "saida",
+      "frame": 97,
+      "position": "out",
+      "seconds": 3.233,
+      "path": "juros-editorial-16x9\\stills\\still-002.png",
+      "tags": {
+        "storyboard": "juros-editorial-16x9",
+        "segmentsHash": "c6fcb845"
+      }
+    },
+    {
+      "sceneId": "mecanica",
+      "moment": "entrada",
+      "frame": 133,
+      "position": "in",
+      "seconds": 4.433,
+      "path": "juros-editorial-16x9\\stills\\still-003.png",
+      "tags": {
+        "storyboard": "juros-editorial-16x9",
+        "segmentsHash": "c6fcb845"
+      }
+    },
+    {
+      "sceneId": "mecanica",
+      "moment": "meio",
+      "frame": 203,
+      "position": "mid",
+      "seconds": 6.767,
+      "path": "juros-editorial-16x9\\stills\\still-004.png",
+      "tags": {
+        "storyboard": "juros-editorial-16x9",
+        "segmentsHash": "c6fcb845"
+      }
+    },
+    {
+      "sceneId": "mecanica",
+      "moment": "saida",
+      "frame": 297,
+      "position": "out",
+      "seconds": 9.9,
+      "path": "juros-editorial-16x9\\stills\\still-005.png",
+      "tags": {
+        "storyboard": "juros-editorial-16x9",
+        "segmentsHash": "c6fcb845"
+      }
+    },
+    {
+      "sceneId": "exemplo",
+      "moment": "entrada",
+      "frame": 330,
+      "position": "in",
+      "seconds": 11,
+      "path": "juros-editorial-16x9\\stills\\still-006.png",
+      "tags": {
+        "storyboard": "juros-editorial-16x9",
+        "segmentsHash": "c6fcb845"
+      }
+    },
+    {
+      "sceneId": "exemplo",
+      "moment": "meio",
+      "frame": 394,
+      "position": "mid",
+      "seconds": 13.133,
+      "path": "juros-editorial-16x9\\stills\\still-007.png",
+      "tags": {
+        "storyboard": "juros-editorial-16x9",
+        "segmentsHash": "c6fcb845"
+      }
+    },
+    {
+      "sceneId": "exemplo",
+      "moment": "saida",
+      "frame": 479,
+      "position": "out",
+      "seconds": 15.967,
+      "path": "juros-editorial-16x9\\stills\\still-008.png",
+      "tags": {
+        "storyboard": "juros-editorial-16x9",
+        "segmentsHash": "c6fcb845"
+      }
+    },
+    {
+      "sceneId": "comparacao",
+      "moment": "entrada",
+      "frame": 515,
+      "position": "in",
+      "seconds": 17.167,
+      "path": "juros-editorial-16x9\\stills\\still-009.png",
+      "tags": {
+        "storyboard": "juros-editorial-16x9",
+        "segmentsHash": "c6fcb845"
+      }
+    },
+    {
+      "sceneId": "comparacao",
+      "moment": "meio",
+      "frame": 539,
+      "position": "mid",
+      "seconds": 17.967,
+      "path": "juros-editorial-16x9\\stills\\still-010.png",
+      "tags": {
+        "storyboard": "juros-editorial-16x9",
+        "segmentsHash": "c6fcb845"
+      }
+    },
+    {
+      "sceneId": "comparacao",
+      "moment": "saida",
+      "frame": 587,
+      "position": "out",
+      "seconds": 19.567,
+      "path": "juros-editorial-16x9\\stills\\still-011.png",
+      "tags": {
+        "storyboard": "juros-editorial-16x9",
+        "segmentsHash": "c6fcb845"
+      }
+    },
+    {
+      "sceneId": "conselho",
+      "moment": "entrada",
+      "frame": 635,
+      "position": "in",
+      "seconds": 21.167,
+      "path": "juros-editorial-16x9\\stills\\still-012.png",
+      "tags": {
+        "storyboard": "juros-editorial-16x9",
+        "segmentsHash": "c6fcb845"
+      }
+    },
+    {
+      "sceneId": "conselho",
+      "moment": "meio",
+      "frame": 653,
+      "position": "mid",
+      "seconds": 21.767,
+      "path": "juros-editorial-16x9\\stills\\still-013.png",
+      "tags": {
+        "storyboard": "juros-editorial-16x9",
+        "segmentsHash": "c6fcb845"
+      }
+    },
+    {
+      "sceneId": "conselho",
+      "moment": "saida",
+      "frame": 707,
+      "position": "out",
+      "seconds": 23.567,
+      "path": "juros-editorial-16x9\\stills\\still-014.png",
+      "tags": {
+        "storyboard": "juros-editorial-16x9",
+        "segmentsHash": "c6fcb845"
+      }
+    }
+  ]
+}

@@ -1,0 +1,149 @@
+{
+ "demo": {
+  "id": "edicao-creator-9x16",
+  "subject": "edicao",
+  "story": "edicao-creator-9x16",
+  "format": "portrait",
+  "route": "recorded"
+ },
+ "route": "recorded",
+ "stage": "video-review",
+ "seconds": 92,
+ "director": {
+  "sends": 1,
+  "providerId": "claude"
+ },
+ "original": {
+  "path": "C:\\Users\\pacas\\AppData\\Local\\Temp\\mainsagents-editing-upgrade\\edicao-creator-9x16\\gravacao-edicao.mp4",
+  "sha256": "72930dbeee9853eaa9e77c085108583d121805c2a70904bdc8a6fdd6880efa50",
+  "untouched": true
+ },
+ "tools": [
+  {
+   "tool": "get_context",
+   "ms": 34,
+   "isError": false,
+   "text": "Context read. Revision 0. Budget: {\"revisionsLeft\":2,\"previewsLeft\":3,\"callsLeft\":59,\"visionBytesLeft\":24000000}.",
+   "images": []
+  },
+  {
+   "tool": "get_frames",
+   "ms": 135,
+   "isError": false,
+   "text": "2 real frame(s) extracted at 1.00s, 17.00s.",
+   "images": [
+    "seen/01-get_frames.jpg",
+    "seen/02-get_frames.jpg"
+   ]
+  },
+  {
+   "tool": "write_plan",
+   "ms": 67,
+   "isError": false,
+   "text": "Plan saved as revision 1 (eae9ad93c5b5), 5 scene(s).",
+   "images": []
+  },
+  {
+   "tool": "render_preview",
+   "ms": 19489,
+   "isError": false,
+   "text": "Preview preview-d9b171e5598af50d rendered for revision 1 (3.614s +8s). Inspect it with get_frames or contact_sheet using target {\"previewId\":\"preview-d9b171e5598af50d\"}.",
+   "images": []
+  },
+  {
+   "tool": "get_frames",
+   "ms": 152,
+   "isError": false,
+   "text": "3 real frame(s) extracted at 1.00s, 4.00s, 7.00s.",
+   "images": [
+    "seen/03-get_frames.jpg",
+    "seen/04-get_frames.jpg",
+    "seen/05-get_frames.jpg"
+   ]
+  },
+  {
+   "tool": "storyboard_stills",
+   "ms": 2995,
+   "isError": false,
+   "text": "9 still(s) of revision 1 (eae9ad93c5b5): hook/in@1.10s, hook/mid@2.30s, hook/out@4.41s, economia/in@17.19s, economia/mid@18.89s, economia/out@21.43s, fechamento/in@22.73s, fechamento/mid@23.63s, fechamento/out@25.43s. Every scene of this revision was inspected.",
+   "images": [
+    "seen/06-storyboard_stills.png",
+    "seen/07-storyboard_stills.png",
+    "seen/08-storyboard_stills.png",
+    "seen/09-storyboard_stills.png",
+    "seen/10-storyboard_stills.png",
+    "seen/11-storyboard_stills.png",
+    "seen/12-storyboard_stills.png",
+    "seen/13-storyboard_stills.png",
+    "seen/14-storyboard_stills.png"
+   ]
+  },
+  {
+   "tool": "finalize",
+   "ms": 4,
+   "isError": false,
+   "text": "Final export is rendering locally. Call export_status later; do not finalize again.",
+   "images": []
+  },
+  {
+   "tool": "export_status",
+   "status": "succeeded",
+   "text": "Final export verified by the host: 2765693 bytes, sha256 90630ebc05a0. The app shows the file to the person."
+  }
+ ],
+ "editPlan": {
+  "authoring": "editor-tools",
+  "planHash": "eae9ad93c5b5a458d146f9e06a1a6e1eaac70bd6e5f7d732faa4324df9ad2716",
+  "sourceDuration": 34.266667,
+  "outputDuration": 25.64,
+  "removedSeconds": 8.6,
+  "cuts": 4,
+  "scenes": 5,
+  "treatment": "creator"
+ },
+ "messages": [
+  {
+   "id": "production:production-8b1aecc1-bbd9-45bf-a230-5db1f8dbcffe:1:planning-edit:plan",
+   "content": "Plano do editor (Editor de Vídeo (Claude Code · modelo padrão do CLI)): Cortes da fala + storyboard creator (5 cenas).\nCortes: 5 trecho(s) mantido(s), 8.6s removidos (34.3s → 25.6s).\nMotion: 5 cena(s) de storyboard renderizadas pelo motor local · revisão do editor: 5/5 cena(s) inspecionada(s).\nExportando localmente; o arquivo verificado volta aqui com o caminho.",
+   "receipts": 0
+  },
+  {
+   "id": "production:production-8b1aecc1-bbd9-45bf-a230-5db1f8dbcffe:1:editing:video",
+   "content": "Vídeo exportado e verificado: export-1.mp4\nC:\\Users\\pacas\\AppData\\Local\\Temp\\mainsagents-editing-upgrade\\edicao-creator-9x16\\media\\owner\\media-26ca64c2-2b91-4286-b8fa-793be6ac2620\\export-1.mp4\nAplicado: 4 corte(s) (8.6s removidos), 5 cena(s) de motion (storyboard), 0 sobreposição(ões), áudio tratado. Direção: Editor de Vídeo (Claude Code · modelo padrão do CLI).\nAbra o arquivo e aprove esta versão, ou peça ajustes.",
+   "receipts": 1
+  }
+ ],
+ "receipt": {
+  "id": "receipt-8dcb7906-369d-4c72-be5a-20ecac11325f",
+  "schema": "mainsagents.receipt/1",
+  "source": {
+   "kind": "production-video",
+   "id": "production-8b1aecc1-bbd9-45bf-a230-5db1f8dbcffe",
+   "step": "epoch-1"
+  },
+  "contentId": "content-1",
+  "workspaceId": "space",
+  "sessionId": "chat-1",
+  "assetId": "asset-b64dca03-d00b-46c2-9981-693719a4c4ae",
+  "versionId": "d6aee3ad-1b49-4ee9-ae01-52e9024816b2",
+  "name": "export-1.mp4",
+  "path": "C:\\Users\\pacas\\AppData\\Local\\Temp\\mainsagents-editing-upgrade\\edicao-creator-9x16\\media\\owner\\media-26ca64c2-2b91-4286-b8fa-793be6ac2620\\export-1.mp4",
+  "size": 2765693,
+  "sha256": "90630ebc05a0b268a1e0e6e82a8580985d7a0031d74cf3f89b276ac146960720",
+  "fileKind": "video",
+  "version": 1,
+  "producedBy": {
+   "agentName": "Editor de Vídeo",
+   "providerId": "claude"
+  },
+  "createdAt": "2026-10-13T01:11:55.664Z",
+  "verifiedNow": true
+ },
+ "output": {
+  "width": 1080,
+  "height": 1920,
+  "fps": 29.961,
+  "duration": 25.700067,
+  "hasAudio": true
+ }
+}

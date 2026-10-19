@@ -46,8 +46,16 @@ export type OverlayVideoProps = {
   lowerThird?: LowerThirdOverlay;
   cta?: CtaOverlay;
   motion?: MotionProps;
+  /** Storyboard autorado já resolvido em frames (editorial-storyboard.mjs resolveStoryboardProps). Exclusivo com título/tarja/CTA e cues. */
+  storyboard?: import('../editorial-storyboard.mjs').StoryboardProps;
+  /** Gravação de TELA de um par câmera+tela, já cortada com a linha do tempo da câmera (janelas = onde existe tela). */
+  screen?: ScreenProps;
+  /** URL loopback da trilha da tela (somente com `screen`). */
+  screenSrc?: string;
   /** assetId -> URL local (media server loopback no render; URL local na prévia). Nunca URL remota. */
   assets?: Record<string, string>;
 };
+
+export type ScreenProps = {mode: 'with-camera' | 'full'; windows: {fromFrame: number; toFrame: number}[]; width: number; height: number};
 
 export const COMPOSITION_ID = 'OverlayVideo';

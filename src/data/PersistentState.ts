@@ -54,10 +54,26 @@ export class PersistentState {
     this.persist(key, this.values[key]);
   }
 
+  /** Applied to every local update (e.g. drops chats deleted locally that a stale response tries to bring back). */
+  private filter: (key: string, value: unknown) => unknown = (_key, value) => value;
+  setFilter(filter: (key: string, value: unknown) => unknown): void { this.filter = filter; }
+  /**
+   * Values the host already committed (a local deletion rewrote these keys in its own transaction): they replace the
+   * in-memory copies without another write, and pending writes of those keys are dropped (the host sanitizes them anyway).
+   */
+  adopt(values: Record<string, unknown>): void {
+    if (!this.loaded) throw new Error('Local state has not been restored');
+    for (const [key, value] of Object.entries(values)) {
+      this.values[key] = value; this.dirty.delete(key); this.defaults.delete(key);
+      for (const listener of this.listeners.get(key) ?? []) listener();
+    }
+    this.updateStatus(this.dirty.size ? this.status.phase : 'saved');
+  }
+
   set<T>(key: string, update: Update<T>): void {
     if (!this.loaded || !Object.hasOwn(this.values, key)) throw new Error('Local state has not been restored');
     const current = this.values[key] as T;
-    const value = typeof update === 'function' ? (update as (current: T) => T)(current) : update;
+    const value = this.filter(key, typeof update === 'function' ? (update as (current: T) => T)(current) : update) as T;
     if (Object.is(current, value)) return;
     this.defaults.delete(key);
     // Desktop SQLite acknowledges the commit before React is notified. Closing

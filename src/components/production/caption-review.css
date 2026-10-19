@@ -30,3 +30,7 @@
 .production-section.caption-review .caption-review-times input{width:88px;padding:4px 6px;min-height:30px}
 .production-section.caption-review .caption-review-row textarea{min-height:52px;padding:6px 8px;line-height:1.4}
 .production-section.caption-review .caption-review-times .text-link{font-size:12px}
+/* Faithful short preview rendered by FFmpeg/libass (same engine, font and style as the final file). */
+.caption-review-preview{display:grid;gap:8px;padding:10px;border:1px solid var(--border);border-radius:8px;min-width:0}
+.caption-review-preview-head{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.caption-review-preview-video{display:block;width:100%;max-width:420px;max-height:420px;border-radius:8px;background:#000}

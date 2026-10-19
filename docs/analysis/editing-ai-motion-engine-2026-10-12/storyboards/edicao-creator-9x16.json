@@ -1,0 +1,67 @@
+{
+  "subject": "edicao",
+  "format": "portrait",
+  "author": "Claude (autoria a partir de work/edicao/words.json; tempos no video editado)",
+  "storyboard": {
+    "version": 1,
+    "title": "Editar vídeos mais rápido",
+    "timeline": {"basis": "output", "segmentsHash": "1ebed40a"},
+    "style": {"treatment": "creator"},
+    "scenes": [
+      {
+        "id": "hook", "name": "Gancho", "start": 0, "end": 4.614,
+        "camera": {"layout": "full", "zoom": [{"t": 0, "v": 1}, {"t": 3.3, "v": 1.04, "ease": "snappy"}, {"t": 3.55, "v": 1.14}, {"t": 4.6, "v": 1.14}]},
+        "layers": [
+          {"id": "kicker", "type": "text", "text": "Hoje eu vou te mostrar", "role": "label", "mode": "words", "slot": "bottom", "start": 0.3, "end": 1.9, "style": {"background": "accent"}, "align": "center", "enter": "pop", "exit": "fade", "source": "speech", "quote": "Hoje eu vou te mostrar"},
+          {"id": "headline", "type": "text", "text": "Editar vídeos bem mais rápido", "role": "headline", "mode": "words", "highlight": ["rápido"], "emphasis": "marker", "slot": "bottom", "start": 2.0, "end": 4.6, "style": {"background": "scrim"}, "enter": "pop", "exit": {"preset": "slideLeft", "seconds": 0.2}, "source": "speech", "quote": "editar videos bem mais rapido"}
+        ]
+      },
+      {
+        "id": "segredo", "name": "O segredo", "start": 4.614, "end": 8.302,
+        "camera": {"layout": "split-top", "zoom": [{"t": 0, "v": 1.1}, {"t": 1.5, "v": 1.18, "ease": "out"}]},
+        "background": {"kind": "solid", "tone": "ink"},
+        "transitionIn": {"kind": "push", "seconds": 0.35, "direction": "up"},
+        "layers": [
+          {"id": "label", "type": "text", "text": "O segredo", "role": "label", "mode": "chars", "slot": "panel-top", "start": 0.15, "end": 3.6, "style": {"color": "accent"}, "align": "left", "source": "speech", "quote": "O segredo"},
+          {"id": "rule", "type": "text", "text": "Nunca cortar no meio da frase", "role": "title", "mode": "words", "highlight": ["Nunca"], "emphasis": "box", "slot": "panel-bottom", "start": 1.3, "end": 3.65, "align": "left", "enter": "rise", "source": "speech", "quote": "nunca cortar no meio da frase",
+            "keyframes": {"rotate": [{"t": 0, "v": -2}, {"t": 0.5, "v": 0, "ease": "snappy"}]}}
+        ]
+      },
+      {
+        "id": "metodo", "name": "Método em 3 passos", "start": 8.302, "end": 16.168,
+        "camera": {"layout": "hidden"},
+        "background": {"kind": "dots", "tone": "bg"},
+        "transitionIn": {"kind": "slide", "seconds": 0.4, "direction": "left"},
+        "layers": [
+          {"id": "chapter", "type": "chapter", "index": 1, "text": "O método", "slot": "top", "start": 0.1, "end": 7.8, "enter": "wipe", "source": "design"},
+          {"id": "steps", "type": "steps", "items": ["Cortar os silêncios", "Revisar as retomadas", "Colocar as legendas"], "box": {"x": 0.06, "y": 0.3, "w": 0.88, "h": 0.33}, "start": 0.3, "end": 7.8,
+            "reveal": [0.1, 2.77, 5.21], "enter": "none", "source": "speech", "quote": "por ultimo, coloca as legendas"}
+        ]
+      },
+      {
+        "id": "economia", "name": "Economia", "start": 16.168, "end": 21.629,
+        "camera": {"layout": "split-top", "zoom": [{"t": 0, "v": 1}, {"t": 2.7, "v": 1}, {"t": 3.1, "v": 1.12, "ease": "snappy"}]},
+        "background": {"kind": "solid", "tone": "ink"},
+        "transitionIn": {"kind": "zoom", "seconds": 0.35},
+        "layers": [
+          {"id": "counter", "type": "counter", "value": 90, "from": 0, "unit": "%", "label": "do tempo de revisão", "slot": "panel", "start": 2.6, "end": 5.4, "enter": "pop", "source": "speech", "quote": "economiza 90% do tempo de revisao"},
+          {"id": "lead", "type": "text", "text": "Com esse cuidado você economiza", "role": "body", "mode": "lines", "slot": "panel", "start": 0.25, "end": 2.55, "align": "center", "exit": "fade", "source": "speech", "quote": "com esse cuidado, voce economiza"}
+        ]
+      },
+      {
+        "id": "fechamento", "name": "Fechamento", "start": 21.629, "end": 25.64,
+        "camera": {"layout": "full", "zoom": [{"t": 0, "v": 1.12}, {"t": 4.0, "v": 1.02, "ease": "inOut"}]},
+        "transitionIn": {"kind": "iris", "seconds": 0.45},
+        "layers": [
+          {"id": "importante", "type": "text", "text": "O mais importante", "role": "label", "mode": "words", "slot": "bottom", "start": 0.3, "end": 1.8, "style": {"background": "accent"}, "exit": "fade", "source": "speech", "quote": "o mais importante"},
+          {"id": "cta", "type": "text", "text": "Revise antes de publicar", "role": "headline", "mode": "words", "highlight": ["publicar"], "emphasis": "underline", "slot": "bottom", "start": 1.9, "end": 4.0, "style": {"background": "scrim"}, "enter": "pop", "source": "brief", "quote": "revise antes de publicar"}
+        ]
+      }
+    ],
+    "sfx": [
+      {"kind": "whoosh", "at": 4.62, "gainDb": -22},
+      {"kind": "tick", "at": 11.37, "gainDb": -24},
+      {"kind": "pop", "at": 18.8, "gainDb": -20}
+    ]
+  }
+}

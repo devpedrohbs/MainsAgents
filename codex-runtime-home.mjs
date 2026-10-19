@@ -1,7 +1,7 @@
 import { homedir } from 'node:os';
 import { join, resolve, relative, isAbsolute } from 'node:path';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, lstatSync, statSync, realpathSync, linkSync, symlinkSync, unlinkSync, copyFileSync, constants } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, lstatSync, statSync, realpathSync, linkSync, symlinkSync, unlinkSync, copyFileSync, constants, openSync, readSync, closeSync } from 'node:fs';
 import { shareCodexSecretKey } from './codex-shared-key.mjs';
 
 const connectionFiles = ['config.toml', 'auth.json', '.credentials.json'];
@@ -15,6 +15,51 @@ export function standaloneCodexEnvironment(source = process.env) {
       && !(key === 'CODEX_CLI_PATH' && !fromDesktop)) delete env[key];
   }
   return env;
+}
+const desktopMarkers = localAppData => [
+  ...(localAppData ? [join(localAppData, 'OpenAI', 'Codex', '/')] : []), '\\appdata\\local\\openai\\codex\\', '\\windowsapps\\openai.codex_', '/codex.app/contents/',
+].map(path => path.replaceAll('/', '\\').toLowerCase());
+const isDesktopPath = (value, localAppData) => {
+  const path = String(value).replaceAll('/', '\\').toLowerCase();
+  return desktopMarkers(localAppData).some(marker => path.includes(marker));
+};
+const tomlString = raw => {
+  raw = raw.trim();
+  if (raw.startsWith("'")) return raw.slice(1, raw.indexOf("'", 1));
+  try { return JSON.parse(raw.match(/^"(?:[^"\\]|\\.)*"/)?.[0] ?? ''); } catch { return ''; }
+};
+/**
+ * Codex Desktop internals (node_repl kernel, computer-use notify) only run under the
+ * Desktop's registered sandbox service. The standalone CLI must neither launch them nor
+ * let its Windows sandbox setup ACL-validate the Desktop runtime directory: a running
+ * Desktop node_repl.exe is locked (os error 32) and every shell command then fails with
+ * "setup refresh had errors". Sandbox policy, user MCP servers and auth are unchanged.
+ */
+export function desktopRuntimeIsolation({ home, configText = '', source = process.env, platform = process.platform }) {
+  const localAppData = source.LOCALAPPDATA, args = [];
+  let section = '', notifyFromDesktop = false;
+  const desktopServers = new Set(), stdioServers = new Set(), ownLocalAppData = new Set();
+  for (const line of configText.split(/\r?\n/)) {
+    const header = line.match(/^\s*\[([^\]]+)\]\s*(?:#.*)?$/);
+    if (header) { section = header[1].trim(); continue; }
+    const entry = line.match(/^\s*([\w-]+)\s*=\s*(.+)$/);
+    if (!entry) continue;
+    const server = section.match(/^mcp_servers\.([\w-]+)$/)?.[1];
+    if (server && entry[1] === 'command') (isDesktopPath(tomlString(entry[2]), localAppData) ? desktopServers : stdioServers).add(server);
+    const envOf = section.match(/^mcp_servers\.([\w-]+)\.env$/)?.[1];
+    if (envOf && entry[1] === 'LOCALAPPDATA') ownLocalAppData.add(envOf);
+    if (!section && entry[1] === 'notify' && (entry[2].match(/"(?:[^"\\]|\\.)*"|'[^']*'/g) ?? []).some(item => isDesktopPath(tomlString(item), localAppData))) notifyFromDesktop = true;
+  }
+  for (const server of desktopServers) args.push('-c', `mcp_servers.${server}.enabled=false`);
+  if (notifyFromDesktop) args.push('-c', 'notify=[]');
+  if (platform !== 'win32' || !localAppData) return { env: {}, args, desktopServers: [...desktopServers] };
+  // The sandbox setup helper discovers Desktop runtimes through LOCALAPPDATA. Point only
+  // the CLI process at a private empty directory; commands and user MCP servers keep the real value.
+  const isolated = join(home, 'desktop-isolation');
+  mkdirSync(isolated, { recursive: true, mode: 0o700 });
+  args.push('-c', `shell_environment_policy.set.LOCALAPPDATA=${JSON.stringify(localAppData)}`);
+  for (const server of stdioServers) if (!desktopServers.has(server) && !ownLocalAppData.has(server)) args.push('-c', `mcp_servers.${server}.env.LOCALAPPDATA=${JSON.stringify(localAppData)}`);
+  return { env: { LOCALAPPDATA: isolated }, args, desktopServers: [...desktopServers] };
 }
 const fingerprint = file => existsSync(file) ? createHash('sha256').update(readFileSync(file)).digest('hex') : null;
 const sameFile = (left, right) => {
@@ -88,13 +133,15 @@ export function prepareCodexRuntimeHome({ home, sharedHome = process.env.CODEX_H
     } else symlinkSync(source, target, process.platform === 'win32' ? 'junction' : 'dir');
   }
   shareSecretKey(sharedHome, home);
+  const config = join(home, 'config.toml');
+  const isolation = desktopRuntimeIsolation({ home, configText: existsSync(config) ? readFileSync(config, 'utf8') : '' });
   const timer = setInterval(() => { try { sync(); } catch (error) { onError(error); } }, 1000);
   timer.unref();
   return {
-    home, sharedHome, sync,
-    env: { ...standaloneCodexEnvironment(), CODEX_HOME: home, CODEX_SQLITE_HOME: home },
+    home, sharedHome, sync, isolation,
+    env: { ...standaloneCodexEnvironment(), ...isolation.env, CODEX_HOME: home, CODEX_SQLITE_HOME: home },
     // CLI overrides also prevent a shared sqlite_home config from leaking history.
-    args: ['-c', `sqlite_home=${JSON.stringify(home)}`],
+    args: ['-c', `sqlite_home=${JSON.stringify(home)}`, ...isolation.args],
     close() { clearInterval(timer); sync(); },
   };
 }
@@ -112,6 +159,28 @@ function findRollout(directory, threadId) {
 }
 
 /** Import only the old conversation requested by MainsAgents. Originals stay intact. */
+/**
+ * Names of the application tools a thread was started with (`dynamic_tools` of its rollout session_meta). The app-server
+ * only accepts tools on thread/start and a resumed thread keeps the stored ones, so this is the truth for an older thread.
+ * Returns null when the rollout or its first record cannot be read.
+ */
+export function threadDynamicToolNames({ home }, threadId) {
+  if (!/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(threadId)) return null;
+  const file = findRollout(join(home, 'sessions'), threadId) ?? findRollout(join(home, 'archived_sessions'), threadId);
+  if (!file) return null;
+  try {
+    // session_meta is the first line; read at most 2 MB of it, never the whole (possibly large) rollout.
+    const handle = openSync(file, 'r'), buffer = Buffer.alloc(2 * 1024 * 1024);
+    let length; try { length = readSync(handle, buffer, 0, buffer.length, 0); } finally { closeSync(handle); }
+    const text = buffer.subarray(0, length).toString('utf8'), end = text.indexOf('\n');
+    if (end < 0 && length === buffer.length) return null;
+    const first = end < 0 ? text : text.slice(0, end);
+    const meta = JSON.parse(first), payload = meta?.payload ?? meta;
+    if (meta?.type !== undefined && meta.type !== 'session_meta') return null;
+    return Array.isArray(payload?.dynamic_tools) ? payload.dynamic_tools.map((tool) => tool?.name).filter((name) => typeof name === 'string') : [];
+  } catch { return null; }
+}
+
 export function importLegacyCodexThread({ home, sharedHome }, threadId) {
   if (!/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(threadId)) throw new Error('Invalid Codex thread identifier.');
   if (findRollout(join(home, 'sessions'), threadId) || findRollout(join(home, 'archived_sessions'), threadId)) return false;

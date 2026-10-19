@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type PropsWithChildren } from 'react';
 import type { Agent, AgentId } from '../agents/model/Agent';
-import type { AgentSession, ChatActivityItem, ChatContextReference, ChatItem, ChatMessageItem, ChatRunState, ReasoningEffort } from './model/Chat';
+import type { AgentSession, ChatActivityItem, ChatAttachment, ChatContextReference, ChatItem, ChatMessageItem, ChatRunState, ReasoningEffort } from './model/Chat';
+import type {ChatEditRequestView} from './chatEdits';
 import type { CodexEvent } from './CodexService';
 import type { AiProvider } from './AiProvider';
 import { sessionProviderId, sessionRemoteId } from './AiProvider';
@@ -16,23 +17,67 @@ import {storageProfile} from '../../data/IndexedDbStateStore';
 import {mergeNativeDelegations,type NativeDelegationSnapshot} from './nativeDelegations';
 import {finishResponseTiming,recoverResponseTiming,startRunItem} from './responseTiming';
 import {createComparisonLauncher,deriveComparisons,type AgentComparison,type AgentComparisonInput} from './agentComparison';
-import {activeAfterCreate,childContentLink} from './contentSessions';
+import {activeAfterCreate,chatSessionSnapshot,childContentLink} from './contentSessions';
+import {activeScopeKey,contentScopesKey,continueTargetProblem,delegationBusy,emptyContentScopes,normalizeContentScopes,organizeSessions,rawScope,withOpened,withSelected,withVisible,withoutSession,type ContentScopeState,type OrganizeContext,type OrganizeRequest,type ScopeKey} from './contentScopes';
+import type {EditorialContent} from '../content/model';
+import {providerSwitchPlan} from './providerChoice';
+import {isMissingThreadError,isThreadNotLoadedError,recoveredSession,recoveryBriefing,recoveryNotice} from './sessionRecovery';
+import {contentDeletedEvent,deleteChatLocally,type ContentDeletedDetail} from '../content/contentDeletion';
 
 interface ChatContextValue {
   sessions: readonly AgentSession[];
   getAgentSessions: (agentId: AgentId) => AgentSession[];
   getActiveSession: (agentId: AgentId) => AgentSession | undefined;
   getRunState: (sessionId?: string) => ChatRunState;
-  createSession: (agentId: AgentId, title?: string, providerId?:AgentSession['providerId'], modelId?:string,editorial?:Pick<AgentSession,'contentId'|'topicId'|'contentTitle'>,activate?:boolean) => AgentSession;
-  openSession: (agentId: AgentId, sessionId: string) => void;
+  /** activate: true = active chat of its own scope; 'select' = also selects that scope; false = background child (never changes what is shown). */
+  createSession: (agentId: AgentId, title?: string, providerId?:AgentSession['providerId'], modelId?:string,editorial?:Pick<AgentSession,'contentId'|'topicId'|'contentTitle'>,activate?:boolean|'select') => AgentSession;
+  /** Opens a chat and, unless select is false, moves the workspace's content selection to that chat's scope. */
+  openSession: (agentId: AgentId, sessionId: string, options?:{select?:boolean}) => void;
+  /** Saved content scopes (per profile via the profile-isolated store): selection per workspace, active chat per workspace+agent+scope. */
+  contentScopes: ContentScopeState;
+  selectScope: (workspaceId:string, scope:ScopeKey) => void;
+  /** Legacy single active chat per agent: only a fallback before the user ever chose a scope. */
+  legacyActiveSessionId: (agentId:AgentId) => string|undefined;
+  /** The chat currently on screen in the side panel; automatic specialist views only open for it. */
+  reportFocusedSession: (sessionId?:string) => void;
+  isSessionBusy: (sessionId:string) => boolean;
+  /** Saves the chat the panel resolved and shows as its slot's pointer (never changes the selected scope). */
+  pinVisibleSession: (workspaceId:string, agentId:AgentId, scope:ScopeKey, sessionId:string) => void;
+  /**
+   * Explicit organize of General chats into one content. `current` reads the authoritative editorial/production state at apply time;
+   * the complete guard runs again on the live chats and the change is all-or-nothing (throws OrganizeRefused).
+   */
+  assignSessionsToContent: (request:OrganizeRequest, current:()=>Omit<OrganizeContext,'sessions'|'busy'>&{contents:readonly EditorialContent[]}, focusSessionId?:string) => void;
   renameSession: (sessionId: string, title: string) => void;
-  deleteSession: (sessionId: string) => void;
+  /** Resolves only after the removal is committed (desktop: durable host fence); rejects with the reason otherwise. */
+  deleteSession: (sessionId: string) => Promise<void>;
+  /** Chats of `ids` still responding in this window (a content deletion must stop them first). */
+  respondingSessions: (ids: readonly string[]) => string[];
+  /** Stops the responses of `ids` and waits (bounded) until they really ended; returns the ids still responding. */
+  stopSessions: (ids: readonly string[]) => Promise<string[]>;
   sendMessage: (agent: Agent, content: string, contextNodes?: ChatContextReference[], sessionId?: string, selectedSkill?: string) => void;
   runWorkflowMessage: (agent: Agent, content: string, title: string, sessionId?: string) => Promise<{sessionId:string;content:string}>;
+  /**
+   * An unequivocal edit request: the user message (with its attached videos) is saved, then the HOST decides on that saved
+   * message and starts the local edit engine. No provider turn is sent for it (no "I can't edit" reply).
+   */
+  sendEditRequest: (agent: Agent, content: string, attachments: readonly ChatAttachment[], sessionId?: string, kind?: 'edit' | 'adjust', sourcePair?: ChatMessageItem['sourcePair']) => Promise<void>;
+  /** Cancels the camera/screen offset measurement (or the pending manual choice) of one saved request; nothing was started. */
+  cancelChatEditMeasure: (sessionId: string, messageId: string) => Promise<void>;
+  /** Host state of the edit requests of the loaded chats, by user message id. */
+  chatEditRequests: Readonly<Record<string, ChatEditRequestView>>;
+  /** Admits (or reconciles) the request of a saved message; `choice`/`editorAgentId` answer a needs-choice/needs-editor state. */
+  admitChatEdit: (sessionId: string, messageId: string, extra?: {choice?: string; editorAgentId?: string; sync?: {offsetSeconds: number}}) => Promise<void>;
+  refreshChatEdits: (sessionId: string) => Promise<void>;
   getProviderStatus: (providerId: NonNullable<AgentSession['providerId']>) => Promise<import('./AiProvider').ProviderStatus>;
   cancelExecution: (sessionId?: string) => void;
   listModels:(providerId:NonNullable<AgentSession['providerId']>)=>Promise<readonly {id:string;name:string}[]>;
   setSessionModel:(sessionId:string,modelId?:string)=>void;
+  /**
+   * Changes the provider of a chat that never talked to a provider (no messages, thread, pair, handoff or production; not busy
+   * or with specialist work queued/running). Anything else throws: the caller opens a new chat instead. Never sends.
+   */
+  setSessionProvider:(sessionId:string,providerId:'codex'|'claude',modelId?:string,guard?:{productionSessionIds?:ReadonlySet<string>})=>void;
   setSessionReasoningEffort:(sessionId:string,effort:ReasoningEffort)=>void;
   handoffs: readonly AgentHandoff[];
   collaborationId: string | null;
@@ -62,6 +107,12 @@ export function ChatProvider({ children, providers }: PropsWithChildren<{provide
   const [collaborationId,showCollaboration]=useState<string|null>(null);
   const [comparisonSelection,showComparison]=useState<string|null>(null);
   const [activeSessionIds,setActiveSessionIds]=usePersistentState<Record<AgentId,string>>('active-sessions',{});
+  const [savedScopes,setSavedScopes]=usePersistentState<ContentScopeState>(contentScopesKey,emptyContentScopes);
+  // Always the current key contract (pre-release delimited slot keys are rewritten as JSON tuples; valid entries are kept).
+  const contentScopes=useMemo(()=>normalizeContentScopes(savedScopes),[savedScopes]);
+  const setContentScopes=useCallback((change:(state:ContentScopeState)=>ContentScopeState)=>setSavedScopes(current=>change(normalizeContentScopes(current))),[setSavedScopes]);
+  const workspaceOf=(agentId:string)=>agentsRef.current.find(agent=>agent.id===agentId)?.workspaceId;
+  const focusedSession=useRef<string|undefined>(undefined);
   const [defaultCodexModelId]=usePersistentState<string>('default-codex-model','');
   const [runStates,setRunStates]=useState<Record<string,ChatRunState>>({});
   const executions=useRef<Record<string,string>>({});
@@ -74,7 +125,9 @@ export function ChatProvider({ children, providers }: PropsWithChildren<{provide
       const previousJobs=nativeJobs.current;nativeJobs.current=snapshot.jobs;
       setSessions(current=>mergeNativeDelegations(current,snapshot,agentsRef.current.map(agent=>agent.id)));
       setRunStates(current=>{const states={...current};for(const job of snapshot.jobs){if(inFlightSessions.current.has(job.targetSessionId)||previousJobs.find(item=>item.id===job.id)?.status===job.status)continue;states[job.targetSessionId]=['queued','running'].includes(job.status)?'using-tool':job.status==='completed'?'finished':job.status==='cancelled'?'idle':'error';}return JSON.stringify(current)===JSON.stringify(states)?current:states;});
-      for(const job of snapshot.jobs)if(['queued','running'].includes(job.status)&&!nativeShown.current.has(job.id)){nativeShown.current.add(job.id);if(!hasVisibleChats(job.sourceSessionId,job.targetSessionId))showCollaboration(job.id);}
+      for(const job of snapshot.jobs)if(['queued','running'].includes(job.status)&&!nativeShown.current.has(job.id)){nativeShown.current.add(job.id);
+        // Background work never takes over the screen: only the chat the user is looking at may open its specialist view.
+        if(job.sourceSessionId===focusedSession.current&&!hasVisibleChats(job.sourceSessionId,job.targetSessionId))showCollaboration(job.id);}
     }catch{/* Native queue keeps its durable data while the UI is disconnected. */}};
     void refresh();const timer=setInterval(()=>void refresh(),800);return()=>{active=false;clearInterval(timer);};
   },[setSessions,hasVisibleChats]);
@@ -92,29 +145,81 @@ export function ChatProvider({ children, providers }: PropsWithChildren<{provide
   },[sessionsReady,setSessions]);
 
   const updateSession=useCallback((sessionId:string,change:(session:AgentSession)=>AgentSession)=>setSessions((current)=>current.map((session)=>session.id===sessionId?change(session):session)),[setSessions]);
-  const createSession=useCallback((agentId:AgentId,title?:string,providerId:AgentSession['providerId']='codex',modelId?:string,editorial?:Pick<AgentSession,'contentId'|'topicId'|'contentTitle'>,activate=true)=>{const session={...makeSession(agentId,title,providerId,modelId??(providerId==='codex'?defaultCodexModelId||undefined:undefined)),...childContentLink(editorial)};pendingSessions.current.set(session.id,session);setSessions((current)=>[session,...current]);setActiveSessionIds((current)=>activeAfterCreate(current,agentId,session.id,activate));setRunStates((current)=>({...current,[session.id]:'idle'}));return session},[defaultCodexModelId,setActiveSessionIds,setSessions]);
-  const openSession=useCallback((agentId:AgentId,sessionId:string)=>setActiveSessionIds((current)=>({...current,[agentId]:sessionId})),[setActiveSessionIds]);
+  const createSession=useCallback((agentId:AgentId,title?:string,providerId:AgentSession['providerId']='codex',modelId?:string,editorial?:Pick<AgentSession,'contentId'|'topicId'|'contentTitle'>,activate:boolean|'select'=true)=>{const session={...makeSession(agentId,title,providerId,modelId??(providerId==='codex'?defaultCodexModelId||undefined:undefined)),...childContentLink(editorial)};pendingSessions.current.set(session.id,session);setSessions((current)=>[session,...current]);setActiveSessionIds((current)=>activeAfterCreate(current,agentId,session.id,activate!==false));
+    // A background chat (specialist child, workflow, Canvas) never becomes a slot pointer: what the user sees stays put.
+    const workspaceId=workspaceOf(agentId);if(workspaceId&&activate!==false)setContentScopes(current=>withOpened(current,workspaceId,session,activate==='select'));
+    setRunStates((current)=>({...current,[session.id]:'idle'}));return session},[defaultCodexModelId,setActiveSessionIds,setContentScopes,setSessions]);
+  const openSession=useCallback((agentId:AgentId,sessionId:string,options?:{select?:boolean})=>{
+    setActiveSessionIds((current)=>({...current,[agentId]:sessionId}));
+    const session=sessionsRef.current.find(item=>item.id===sessionId)??pendingSessions.current.get(sessionId),workspaceId=workspaceOf(agentId);
+    if(session&&session.agentId===agentId&&workspaceId)setContentScopes(current=>withOpened(current,workspaceId,session,options?.select!==false));
+  },[setActiveSessionIds,setContentScopes]);
+  const selectScope=useCallback((workspaceId:string,scope:ScopeKey)=>setContentScopes(current=>withSelected(current,workspaceId,scope)),[setContentScopes]);
+  const reportFocusedSession=useCallback((sessionId?:string)=>{focusedSession.current=sessionId;},[]);
+  // Organize/delete guard: a responding chat or specialist work queued/running on EITHER side of a job.
+  const isSessionBusy=useCallback((sessionId:string)=>inFlightSessions.current.has(sessionId)||delegationBusy(nativeJobs.current,sessionId),[]);
+  const pinVisibleSession=useCallback((workspaceId:string,agentId:AgentId,scope:ScopeKey,sessionId:string)=>setContentScopes(current=>current.selected[workspaceId]&&current.active[activeScopeKey(workspaceId,agentId,scope)]===sessionId?current:withVisible(current,workspaceId,agentId,scope,sessionId)),[setContentScopes]);
+  const assignSessionsToContent=useCallback((request:OrganizeRequest,current:()=>Omit<OrganizeContext,'sessions'|'busy'>&{contents:readonly EditorialContent[]},focusSessionId?:string)=>{
+    // All-or-nothing on the live chats: the store applies the updater synchronously, so the guard and the change see the same state.
+    let refused:unknown;
+    setSessions(live=>{try{return organizeSessions(live,request,{...current(),busy:isSessionBusy});}catch(error){refused=error;return live;}});
+    if(refused)throw refused;
+    // The organized chat stays on screen, now inside its content.
+    const focus=sessionsRef.current.find(session=>session.id===focusSessionId),workspaceId=focus&&workspaceOf(focus.agentId);
+    if(focus&&workspaceId)setContentScopes(state=>withOpened(state,workspaceId,{...focus,contentId:request.contentId},true));
+  },[isSessionBusy,setContentScopes,setSessions]);
   const renameSession=useCallback((sessionId:string,title:string)=>{const clean=title.trim();if(clean)updateSession(sessionId,(session)=>({...session,title:clean,updatedAt:new Date().toISOString()}))},[updateSession]);
-  const deleteSession=useCallback((sessionId:string)=>{
-    if(inFlightSessions.current.has(sessionId)||nativeBusy(sessionId))return;
-    const target=sessions.find((session)=>session.id===sessionId);if(!target)return;
-    const next=sessions.filter((session)=>session.agentId===target.agentId&&session.id!==sessionId).sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt))[0];
+  const deleteSession=useCallback(async(sessionId:string)=>{
+    const pt=document.documentElement.lang==='pt-BR';
+    if(inFlightSessions.current.has(sessionId)||delegationBusy(nativeJobs.current,sessionId))throw new Error(pt?'Esta conversa ainda está respondendo ou tem trabalho de especialista em andamento. Pare antes de excluir.':'This chat is still responding or has specialist work running. Stop it before deleting.');
+    const target=sessionsRef.current.find((session)=>session.id===sessionId);if(!target)throw new Error(pt?'Esta conversa não existe mais.':'This chat no longer exists.');
+    // The legacy pointer falls back inside the SAME scope (content or General), never to another content's chat.
+    const next=sessionsRef.current.filter((session)=>session.agentId===target.agentId&&session.id!==sessionId&&rawScope(session)===rawScope(target)).sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt))[0];
+    // Desktop: the host removes it in one transaction (with pointers and drafts) and fences it against late writers; it
+    // refuses a chat that conducts a production (the whole content must be deleted instead).
+    if(window.mainsAgentsDesktop?.state&&window.mainsAgentsDesktop.content)await deleteChatLocally(sessionId);
+    else if(window.mainsAgentsDesktop?.state){const response=await fetch(`/api/content/delegations/sessions/${encodeURIComponent(sessionId)}?profile=${encodeURIComponent(storageProfile())}`,{method:'DELETE'});if(!response.ok)throw new Error((await response.json().catch(()=>({}))).error??'Could not delete this chat.');}
     abortControllers.current[sessionId]?.abort();delete abortControllers.current[sessionId];delete executions.current[sessionId];pendingSessions.current.delete(sessionId);
     writeChatDraft(target.agentId,sessionId,{text:'',skill:null});
-    const remove=()=>{nativeGeneration.current++;setSessions((current)=>current.filter((session)=>session.id!==sessionId).map(session=>session.agentConnection?.targetSessionId===sessionId?{...session,agentConnection:{...session.agentConnection,targetSessionId:undefined}}:session));};
-    if(window.mainsAgentsDesktop?.state)void fetch(`/api/content/delegations/sessions/${encodeURIComponent(sessionId)}?profile=${encodeURIComponent(storageProfile())}`,{method:'DELETE'}).then(async response=>{if(!response.ok)throw new Error((await response.json()).error);remove();}).catch(error=>window.dispatchEvent(new CustomEvent('mainsagents:persistence-error',{detail:error.message})));else remove();
+    nativeGeneration.current++;
+    setSessions((current)=>current.filter((session)=>session.id!==sessionId).map(session=>session.agentConnection?.targetSessionId===sessionId?{...session,agentConnection:{...session.agentConnection,targetSessionId:undefined}}:session));
     setActiveSessionIds((current)=>{if(current[target.agentId]!==sessionId)return current;const result={...current};if(next)result[target.agentId]=next.id;else delete result[target.agentId];return result;});
-  },[sessions,setActiveSessionIds,setSessions]);
+    setContentScopes(current=>withoutSession(current,sessionId));
+  },[setActiveSessionIds,setContentScopes,setSessions]);
+  const respondingSessions=useCallback((ids:readonly string[])=>ids.filter(id=>inFlightSessions.current.has(id)),[]);
+  const stopSessions=useCallback(async(ids:readonly string[])=>{
+    for(const id of ids)if(inFlightSessions.current.has(id))cancelRef.current(id);
+    const deadline=Date.now()+10_000;
+    while(ids.some(id=>inFlightSessions.current.has(id))&&Date.now()<deadline)await new Promise(resolve=>window.setTimeout(resolve,100));
+    return ids.filter(id=>inFlightSessions.current.has(id));
+  },[]);
+  // A local content deletion: nothing still in memory for its chats may be written back (stale native/production snapshots).
+  useEffect(()=>{const handle=(event:Event)=>{const {sessionIds}=(event as CustomEvent<ContentDeletedDetail>).detail;nativeGeneration.current++;
+    for(const id of sessionIds){abortControllers.current[id]?.abort();delete abortControllers.current[id];delete executions.current[id];pendingSessions.current.delete(id);}
+    setRunStates(current=>{const next={...current};for(const id of sessionIds)delete next[id];return next;});};
+    window.addEventListener(contentDeletedEvent,handle);return()=>window.removeEventListener(contentDeletedEvent,handle);},[]);
   const listModels=useCallback(async(providerId:NonNullable<AgentSession['providerId']>)=>{const provider=providers.find((item)=>item.id===providerId);if(!provider)throw new Error(`Provider ${providerId} is unavailable`);return provider.listModels()},[providers]);
   const getProviderStatus=useCallback(async(providerId:NonNullable<AgentSession['providerId']>)=>{const provider=providers.find((item)=>item.id===providerId);if(!provider)throw new Error(`Provider ${providerId} is unavailable`);return provider.getStatus()},[providers]);
   const setSessionModel=useCallback((sessionId:string,modelId?:string)=>updateSession(sessionId,(session)=>({...session,modelId:modelId||undefined,updatedAt:new Date().toISOString()})),[updateSession]);
+  const setSessionProvider=useCallback((sessionId:string,providerId:'codex'|'claude',modelId?:string,guard?:{productionSessionIds?:ReadonlySet<string>})=>{
+    // Checked against the live chat (not the rendered one) so a reply or native job that just started is never rebound.
+    const live=sessionsRef.current.find(item=>item.id===sessionId)??pendingSessions.current.get(sessionId);
+    if(!live)throw new Error('Chat unavailable.');
+    const plan=providerSwitchPlan(live,{busy:inFlightSessions.current.has(sessionId)||delegationBusy(nativeJobs.current,sessionId),productionSessionIds:guard?.productionSessionIds});
+    if(plan.kind!=='in-place')throw new Error(plan.reason==='busy'?'Wait for the current response.':'This chat is already bound to its provider; open a new chat.');
+    const change=(session:AgentSession):AgentSession=>({...session,providerId,modelId:modelId||(providerId==='codex'?defaultCodexModelId||undefined:undefined),updatedAt:new Date().toISOString()});
+    const pending=pendingSessions.current.get(sessionId);if(pending)pendingSessions.current.set(sessionId,change(pending));
+    updateSession(sessionId,change);
+  },[defaultCodexModelId,updateSession]);
   const setSessionReasoningEffort=useCallback((sessionId:string,reasoningEffort:ReasoningEffort)=>updateSession(sessionId,(session)=>({...session,reasoningEffort,updatedAt:new Date().toISOString()})),[updateSession]);
   const setAgentConnection=useCallback((sessionId:string,targetAgentId:string,enabled:boolean)=>{
     if(inFlightSessions.current.has(sessionId))throw new Error('Wait for the current response.');
     const session=sessionsRef.current.find(item=>item.id===sessionId)??pendingSessions.current.get(sessionId);
     const source=agentsRef.current.find(item=>item.id===session?.agentId),target=agentsRef.current.find(item=>item.id===targetAgentId);
     if(!session||!source||enabled&&(!target||source.id===target.id||source.workspaceId!==target.workspaceId))throw new Error('Choose another agent in this workspace.');
-    updateSession(sessionId,current=>({...current,agentConnection:{enabled,targetAgentId,targetSessionId:current.agentConnection?.targetAgentId===targetAgentId?current.agentConnection.targetSessionId:undefined},updatedAt:new Date().toISOString()}));
+    // A saved continue target survives only while it is the same agent's chat of this workspace and content.
+    const keep=(current:AgentSession)=>{const id=current.agentConnection?.targetAgentId===targetAgentId?current.agentConnection.targetSessionId:undefined;const target=id?sessionsRef.current.find(item=>item.id===id)??pendingSessions.current.get(id):undefined;return id&&!continueTargetProblem(current,target,targetAgentId,agentsRef.current)?id:undefined;};
+    updateSession(sessionId,current=>({...current,agentConnection:{enabled,targetAgentId,targetSessionId:keep(current)},updatedAt:new Date().toISOString()}));
   },[updateSession]);
   const newConnectedSession=useCallback((sessionId:string)=>{
     const session=sessionsRef.current.find(item=>item.id===sessionId),connection=session?.agentConnection;
@@ -176,9 +281,6 @@ export function ChatProvider({ children, providers }: PropsWithChildren<{provide
         let providerContent=providerSkillPrompt(agent,clean,selectedSkill);
         if(!selectedSkill)providerContent+=`\n\nMainsAgents optional editorial delivery format:\n${chatDeliveryInstructions}`;
         // Read when sending (not at click time): an approval made just before must reach the prompt.
-        const productionSnapshot=(context:AgentSession['productionContext'])=>context?`\n\nMainsAgents authoritative production snapshot (reference data, not authorization to run tools):\n${JSON.stringify(context)}\nThe app owns these production steps. Use its production controls for approvals and scheduling. Never claim a step advanced or a post was scheduled merely from your text response.`:'';
-        // Content session before any production: its identity only (never another content or chat).
-        const sessionSnapshot=(current:AgentSession)=>current.productionContext?productionSnapshot(current.productionContext):current.contentId?`\n\nMainsAgents content session (reference data for THIS conversation only):\n${JSON.stringify({contentId:current.contentId,title:current.contentTitle??current.title,production:'none yet: no script, recording or edit has started in the app'})}\nAnswer only about this content; other contents and chats are not part of this conversation. Productions start from the app controls, never from your text.`:'';
         const connection=session.agentConnection?.enabled?session.agentConnection:undefined;
         const available=handoffTargets(agent,agentsRef.current,ancestors);
         // Comparison sessions never fan out unless the user later enables a connection explicitly.
@@ -189,12 +291,29 @@ export function ChatProvider({ children, providers }: PropsWithChildren<{provide
         const remoteId=migrate?undefined:oldRemoteId;
         if(migrate)providerContent=`Saved conversation before enabling specialist calls:\n${session.messages.filter(item=>item.type==='message').map(item=>`${item.role}: ${item.content}`).join('\n\n')}\n\nCurrent request:\n${providerContent}`;
         await saveNow();
-        const thread=remoteId?await provider.resumeSession(remoteId):await provider.createSession({localSessionId:sessionId,agentId:agent.id,agentName:agent.name,workspaceId:agent.workspaceId,instructions:agent.instructions,modelId:session.modelId,tools:agent.tools,skillsDirectory:agent.skillsDirectory,skills:agent.skills});
-        if(!remoteId)updateSession(sessionId,(current)=>({...current,providerId:provider.id,remoteSessionId:thread.remoteSessionId,codexThreadId:provider.id==='codex'?thread.remoteSessionId:current.codexThreadId,delegationRuntimeVersion:provider.id==='codex'?2:undefined,previousCodexThreadId:migrate?oldRemoteId:current.previousCodexThreadId,updatedAt:new Date().toISOString()}));
+        const openThread=()=>provider.createSession({localSessionId:sessionId,agentId:agent.id,agentName:agent.name,workspaceId:agent.workspaceId,instructions:agent.instructions,modelId:session.modelId,tools:agent.tools,skillsDirectory:agent.skillsDirectory,skills:agent.skills,paperDesign:agent.paperDesign});
+        let thread:Awaited<ReturnType<typeof openThread>>,recoveredFrom:string|undefined;
+        if(!remoteId)thread=await openThread();
+        else try{thread=await provider.resumeSession(remoteId);}catch(error){
+          // Only a missing/expired provider thread is replaced (never by age); the saved chat goes along once as reference text.
+          if(!isMissingThreadError(error)||controller.signal.aborted)throw error;
+          thread=await openThread();recoveredFrom=remoteId;
+          const live=sessionsRef.current.find(item=>item.id===sessionId)??session;
+          providerContent=recoveryBriefing(live.messages,userMessageId)+providerContent;
+        }
+        if(recoveredFrom){const at=new Date().toISOString();updateSession(sessionId,current=>({...recoveredSession(current,provider.id,thread.remoteSessionId,recoveredFrom!,at),messages:[...current.messages,recoveryNotice(makeId('thread-recovery'),document.documentElement.lang==='pt-BR')]}));}
+        else if(!remoteId)updateSession(sessionId,(current)=>({...current,providerId:provider.id,remoteSessionId:thread.remoteSessionId,codexThreadId:provider.id==='codex'?thread.remoteSessionId:current.codexThreadId,delegationRuntimeVersion:provider.id==='codex'?2:undefined,previousCodexThreadId:migrate?oldRemoteId:current.previousCodexThreadId,updatedAt:new Date().toISOString()}));
         await saveNow();
         if(controller.signal.aborted)throw new Error('Execution cancelled.');
         const live=sessionsRef.current.find(item=>item.id===sessionId)??session;
-        const execution=await provider.sendMessage({remoteSessionId:thread.remoteSessionId,content:providerContent+sessionSnapshot(live),modelId:session.modelId,reasoningEffort:session.reasoningEffort??'medium',instructions:agent.instructions,agentId:agent.id,agentName:agent.name,role:agent.role,workspaceId:agent.workspaceId,tools:agent.tools,skillsDirectory:agent.skillsDirectory,skills:agent.skills,firstMessage:!remoteId,history:(sessionsRef.current.some(item=>item.id===sessionId)?live.messages:session.messages).filter((item):item is ChatMessageItem=>item.type==='message'&&item.id!==userMessageId).map((item)=>({role:item.role,content:item.content})),context:contextNodes.map((node)=>({id:node.nodeId,kind:node.kind,label:node.label,content:node.content})),delegation:{sourceAgentId:agent.id,workspaceId:agent.workspaceId,targets:targets.map(item=>({id:item.id,name:item.name,role:item.role})),connectedAgentId:connection?.targetAgentId}});
+        const turn={remoteSessionId:thread.remoteSessionId,content:providerContent+chatSessionSnapshot(live),modelId:session.modelId,reasoningEffort:session.reasoningEffort??'medium',instructions:agent.instructions,agentId:agent.id,agentName:agent.name,role:agent.role,workspaceId:agent.workspaceId,tools:agent.tools,skillsDirectory:agent.skillsDirectory,skills:agent.skills,paperDesign:agent.paperDesign,firstMessage:!remoteId||!!recoveredFrom,history:(sessionsRef.current.some(item=>item.id===sessionId)?live.messages:session.messages).filter((item):item is ChatMessageItem=>item.type==='message'&&item.id!==userMessageId).map((item)=>({role:item.role,content:item.content})),context:contextNodes.map((node)=>({id:node.nodeId,kind:node.kind,label:node.label,content:node.content})),delegation:{sourceAgentId:agent.id,workspaceId:agent.workspaceId,targets:targets.map(item=>({id:item.id,name:item.name,role:item.role})),connectedAgentId:connection?.targetAgentId}};
+        let execution;
+        try{execution=await provider.sendMessage(turn);}catch(error){
+          // Refused before any turn started (thread unloaded after a restart): resume the SAME thread and send once more.
+          if(!isThreadNotLoadedError(error)||controller.signal.aborted)throw error;
+          await provider.resumeSession(thread.remoteSessionId);
+          execution=await provider.sendMessage(turn);
+        }
         executions.current[sessionId]=execution.executionId;
         if(controller.signal.aborted){await provider.cancelExecution(execution.executionId);throw new Error('Execution cancelled.');}
         let output='', completed=false, delegationCount=0, imageCount=0;
@@ -235,8 +354,9 @@ export function ChatProvider({ children, providers }: PropsWithChildren<{provide
     const connection=liveSession.agentConnection;
     if(connection?.enabled&&connection.targetAgentId!==target.id)throw new Error('Use the selected connected agent.');
     const linked=connection?.enabled&&connection.targetAgentId===target.id;
-    const existing=linked&&request.sessionMode!=='new'&&connection.targetSessionId?sessionsRef.current.find(item=>item.id===connection.targetSessionId&&item.agentId===target.id)??pendingSessions.current.get(connection.targetSessionId):undefined;
-    if(existing&&existing.agentId!==target.id)throw new Error('The connected session belongs to another agent. Choose a new session.');
+    const candidate=linked&&request.sessionMode!=='new'&&connection.targetSessionId?sessionsRef.current.find(item=>item.id===connection.targetSessionId)??pendingSessions.current.get(connection.targetSessionId):undefined;
+    // Same rule as the native runtime: continue only in the connected agent's chat of the same workspace AND content (General↔General).
+    const existing=candidate&&!continueTargetProblem(liveSession,candidate,target.id,agentsRef.current)?candidate:undefined;
     if(existing&&inFlightSessions.current.has(existing.id))throw new Error('The connected agent is already responding. Wait before sending another task.');
     // A specialist child keeps the target agent's visible session and belongs to the requesting content.
     const child=existing??createSession(target.id,request.title,target.providerId??'codex',target.modelId,childContentLink(liveSession),false);
@@ -245,7 +365,7 @@ export function ChatProvider({ children, providers }: PropsWithChildren<{provide
     const handoff:AgentHandoff={...request,id:makeId('handoff'),sourceAgentId:source.id,sourceSessionId:sourceSession.id,targetSessionId:child.id,workspaceId:source.workspaceId,context:[...context],status:'running',createdAt:now,updatedAt:now};
     updateSession(child.id,current=>({...current,originHandoffId:current.originHandoffId??handoff.id}));
     updateSession(sourceSession.id,current=>({...current,handoffs:[...(current.handoffs??[]),handoff],updatedAt:now}));
-    if(!hasVisibleChats(handoff.sourceSessionId,handoff.targetSessionId))showCollaboration(handoff.id);
+    if(handoff.sourceSessionId===focusedSession.current&&!hasVisibleChats(handoff.sourceSessionId,handoff.targetSessionId))showCollaboration(handoff.id);
     const stop=()=>{const executionId=executions.current[child.id];if(executionId)void providers.find(provider=>provider.id===sessionProviderId(child))?.cancelExecution(executionId).catch(()=>{});abortControllers.current[child.id]?.abort();};
     parent?.signal.addEventListener('abort',stop,{once:true});
     let timedOut=false;
@@ -283,8 +403,40 @@ export function ChatProvider({ children, providers }: PropsWithChildren<{provide
     void executeMessage(agent,content,contextNodes,session,selectedSkill).catch(()=>{});
   },[activeSessionIds,createSession,executeMessage,sessions]);
 
+  const [chatEditRequests,setChatEditRequests]=useState<Record<string,ChatEditRequestView>>({});
+  const admitChatEdit=useCallback(async(sessionId:string,messageId:string,extra:{choice?:string;editorAgentId?:string;sync?:{offsetSeconds:number}}={})=>{
+    setChatEditRequests(current=>({...current,[messageId]:{...(current[messageId]??{sessionId,messageId}),status:'pending',error:undefined}}));
+    try{
+      await saveNow();
+      const response=await fetch(`/api/content/chat-edits?profile=${encodeURIComponent(storageProfile())}`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({requestId:crypto.randomUUID(),sessionId,messageId,...extra})});
+      const body=await response.json().catch(()=>({})) as {request?:ChatEditRequestView;error?:string;options?:ChatEditRequestView['options']};
+      if(!response.ok||!body.request){setChatEditRequests(current=>({...current,[messageId]:{...(current[messageId]??{sessionId,messageId}),sessionId,messageId,status:body.options?'needs-window':'failed',error:body.error??'O app não confirmou o pedido de edição.',...(body.options?{options:body.options}:{})}}));return;}
+      const view=body.request;setChatEditRequests(current=>({...current,[messageId]:view}));
+    }catch(error){setChatEditRequests(current=>({...current,[messageId]:{...(current[messageId]??{sessionId,messageId}),status:'failed',error:error instanceof Error?error.message:String(error)}}));}
+  },[]);
+  const refreshChatEdits=useCallback(async(sessionId:string)=>{
+    try{const response=await fetch(`/api/content/chat-edits?profile=${encodeURIComponent(storageProfile())}&session=${encodeURIComponent(sessionId)}`,{cache:'no-store'});if(!response.ok)return;
+     const body=await response.json() as {requests?:ChatEditRequestView[]};if(!Array.isArray(body.requests))return;
+     setChatEditRequests(current=>{const next={...current};let changed=false;for(const item of body.requests!){const old=current[item.messageId];if(old?.status==='pending')continue;if(JSON.stringify(old)!==JSON.stringify(item)){next[item.messageId]=item;changed=true;}}return changed?next:current;});
+    }catch{/* The saved request stays as last known; the next refresh retries. */}
+  },[]);
+  const cancelChatEditMeasure=useCallback(async(sessionId:string,messageId:string)=>{
+    const response=await fetch(`/api/content/chat-edits/cancel?profile=${encodeURIComponent(storageProfile())}`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({sessionId,messageId})});
+    const body=await response.json().catch(()=>({})) as {request?:ChatEditRequestView;error?:string};
+    if(!response.ok)throw new Error(body.error??'O app não confirmou o cancelamento.');if(body.request)setChatEditRequests(current=>({...current,[messageId]:body.request!}));
+  },[]);
+  const sendEditRequest=useCallback(async(agent:Agent,content:string,attachments:readonly ChatAttachment[],targetSessionId?:string,kind:'edit'|'adjust'='edit',sourcePair?:ChatMessageItem['sourcePair'])=>{
+    const clean=content.trim();if(!clean)return;
+    let session=targetSessionId?(sessionsRef.current.find((item)=>item.id===targetSessionId)??pendingSessions.current.get(targetSessionId)):sessionsRef.current.find((item)=>item.id===activeSessionIds[agent.id]);
+    if(targetSessionId&&!session)throw new Error('Conversa não encontrada.');
+    if(!session)session=createSession(agent.id,undefined,agent.providerId??'codex',agent.modelId);
+    const id=makeId('message'),at=new Date().toISOString(),sessionId=session.id;
+    updateSession(sessionId,current=>({...current,title:['New session','Nova sessão'].includes(current.title)?titleFromMessage(clean):current.title,updatedAt:at,messages:[...current.messages,{id,type:'message',role:'user',content:clean,createdAt:at,...(attachments.length?{attachments:[...attachments]}:{}),...(sourcePair?{sourcePair}:{}),chatEdit:{kind}}]}));
+    await admitChatEdit(sessionId,id);
+  },[activeSessionIds,admitChatEdit,createSession,updateSession]);
+
   const runWorkflowMessage=useCallback((agent:Agent,content:string,title:string,targetSessionId?:string)=>{
-    const session=targetSessionId?(sessions.find((item)=>item.id===targetSessionId)??pendingSessions.current.get(targetSessionId)):createSession(agent.id,title,agent.providerId??'codex',agent.modelId);
+    const session=targetSessionId?(sessions.find((item)=>item.id===targetSessionId)??pendingSessions.current.get(targetSessionId)):createSession(agent.id,title,agent.providerId??'codex',agent.modelId,undefined,false);
     if(!session)throw new Error('The linked agent session could not be found.');
     return executeMessage(agent,content,[],session);
   },[createSession,executeMessage,sessions]);
@@ -301,6 +453,8 @@ export function ChatProvider({ children, providers }: PropsWithChildren<{provide
       setSessions(current=>[...pair,...current.filter(session=>!ids.has(session.id))]);
       // Same-agent comparisons share one agent id: keep the Codex side (first) as that agent's active session.
       setActiveSessionIds(current=>({...current,...Object.fromEntries([...pair].reverse().map(session=>[session.agentId,session.id]))}));
+      // Explicit user action: each side becomes its agent's shown chat in ITS scope (the source chat's content); the selection never changes.
+      setContentScopes(current=>[...pair].reverse().reduce((state,session)=>{const workspaceId=workspaceOf(session.agentId);return workspaceId?withOpened(state,workspaceId,session,false):state;},current));
       setRunStates(current=>({...current,...Object.fromEntries(pair.map(session=>[session.id,'idle' as const]))}));
       await saveNow();
     },
@@ -310,9 +464,16 @@ export function ChatProvider({ children, providers }: PropsWithChildren<{provide
   const comparisons=useMemo(()=>deriveComparisons(sessions,agents),[sessions,agents]);
   const comparisonId=comparisonSelection&&comparisons.some(item=>item.id===comparisonSelection)?comparisonSelection:null;
 
+  const cancelRef=useRef<(sessionId?:string)=>void>(()=>{});
   const cancelExecution=useCallback((sessionId?:string)=>{if(!sessionId)return;for(const job of nativeJobs.current)if(job.targetSessionId===sessionId&&['queued','running'].includes(job.status))void fetch(`/api/content/delegations/${encodeURIComponent(job.id)}/cancel?profile=${encodeURIComponent(storageProfile())}`,{method:'POST'}).catch(()=>{});const executionId=executions.current[sessionId];const session=sessions.find((item)=>item.id===sessionId)??pendingSessions.current.get(sessionId);const provider=providers.find((item)=>item.id===sessionProviderId(session??{}));if(executionId&&provider)void provider.cancelExecution(executionId).catch((error)=>applyEvent(sessionId,{type:'execution.failed',executionId,code:'cancel_error',message:error instanceof Error?error.message:'Could not cancel execution',retryable:true}));abortControllers.current[sessionId]?.abort();},[applyEvent,providers,sessions]);
+  cancelRef.current=cancelExecution;
 
-  const value=useMemo<ChatContextValue>(()=>({sessions,handoffs:sessions.flatMap(session=>session.handoffs??[]),collaborationId,showCollaboration,comparisons,comparisonId,showComparison,startComparison,delegateToAgent,setAgentConnection,newConnectedSession,refreshSessionImages,getAgentSessions:(agentId)=>sessions.filter((session)=>session.agentId===agentId).sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt)),getActiveSession:(agentId)=>sessions.find((session)=>session.id===activeSessionIds[agentId]),getRunState:(sessionId)=>sessionId?runStates[sessionId]??'idle':'idle',createSession,openSession,renameSession,deleteSession,sendMessage,runWorkflowMessage,getProviderStatus,cancelExecution,listModels,setSessionModel,setSessionReasoningEffort}),[comparisons,comparisonId,startComparison,collaborationId,delegateToAgent,setAgentConnection,newConnectedSession,refreshSessionImages,activeSessionIds,cancelExecution,createSession,deleteSession,getProviderStatus,listModels,openSession,renameSession,runStates,runWorkflowMessage,sendMessage,sessions,setSessionModel,setSessionReasoningEffort]);
+  const value=useMemo<ChatContextValue>(()=>({sessions,handoffs:sessions.flatMap(session=>session.handoffs??[]),collaborationId,showCollaboration,comparisons,comparisonId,showComparison,startComparison,delegateToAgent,setAgentConnection,newConnectedSession,refreshSessionImages,sendEditRequest,chatEditRequests,admitChatEdit,cancelChatEditMeasure,refreshChatEdits,getAgentSessions:(agentId)=>sessions.filter((session)=>session.agentId===agentId).sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt)),getActiveSession:(agentId)=>{const workspaceId=agents.find(agent=>agent.id===agentId)?.workspaceId,scope=workspaceId?contentScopes.selected[workspaceId]:undefined;
+      if(!workspaceId||!scope)return sessions.find((session)=>session.id===activeSessionIds[agentId]);
+      const own=sessions.filter(session=>session.agentId===agentId&&rawScope(session)===scope).sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt));
+      // Scoped pointer, then the legacy active chat only when it is in this same scope, then the newest of the scope.
+      return own.find(session=>session.id===contentScopes.active[activeScopeKey(workspaceId,agentId,scope)])??own.find(session=>session.id===activeSessionIds[agentId])??own[0];},
+    contentScopes,selectScope,legacyActiveSessionId:(agentId)=>activeSessionIds[agentId],reportFocusedSession,isSessionBusy,pinVisibleSession,assignSessionsToContent,getRunState:(sessionId)=>sessionId?runStates[sessionId]??'idle':'idle',createSession,openSession,renameSession,deleteSession,respondingSessions,stopSessions,sendMessage,runWorkflowMessage,getProviderStatus,cancelExecution,listModels,setSessionModel,setSessionProvider,setSessionReasoningEffort}),[agents,contentScopes,selectScope,reportFocusedSession,isSessionBusy,pinVisibleSession,assignSessionsToContent,comparisons,comparisonId,startComparison,collaborationId,delegateToAgent,setAgentConnection,newConnectedSession,refreshSessionImages,activeSessionIds,cancelExecution,createSession,deleteSession,respondingSessions,stopSessions,getProviderStatus,listModels,openSession,renameSession,runStates,runWorkflowMessage,sendMessage,sendEditRequest,chatEditRequests,admitChatEdit,cancelChatEditMeasure,refreshChatEdits,sessions,setSessionModel,setSessionProvider,setSessionReasoningEffort]);
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
 }
 

@@ -1,0 +1,53 @@
+{
+ "progress": "Planejando cortes e motion\n\nDireção: Editor de Vídeo (Claude Code)\n\nCâmera: aula-camera.mp4 · Tela: aula-screen.mkv · voz: câmera · alternar · A tela começa 2,39 s depois da câmera. (medido no áudio comum)\n\nCancelar edição",
+ "pairCard": "Vídeo editado entregue\n\nO arquivo verificado está nesta conversa. Peça ajustes aqui (ex.: “Entre 12 e 18 segundos troque a animação por uma comparação”). Direção: Editor de Vídeo (Claude Code).\n\nCâmera: aula-camera.mp4 · Tela: aula-screen.mkv · voz: câmera · alternar · A tela começa 2,39 s depois da câmera. (medido no áudio comum)\n\nAbrir produção",
+ "waitCard": "Aguardando limite de uso do Claude Code\n\nDesde 16/10, 14:15 · Horário de liberação desconhecido (o provedor não informou). Nada é reenviado sozinho. Use Retomar quando quiser tentar de novo: continua do que está guardado, sem refazer.\n\nCâmera: demo-camera.mp4 · Tela: demo-screen.mkv · voz: tela · câmera no canto · A tela começa 1,70 s antes da câmera. (manual, não verificado pelo app)\n\nConcluído e guardado\nCâmera verificado (sha 164108ba2084)\nTela verificada (sha 1f9a62b002ba)\nPlano: 1 revisão(ões), atual r1\n1 prévia(s) renderizada(s) com hash\n1 cena(s) inspecionada(s) pelo diretor\nFalta\nConcluir inspeção/revisão com o diretor\nExportação final\nEntrega com recibo no chat\nRetomar\nCancelar edição",
+ "composerNotice": "Claude Code está com limite de uso desde 16/10, 14:15. Horário de liberação desconhecido (o provedor não informou). Mensagens enviadas agora podem ser recusadas; edições automáticas ficam guardadas até você usar Retomar.",
+ "restart": {
+  "newTurns": 0
+ },
+ "resumedCard": "Vídeo editado entregue\n\nO arquivo verificado está nesta conversa. Peça ajustes aqui (ex.: “Entre 12 e 18 segundos troque a animação por uma comparação”). Direção: Editor de Vídeo (Claude Code).\n\nCâmera: demo-camera.mp4 · Tela: demo-screen.mkv · voz: tela · câmera no canto · A tela começa 1,70 s antes da câmera. (manual, não verificado pelo app)\n\nAbrir produção",
+ "runs": [
+  {
+   "stage": "video-review",
+   "pair": {
+    "voice": "screen",
+    "layout": "camera-corner",
+    "sync": {
+     "origin": "manual",
+     "verified": false,
+     "reason": "camera-no-audio"
+    }
+   },
+   "waitResumes": 1,
+   "director": {
+    "name": "Editor de Vídeo",
+    "provider": "claude",
+    "choice": "claude"
+   }
+  },
+  {
+   "stage": "video-review",
+   "pair": {
+    "voice": "camera",
+    "layout": "alternate",
+    "sync": {
+     "origin": "measured",
+     "verified": true,
+     "driftSeconds": -0.002,
+     "score": 0.727,
+     "measuredAt": "2026-10-16T17:15:26.986Z"
+    }
+   },
+   "waitResumes": 0,
+   "director": {
+    "name": "Editor de Vídeo",
+    "provider": "claude",
+    "choice": "claude"
+   }
+  }
+ ],
+ "chatSends": 0,
+ "editorTurns": 3,
+ "out": "C:\\Users\\pacas\\Documents\\ChatGPT\\MainsAgents\\.mainsagents-workspaces\\camera-screen-ui\\1792170921025"
+}

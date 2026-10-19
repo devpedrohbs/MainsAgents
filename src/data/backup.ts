@@ -57,15 +57,16 @@ export async function exportBackup():Promise<BackupFile> {
   return {format:'mainsagents-backup',version:1,exportedAt:new Date().toISOString(),data:await embedChatImages(safeData(all),readChatImageDataUrl),editorial,execution:native?.execution,recovery,fileManifest:agents.map(agent=>({agentId:agent.id,directory:agent.skillsDirectory,skills:agent.skillFiles??[]}))};
 }
 
-export async function importBackup(file:BackupFile,mode:ImportMode):Promise<void> {
+/** Desktop: contents/chats deleted on this computer that the backup still held and were left out (they stay deleted). */
+export async function importBackup(file:BackupFile,mode:ImportMode):Promise<{omittedDeleted?:{contents:number;sessions:number}}|undefined> {
   await saveNow();
   const native=await window.mainsAgentsDesktop?.backup?.snapshot();
   if(native){
     const nextEditorial:Record<string,unknown>=mode==='replace'?(file.editorial??{...emptyEditorialState()}):file.editorial?mergeEditorial(native.editorial.state,file.editorial):native.editorial.state;
-    await window.mainsAgentsDesktop!.backup!.restore(composeImport(native.values,file,mode),nextEditorial,{revisions:native.revisions,editorialRevision:native.editorial.revision,executionRevision:native.executionRevision},{state:file.execution??(mode==='merge'?native.execution:{jobs:[],events:[],connections:[]}),mode});
-    return;
+    return await window.mainsAgentsDesktop!.backup!.restore(composeImport(native.values,file,mode,{profile:storageProfile()}),nextEditorial,{revisions:native.revisions,editorialRevision:native.editorial.revision,executionRevision:native.executionRevision},{state:file.execution??(mode==='merge'?native.execution:{jobs:[],events:[],connections:[]}),mode});
   }
   const [current,editorial]=await Promise.all([indexedDbStateStore.readAll(),readEditorial()]);
   const nextEditorial:Record<string,unknown>=mode==='replace'?(file.editorial??{...emptyEditorialState()}):file.editorial?mergeEditorial(editorial.state,file.editorial):editorial.state;
-  await restoreWorkspaceRecoverably(indexedDbStateStore,editorialTransport,composeImport(current,file,mode),unverifiedFiles(nextEditorial));
+  await restoreWorkspaceRecoverably(indexedDbStateStore,editorialTransport,composeImport(current,file,mode,{profile:storageProfile()}),unverifiedFiles(nextEditorial));
+  return undefined;
 }

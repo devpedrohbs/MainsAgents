@@ -5,7 +5,8 @@ export type CaptionVersion={version:number;hash:string;segments:CaptionSegment[]
 export type ProductionCaptions={
  base:CaptionRef;durationSeconds:number;language:string;versions:CaptionVersion[];
  transcription?:{id:string;status:'running'|'done'|'failed'|'canceled'|'interrupted';mode?:'words';error?:string;startedAt:string;finishedAt?:string};
- approved?:{version:number;hash:string;style:CaptionStyleId;approvedAt:string};
+ /** `previewed`: this app session rendered the short libass preview of exactly this hash+style before approving. */
+ approved?:{version:number;hash:string;style:CaptionStyleId;previewed?:boolean;approvedAt:string};
  render?:{id:string;status:'running'|'done'|'failed'|'canceled'|'interrupted';version:number;hash:string;style:CaptionStyleId;progress?:number;error?:string;startedAt:string;finishedAt?:string};
  output?:CaptionRef&{version:number;hash:string;style:CaptionStyleId;srtAssetId?:string;audio:'copied'|'reencoded'|'none';font:string;engine:string;createdAt:string};
 };

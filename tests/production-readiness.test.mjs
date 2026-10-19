@@ -61,3 +61,17 @@ test('optional gaps never block the summary; everything proven says ready; Engli
  const en=productionReadiness([codexRow(diag(),'',false),claudeRow({state:'connected'},false),mediaRow(media(),true,false)],false);
  assert.equal(en.items.find(i=>i.id==='ffmpeg').stateLabel,'Ready');assert.equal(en.items.find(i=>i.id==='whisper').title,'Transcription (Whisper)');
 });
+
+test('a signed-in Codex whose local executor fails is blocked on the executor item, not on sign-in',async()=>{
+ const {executorRow}=await import('../src/features/chat/runtimeDiagnosticsView.ts');
+ const failed={ready:false,error:'exec failed: windows sandbox: helper_unknown_error: setup refresh had errors',diagnosis:{code:'helper_unknown_error',osError:32,path:'C:/x/node_repl.exe',summary:'Windows sandbox setup failed (helper_unknown_error): C:/x/node_repl.exe is in use by another process (os error 32), so its ACL could not be validated.'},desktopIsolation:{localAppDataIsolated:false,disabledDesktopMcpServers:[]}};
+ const items=byId(productionReadiness([...rows(),executorRow(failed,'',true,true)],true));
+ assert.equal(items.provider.state,'ready');
+ assert.equal(items.executor.state,'blocked');
+ assert.match(items.executor.detail,/os error 32/);
+ assert.match(items.executor.next,/Reinicie o MainsAgents/);
+ assert.match(items.executor.next,/não é desativado/);
+ const ok=byId(productionReadiness([...rows(),executorRow({ready:true,desktopIsolation:{localAppDataIsolated:true,disabledDesktopMcpServers:['node_repl']}},'',true,true)],true));
+ assert.equal(ok.executor.state,'ready');
+ assert.equal(byId(productionReadiness([...rows(),executorRow(null,'',false,true)],true)).executor.state,'unchecked');
+});

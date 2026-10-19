@@ -1,0 +1,52 @@
+[
+ {
+  "id": "edicao-creator-9x16",
+  "route": "recorded",
+  "stage": "video-review",
+  "seconds": 92,
+  "scenes": 5,
+  "treatment": "creator",
+  "output": {
+   "width": 1080,
+   "height": 1920,
+   "fps": 29.961,
+   "duration": 25.700067,
+   "hasAudio": true
+  },
+  "receipt": {
+   "path": "C:\\Users\\pacas\\AppData\\Local\\Temp\\mainsagents-editing-upgrade\\edicao-creator-9x16\\media\\owner\\media-26ca64c2-2b91-4286-b8fa-793be6ac2620\\export-1.mp4",
+   "sha256": "90630ebc05a0b268a1e0e6e82a8580985d7a0031d74cf3f89b276ac146960720",
+   "version": 1,
+   "producedBy": {
+    "agentName": "Editor de Vídeo",
+    "providerId": "claude"
+   }
+  },
+  "originalUntouched": true
+ },
+ {
+  "id": "edicao-handoff-16x9",
+  "route": "handoff",
+  "stage": "video-review",
+  "seconds": 84,
+  "scenes": 5,
+  "treatment": "creator",
+  "output": {
+   "width": 1280,
+   "height": 720,
+   "fps": 29.961,
+   "duration": 25.700067,
+   "hasAudio": true
+  },
+  "receipt": {
+   "path": "C:\\Users\\pacas\\AppData\\Local\\Temp\\mainsagents-editing-upgrade\\edicao-handoff-16x9\\media\\owner\\media-7d45bc71-12d9-4584-8622-4bce9592a4b8\\export-1.mp4",
+   "sha256": "9c52afb6d742b4a165f3824a412bedfbb5d219db634cb71789ca7414c039733f",
+   "version": 1,
+   "producedBy": {
+    "agentName": "Editor de Vídeo",
+    "providerId": "claude"
+   }
+  },
+  "originalUntouched": true
+ }
+]

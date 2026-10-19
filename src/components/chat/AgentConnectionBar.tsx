@@ -5,6 +5,7 @@ import { useChat } from '../../features/chat/ChatProvider';
 import { useLanguage } from '../../app/LanguageProvider';
 import { SelectMenu } from '../common/SelectMenu';
 import { Icon } from '../common/Icon';
+import { continueTargetProblem } from '../../features/chat/contentScopes';
 
 export function AgentConnectionBar({agent,session,ensureSession,busy,providerId,onError}:{
   agent:Agent; session?:AgentSession; ensureSession:()=>AgentSession;
@@ -17,7 +18,10 @@ export function AgentConnectionBar({agent,session,ensureSession,busy,providerId,
   const targets=agents.filter(item=>item.workspaceId===agent.workspaceId&&item.id!==agent.id);
   const enabled=connection?.enabled??false;
   const selected=targets.find(item=>item.id===connection?.targetAgentId);
-  const targetSession=sessions.find(item=>item.id===connection?.targetSessionId);
+  // Only a same-agent, same-workspace, same-content chat is a valid "continues in" target; a stale one is never shown as current.
+  const linkedSession=sessions.find(item=>item.id===connection?.targetSessionId);
+  const staleTarget=!!(session&&linkedSession&&connection&&continueTargetProblem(session,linkedSession,connection.targetAgentId,agents));
+  const targetSession=staleTarget?undefined:linkedSession;
   const targetState=getRunState(targetSession?.id);
   const targetBusy=targetState==='thinking'||targetState==='searching'||targetState==='using-tool';
   const change=(targetId:string,on:boolean)=>{
@@ -51,6 +55,7 @@ export function AgentConnectionBar({agent,session,ensureSession,busy,providerId,
     {enabled&&<p className={!selected?'connection-unavailable':''}>
       {!selected?(pt?'O agente não está disponível. Selecione outro ou desligue a conexão.':'This agent is unavailable. Choose another or turn off the connection.'):
         targetSession?(pt?`Continua em: ${targetSession.title}`:`Continues in: ${targetSession.title}`):
+        staleTarget?(pt?`A conversa ligada era de outro conteúdo. O próximo pedido abre uma conversa nova de ${selected.name} neste conteúdo.`:`The linked chat belonged to another content. The next request opens a fresh ${selected.name} chat in this content.`):
         (pt?'Pedidos relevantes serão enviados ao agente escolhido, na mesma sessão.':'Relevant requests go to the selected agent in the same session.')}
     </p>}
   </div>;

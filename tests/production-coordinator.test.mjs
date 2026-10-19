@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtempSync,mkdirSync,readFileSync,readdirSync} from 'node:fs';
+import {appendFileSync,existsSync,mkdtempSync,mkdirSync,readFileSync,readdirSync} from 'node:fs';
 import {tmpdir} from 'node:os';
-import {join} from 'node:path';
+import {isAbsolute,join} from 'node:path';
 import {DatabaseSync} from 'node:sqlite';
 import {createContentWorkflowBridge} from '../content-workflow-bridge.mjs';
 import {createChatImageArtifacts} from '../chat-image-artifacts.mjs';
@@ -12,6 +12,7 @@ import {inspectLocalAsset} from '../editorial-local-files.mjs';
 import {createProductionFlow} from '../src/features/flows/flowModel.ts';
 import {parseProductionSchedule,productionChatIntent,validateEditPlan} from '../production-protocol.mjs';
 import {executionSnapshot,restoreExecution} from '../editorial-execution-backup.mjs';
+import {classifyCodexTurnError,limitFailure} from '../provider-limits.mjs';
 const inspect=path=>inspectLocalAsset(path,{stabilityMs:0});
 const scriptOptions={hooks:['A useful demo','Start here','This saves time'],ctas:['Save it','Try it'],paths:[{title:'Demo',outline:'Show the problem and demonstrate the practical solution.'},{title:'Story',outline:'Explain the example and how to apply it in daily work.'}],improvisationTopics:['Demo','Context'],thumbnailDirection:'Show a clear demo',draftScript:'A practical automation can save time in a repetitive task. Start with the problem, show the working example and explain how someone can apply this idea to their own daily routine.'};
 async function until(check){const end=Date.now()+20000;while(Date.now()<end){if(check())return;await new Promise(resolve=>setTimeout(resolve,20));}throw Error('Production timed out');}
@@ -20,15 +21,19 @@ async function fixture(mediaExtra={},{providers={}}={}){
  await runMediaProcess('ffmpeg',['-nostdin','-v','error','-n','-f','lavfi','-i','testsrc2=size=192x108:rate=24','-f','lavfi','-i','sine=frequency=440:sample_rate=48000','-t','1.5','-c:v','libx264','-c:a','aac',input]);
  await runMediaProcess('ffmpeg',['-nostdin','-v','error','-n','-f','lavfi','-i','color=c=white:size=64x96','-frames:v','1',png]);
  const base={workspaceId:'space',instructions:'Keep my role and own skills',tools:['files'],skills:['own-skill'],providerId:'codex',createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()},agents=[{...base,id:'source',name:'Editor de Conteúdo',role:'Conteúdo',providerId:providers.source??'codex'},{...base,id:'editor',name:'Editor de Vídeo',role:'Vídeo',providerId:providers.editor??'codex'}],flow=createProductionFlow('space','Content creation',agents),images=createChatImageArtifacts(join(directory,'images'));
- let serial=0,sends=0,creates=0,uploads=0,notionWrites=0,notes='Original note',held=false;const executions=new Map(),threads=new Map(),posts=new Map(),prompts=[],notionPayloads=[];
+ let serial=0,sends=0,creates=0,uploads=0,notionWrites=0,notes='Original note',held=false,limitNext=0;const executions=new Map(),threads=new Map(),posts=new Map(),prompts=[],notionPayloads=[];
  // Simulated Claude Code CLI runtime (text only, no real CLI or quota): same interface as claude-code-bridge `runtime`.
  const reply=prompt=>prompt.includes('"removeSilences"')?JSON.stringify({removeSilences:true,silence:{thresholdDb:-35,minDuration:0.5,padding:0.15},normalizeAudio:false,animations:{},summary:'Cortar pausas (Claude)'}):prompt.includes('Retorne SOMENTE JSON: {"start"')?JSON.stringify({start:0,duration:1.5,format:'original',normalizeAudio:true,fadeSeconds:.15,summary:'Claude'}):prompt.includes('Prepare legendas')?JSON.stringify({deliveries:['Instagram','TikTok'].map(platform=>({platform,caption:`Claude caption ${platform}`,coverPrompt:'A clear vertical cover'}))}):JSON.stringify(scriptOptions);
  const claude={sends:[],cancels:[],held:false,available:true,status:{state:'connected'},statusCalls:0},claudeOutputs=new Map();
  const chat={providerId:'claude',send:async(session,content,agent)=>{if(claude.sends.some(item=>item.session===session))throw Error('A Claude session was reused');claude.sends.push({session,content,agent});const id=`claude-execution-${++serial}`;claudeOutputs.set(id,reply(content));return {executionId:id}},events:async function*(id,signal){if(claude.held)await new Promise((resolve,reject)=>signal.addEventListener('abort',()=>reject(Error('Interrupted')),{once:true}));const output=claudeOutputs.get(id);yield {type:'message.delta',delta:output.slice(0,4)};yield {type:'message.completed',content:output};yield {type:'execution.completed'}},cancel:async(_session,id)=>{claude.cancels.push(id)}};
- const runtime={createSession:async()=>{const id=`thread-${++serial}`;threads.set(id,{turns:[]});return id},resumeSession:async()=>{},readThread:async id=>threads.get(id),cancel:async()=>{},imageFile:image=>images.pathForImage(image),imageFromItem:(item,id)=>images.fromItem(item,id),send:async(thread,prompt,agent)=>{sends++;prompts.push({prompt,agent});const id=`execution-${++serial}`;let output,imageItem;if(prompt.includes('"removeSilences"'))output=JSON.stringify({removeSilences:true,silence:{thresholdDb:-35,minDuration:0.5,padding:0.15},normalizeAudio:false,animations:{title:'Sem renderer neste teste'},summary:'Cortar pausas longas'});else if(prompt.includes('Retorne SOMENTE JSON: {"start"'))output=JSON.stringify({start:0,duration:1.5,format:'original',normalizeAudio:true,fadeSeconds:.15,summary:'Áudio normalizado e acabamento discreto'});else if(prompt.includes('Prepare legendas'))output=JSON.stringify({deliveries:['Instagram','TikTok'].map(platform=>({platform,caption:`Approved caption ${platform}`,coverPrompt:'A clear professional vertical cover'}))});else if(prompt.includes('vídeo de REFERÊNCIA'))output=analysisReply;else if(prompt.includes('Gere uma imagem de capa')){output='Imagem gerada';imageItem={id:`image-${id}`,type:'imageGeneration',status:'completed',result:readFileSync(png).toString('base64')}}else output=JSON.stringify(scriptOptions);executions.set(id,{thread,prompt,output,imageItem});return {executionId:id}},events:async function*(id,signal){if(held)await new Promise((resolve,reject)=>signal.addEventListener('abort',()=>reject(Error('Interrupted')),{once:true}));const item=executions.get(id);yield {type:'message.completed',content:item.output};if(item.imageItem)yield images.fromItem(item.imageItem,id);threads.get(item.thread).turns.push({id,status:'completed',items:[{type:'userMessage',content:[{type:'text',text:item.prompt}]},{type:'agentMessage',text:item.output},...(item.imageItem?[item.imageItem]:[])]});yield {type:'execution.completed'}}};
+ const runtime={createSession:async()=>{const id=`thread-${++serial}`;threads.set(id,{turns:[]});return id},resumeSession:async()=>{},readThread:async id=>threads.get(id),cancel:async()=>{},imageFile:image=>images.pathForImage(image),imageFromItem:(item,id)=>images.fromItem(item,id),send:async(thread,prompt,agent)=>{sends++;prompts.push({prompt,agent});const id=`execution-${++serial}`;let output,imageItem;if(prompt.includes('"removeSilences"'))output=JSON.stringify({removeSilences:true,silence:{thresholdDb:-35,minDuration:0.5,padding:0.15},normalizeAudio:false,animations:{title:'Sem renderer neste teste'},summary:'Cortar pausas longas'});else if(prompt.includes('Retorne SOMENTE JSON: {"start"'))output=JSON.stringify({start:0,duration:1.5,format:'original',normalizeAudio:true,fadeSeconds:.15,summary:'Áudio normalizado e acabamento discreto'});else if(prompt.includes('Prepare legendas'))output=JSON.stringify({deliveries:['Instagram','TikTok'].map(platform=>({platform,caption:`Approved caption ${platform}`,coverPrompt:'A clear professional vertical cover'}))});else if(prompt.includes('vídeo de REFERÊNCIA'))output=analysisReply;else if(prompt.includes('Gere uma imagem de capa')){output='Imagem gerada';imageItem={id:`image-${id}`,type:'imageGeneration',status:'completed',result:readFileSync(png).toString('base64')}}else output=JSON.stringify(scriptOptions);executions.set(id,{thread,prompt,output,imageItem});return {executionId:id}},events:async function*(id,signal){if(held)await new Promise((resolve,reject)=>signal.addEventListener('abort',()=>reject(Error('Interrupted')),{once:true}));const item=executions.get(id);
+  // Usage limit of the provider: a FAILED turn with the structured codexErrorInfo (as the app-server reports it).
+  if(limitNext>0){limitNext--;threads.get(item.thread).turns.push({id,status:'failed',error:{message:'limit',codexErrorInfo:'usageLimitExceeded'},items:[]});yield {type:'execution.failed',executionId:id,...limitFailure(classifyCodexTurnError({codexErrorInfo:'usageLimitExceeded'}),'Codex')};return;}
+  yield {type:'message.completed',content:item.output};if(item.imageItem)yield images.fromItem(item.imageItem,id);threads.get(item.thread).turns.push({id,status:'completed',items:[{type:'userMessage',content:[{type:'text',text:item.prompt}]},{type:'agentMessage',text:item.output},...(item.imageItem?[item.imageItem]:[])]});yield {type:'execution.completed'}}};
  const fetchImpl=async(url,init={})=>{const u=new URL(url),path=u.pathname.split('/api/v1/')[1];if(init.method==='PUT'&&!path){for await(const chunk of init.body){}uploads++;return new Response('');}if(path==='accounts')return Response.json({accounts:[{_id:'ig',platform:'instagram',isActive:true,username:'IG'},{_id:'tt',platform:'tiktok',isActive:true,username:'TT'}]});if(path?.includes('creator-info'))return Response.json({privacyLevels:[{value:'PUBLIC_TO_EVERYONE',label:'Public'}],commercialContentTypes:[{value:'none',label:'None'}],postingLimits:{interactionSettings:{}}});if(path==='media/presign'){const n=++serial;return Response.json({uploadUrl:`https://media.zernio.com/upload/${n}`,publicUrl:`https://media.zernio.com/temp/${n}.jpg`});}if(path==='posts'&&init.method==='POST'){creates++;const body=JSON.parse(init.body),id=`post-${creates}`;posts.set(id,{...body,_id:id,status:body.isDraft?'draft':'scheduled',platforms:body.platforms.map(target=>({...target,status:body.isDraft?'draft':'scheduled'}))});return Response.json({post:posts.get(id)});}if(path?.startsWith('posts/'))return Response.json({post:posts.get(path.slice(6))});throw Error(`Unexpected endpoint ${url}`)};
  const options={dbPath,getCurrentProfile:()=> 'owner',getAgents:()=>agents,getFlows:()=>({flows:[flow]}),getSessions:()=>[],getRuntime:()=>runtime,getChatRuntime:provider=>provider==='claude'&&claude.available?chat:null,getProviderStatus:async provider=>{claude.statusCalls++;return provider==='claude'?claude.status:undefined},inspect,mediaOptions:{inspect,...mediaExtra},getPublicationConnector:()=>createZernioPublicationConnector(()=> 'fixture-key',{fetchImpl}),getConnector:()=>({upsert:async(payload,ctx)=>{ctx.authorize();notionWrites++;notionPayloads.push(payload.artifact);ctx.saveCheckpoint({phase:'verified',pageId:'12345678-1234-1234-1234-123456789abc'});return {pageId:'12345678-1234-1234-1234-123456789abc',url:'https://www.notion.so/12345678123412341234123456789abc',artifactVersion:payload.artifact.version,verifiedAt:new Date().toISOString()}},readCard:async()=>({text:notes,fetchedAt:new Date().toISOString()})})};
- let bridge=createContentWorkflowBridge(options);const db=new DatabaseSync(dbPath),at=new Date().toISOString(),file=await inspect(input),topic={id:'topic',workspaceId:'space',requestId:'idea',inputKind:'text',input:'A useful automation idea',priority:'normal',status:'review',title:'An automation project',category:'Tech',summary:'A practical project for saving time.',whyItMatters:'It solves a repetitive daily problem.',angles:['Demo','Explain'],sources:[{title:'Reference',url:'https://example.com'}],factualQuestions:[],createdAt:at,updatedAt:at};
+ let bridge=createContentWorkflowBridge(options);// Legacy behaviour under test: the editor agent's own provider directs edits (new default is Claude Code).
+ bridge.production.setEditDirector('owner',{workspaceId:'space',director:{providerId:'agent'}});const db=new DatabaseSync(dbPath),at=new Date().toISOString(),file=await inspect(input),topic={id:'topic',workspaceId:'space',requestId:'idea',inputKind:'text',input:'A useful automation idea',priority:'normal',status:'review',title:'An automation project',category:'Tech',summary:'A practical project for saving time.',whyItMatters:'It solves a repetitive daily problem.',angles:['Demo','Explain'],sources:[{title:'Reference',url:'https://example.com'}],factualQuestions:[],createdAt:at,updatedAt:at};
  db.prepare('INSERT INTO editorial_state VALUES(?,?,?,?)').run('owner',1,JSON.stringify({schemaVersion:1,topics:[topic],contents:[],artifacts:[],approvals:[],runs:[],assets:[],publications:[]}),at);bridge.jobs.configure('owner','space',{dataSourceId:'12345678-1234-1234-1234-123456789abc',autoSync:true});
  const start=()=>bridge.production.start('owner',{requestId:'start',flowId:flow.id,topicId:topic.id,expectedTopic:topic,notionDestination:bridge.jobs.connection('owner','space').dataSourceId,authorize:true});
  const current=()=>JSON.parse(db.prepare('SELECT state_json FROM editorial_state').get().state_json),run=id=>bridge.production.list('owner').find(p=>p.id===id);
@@ -39,10 +44,10 @@ async function fixture(mediaExtra={},{providers={}}={}){
  const toPackage=async(id,choose={})=>{await until(()=>['covers-review','blocked'].includes(run(id).stage));assert.equal(run(id).stage,'covers-review',run(id).error);let r=run(id);const formats=[...new Set(r.covers.destinations.map(d=>d.format))];
   for(const format of formats){await command(id,'cover-render',{format,concepts:r.covers.concepts,brand:r.covers.brand});await until(()=>run(id).covers.render?.status!=='running');assert.equal(run(id).covers.render.status,'done',run(id).covers.render.error);r=run(id);}
   await command(id,'approve-covers',{authorize:true,destinations:r.covers.destinations,concepts:r.covers.concepts,brand:r.covers.brand,selections:formats.map(format=>({format,concept:choose[format]??'person',batchId:r.covers.batches[format].batchId}))});assert.equal(run(id).stage,'package-review');};
- return {toPackage,claude,notionPayloads,toRecording,directory,dbPath,input,file,db,flow,topic,start,run,command,attach,current,prompts,counts:()=>({sends,creates,uploads,notionWrites}),notes:value=>notes=value,hold:value=>held=value,completeSavedTurn:id=>{const step=run(id).step,item=executions.get(step.executionId);threads.get(step.threadId).turns.push({id:step.executionId,status:'completed',items:[{type:'userMessage',content:[{type:'text',text:item.prompt}]},{type:'agentMessage',text:item.output}]})},get bridge(){return bridge},reopen:async()=>{await bridge.close();bridge=createContentWorkflowBridge(options)},close:async()=>{await bridge.close();db.close()}};
+ return {toPackage,claude,notionPayloads,toRecording,directory,dbPath,input,file,db,flow,topic,start,run,command,attach,current,prompts,counts:()=>({sends,creates,uploads,notionWrites}),notes:value=>notes=value,hold:value=>held=value,limit:count=>limitNext=count,completeSavedTurn:id=>{const step=run(id).step,item=executions.get(step.executionId);threads.get(step.threadId).turns.push({id:step.executionId,status:'completed',items:[{type:'userMessage',content:[{type:'text',text:item.prompt}]},{type:'agentMessage',text:item.output}]})},get bridge(){return bridge},reopen:async()=>{await bridge.close();bridge=createContentWorkflowBridge(options)},close:async()=>{await bridge.close();db.close()}};
 }
 test('semi-automatic production produces real edited video and covers, waits for approvals, rereads Notion and schedules each exact package once',async()=>{
- const f=await fixture();try{const p=f.start();assert.equal(f.start().id,p.id);await f.toRecording(p.id);assert.equal(f.run(p.id).stage,'recording',f.run(p.id).error);assert.equal(f.counts().notionWrites,1);assert.equal(f.counts().creates,0);f.notes('NOTION_USER_EDIT');f.attach(p.id);await f.command(p.id,'video',{assetId:'original',format:'original',authorize:true});await until(()=>['video-review','blocked'].includes(f.run(p.id).stage));assert.equal(f.run(p.id).stage,'video-review',f.run(p.id).error);assert(f.prompts.some(x=>x.agent.id==='editor'&&x.prompt.includes('NOTION_USER_EDIT')));assert.equal(readFileSync(f.input).length,f.file.size);assert.equal(f.counts().creates,0);const video=f.run(p.id).outputVideo;assert.notEqual(video.sha256,f.file.sha256);await f.command(p.id,'approve-video',{authorize:true,expectedVideo:video});await f.command(p.id,'platforms',{platforms:['Instagram','TikTok']});await f.toPackage(p.id);assert.equal(f.run(p.id).stage,'package-review',f.run(p.id).error);assert.equal(f.counts().creates,0);assert(f.run(p.id).reviewDeliveries.every(d=>d.cover&&d.media.length===1));await f.command(p.id,'approve-package',{authorize:true,expectedHash:f.run(p.id).reviewHash});await f.command(p.id,'prepare-schedule',{text:'agende amanhã às 18h',timeZone:'America/Sao_Paulo',targets:[{platform:'Instagram',provider:'zernio',accountId:'ig'},{platform:'TikTok',provider:'zernio',accountId:'tt',networkSettings:{tiktokSettings:{privacy_level:'PUBLIC_TO_EVERYONE',commercialContentType:'none',allow_comment:false,allow_duet:false,allow_stitch:false,content_preview_confirmed:true,express_consent_given:true,video_made_with_ai:false}}}]});assert.equal(f.counts().creates,0);await f.command(p.id,'schedule',{authorize:true,expectedHash:f.run(p.id).scheduleHash});await until(()=>['complete','blocked'].includes(f.run(p.id).stage));assert.equal(f.run(p.id).stage,'complete',f.run(p.id).error);assert.equal(f.counts().creates,2);assert.equal(f.counts().uploads,4);const before=f.counts();await f.reopen();await new Promise(resolve=>setTimeout(resolve,850));assert.deepEqual(f.counts(),before);assert(f.current().publications.every(d=>d.receipt&&d.status==='scheduled'));}finally{await f.close()}
+ const f=await fixture();try{const p=f.start();assert.equal(f.start().id,p.id);await f.toRecording(p.id);assert.equal(f.run(p.id).stage,'recording',f.run(p.id).error);assert.equal(f.counts().notionWrites,1);assert.equal(f.counts().creates,0);f.notes('NOTION_USER_EDIT');f.attach(p.id);await f.command(p.id,'video',{assetId:'original',format:'original',editMode:'basic',authorize:true});await until(()=>['video-review','blocked'].includes(f.run(p.id).stage));assert.equal(f.run(p.id).stage,'video-review',f.run(p.id).error);assert(f.prompts.some(x=>x.agent.id==='editor'&&x.prompt.includes('NOTION_USER_EDIT')));assert.equal(readFileSync(f.input).length,f.file.size);assert.equal(f.counts().creates,0);const video=f.run(p.id).outputVideo;assert.notEqual(video.sha256,f.file.sha256);await f.command(p.id,'approve-video',{authorize:true,expectedVideo:video});await f.command(p.id,'platforms',{platforms:['Instagram','TikTok']});await f.toPackage(p.id);assert.equal(f.run(p.id).stage,'package-review',f.run(p.id).error);assert.equal(f.counts().creates,0);assert(f.run(p.id).reviewDeliveries.every(d=>d.cover&&d.media.length===1));await f.command(p.id,'approve-package',{authorize:true,expectedHash:f.run(p.id).reviewHash});await f.command(p.id,'prepare-schedule',{text:'agende amanhã às 18h',timeZone:'America/Sao_Paulo',targets:[{platform:'Instagram',provider:'zernio',accountId:'ig'},{platform:'TikTok',provider:'zernio',accountId:'tt',networkSettings:{tiktokSettings:{privacy_level:'PUBLIC_TO_EVERYONE',commercialContentType:'none',allow_comment:false,allow_duet:false,allow_stitch:false,content_preview_confirmed:true,express_consent_given:true,video_made_with_ai:false}}}]});assert.equal(f.counts().creates,0);await f.command(p.id,'schedule',{authorize:true,expectedHash:f.run(p.id).scheduleHash});await until(()=>['complete','blocked'].includes(f.run(p.id).stage));assert.equal(f.run(p.id).stage,'complete',f.run(p.id).error);assert.equal(f.counts().creates,2);assert.equal(f.counts().uploads,4);const before=f.counts();await f.reopen();await new Promise(resolve=>setTimeout(resolve,850));assert.deepEqual(f.counts(),before);assert(f.current().publications.every(d=>d.receipt&&d.status==='scheduled'));}finally{await f.close()}
 });
 test('restart pauses uncertain inference, profile/config changes block work and imported productions never inherit authorization',async()=>{
  const f=await fixture();try{f.hold(true);const p=f.start();await until(()=>f.run(p.id).step?.phase==='streaming');await f.reopen();assert.equal(f.run(p.id).stage,'paused');await f.command(p.id,'resume',{authorize:true});await until(()=>f.run(p.id).stage==='blocked');assert.equal(f.counts().sends,1);const backup=executionSnapshot(f.db,'owner');restoreExecution(f.db,'owner',backup,'replace');assert.equal(f.run(p.id).imported,true);await assert.rejects(()=>f.command(p.id,'resume',{authorize:true}),/Backup restaura histórico/);}finally{await f.close()}
@@ -55,7 +60,7 @@ test('AI call cap pauses before any extra dispatch and continues only after a re
  const f=await fixture();try{const p=f.bridge.production.start('owner',{requestId:'start-capped',flowId:f.flow.id,topicId:f.topic.id,expectedTopic:f.topic,notionDestination:f.bridge.jobs.connection('owner','space').dataSourceId,authorize:true,budget:{maxCalls:1,maxAttemptsPerStep:2}});
   assert.deepEqual([p.budget.maxCalls,p.budget.maxAttemptsPerStep,p.budget.legacy],[1,2,false]);
   await f.toRecording(p.id);assert.equal(f.run(p.id).stage,'recording',f.run(p.id).error);assert.deepEqual(f.run(p.id).budget.calls.map(c=>c.status),['completed']);
-  f.attach(p.id);await f.command(p.id,'video',{assetId:'original',format:'original',authorize:true});await until(()=>f.run(p.id).stage==='paused');
+  f.attach(p.id);await f.command(p.id,'video',{assetId:'original',format:'original',editMode:'basic',authorize:true});await until(()=>f.run(p.id).stage==='paused');
   let run=f.run(p.id);assert.equal(f.counts().sends,1,'no dispatch beyond the cap');assert.equal(run.budgetStop.kind,'calls');assert.equal(run.resumeStage,'planning-edit');assert.match(run.error,/Limite de chamadas de IA.*\(1\/1\).*Nada foi enviado/);
   await assert.rejects(()=>f.command(p.id,'resume',{authorize:true}),/limite revisado/);
   for(const limits of [{maxCalls:0,maxAttemptsPerStep:2},{maxCalls:41,maxAttemptsPerStep:2},{maxCalls:2.5,maxAttemptsPerStep:2},{maxCalls:3,maxAttemptsPerStep:6},{maxCalls:'3',maxAttemptsPerStep:2}])await assert.rejects(()=>f.command(p.id,'adjust-budget',{authorize:true,reviewedCalls:1,limits}),/Escolha de/);
@@ -79,8 +84,22 @@ test('uncertain sends survive restart, count conservatively and stop at the per-
 
 test('automatic edit mode lets the editor choose bounded parameters while FFmpeg analyzes and the advanced export runs locally',async()=>{
  const f=await fixture();try{const p=f.start();await f.toRecording(p.id);f.attach(p.id);
-  await f.command(p.id,'video',{assetId:'original',format:'original',editMode:'smart',authorize:true});
-  await until(()=>['video-review','blocked'].includes(f.run(p.id).stage));const run=f.run(p.id);assert.equal(run.stage,'video-review',run.error);
+  // Default request = automatic edit WITH motion. Without an animation engine this never degrades silently to a plain cut.
+  await f.command(p.id,'video',{assetId:'original',format:'original',authorize:true});
+  await until(()=>['video-review','blocked'].includes(f.run(p.id).stage));let run=f.run(p.id);
+  assert.equal(run.stage,'blocked');assert.equal(run.blockReason,'motion');assert.match(run.error,/Motion pedido, mas o motor de animação \(Remotion\) está indisponível/);assert.match(run.error,/Continuar sem motion/);
+  assert.deepEqual([run.editPreferences.mode,run.editPreferences.motion,run.editPreferences.style],['smart','balanced','creator-explanatory']);
+  assert.equal(run.videoJobId,undefined,'nothing exported');assert.equal(f.bridge.media.list('owner').length,0);assert(!f.prompts.some(x=>x.prompt.includes('"removeSilences"')),'no AI call spent on an edit that cannot be delivered');
+  await assert.rejects(()=>f.command(p.id,'accept-basic-edit',{authorize:false}),/só existe quando o motion/);
+  await f.command(p.id,'accept-basic-edit',{authorize:true});
+  await until(()=>['video-review','blocked'].includes(f.run(p.id).stage));run=f.run(p.id);assert.equal(run.stage,'video-review',run.error);
+  assert(run.editPreferences.acceptBasic?.at,'the explicit choice is recorded');assert(run.events.some(e=>e.action==='accept-basic-edit'));
+  const delivered=run.editorSession.messages.find(m=>m.id.endsWith(':editing:video')??false)??run.editorSession.messages.find(m=>/Vídeo exportado e verificado/.test(m.content));
+  assert.match(delivered.content,/Sem motion por escolha explícita sua/);assert.match(delivered.content,/Direção: /);
+  // Host receipt on the delivered message: absolute path + sha256 of the verified output, independent of any model text.
+  const [receipt]=delivered.receipts;assert.equal(receipt.source.kind,'production-video');assert.equal(receipt.sha256,run.outputVideo.sha256);assert.equal(receipt.assetId,run.outputVideo.assetId);
+  assert(isAbsolute(receipt.path)&&existsSync(receipt.path)&&!/partial/.test(receipt.path));assert.equal(receipt.version,1);assert.equal(receipt.profileId,undefined,'no profile id leaves the host');
+  assert.deepEqual(f.bridge.production.list('owner')[0].editDirector,{name:run.editorAgent.name,provider:'codex',choice:'agent'});
   assert.equal(run.editPreferences.mode,'smart');assert.equal(run.editPlan.mode,'smart');assert.match(run.editPlan.planHash,/^[a-f0-9]{64}$/);assert.deepEqual(run.editPlan.plan.animations,[],'no animation engine was injected');
   assert(f.prompts.some(x=>x.agent.id==='editor'&&x.prompt.includes('"removeSilences"')&&x.prompt.includes('não tem animações disponíveis')));
   const job=f.bridge.media.list('owner').find(item=>item.id===run.videoJobId);assert.equal(job.mode,'advanced');assert.equal(job.planHash,run.editPlan.planHash);assert.equal(job.status,'succeeded');
@@ -92,11 +111,11 @@ test('automatic edit carries the chosen motion intensity, asks for spoken highli
  const animate=async input=>{const {copyFile}=await import('node:fs/promises');await copyFile(input.inputPath,input.outputPath);};
  const f=await fixture({animate,animationCapabilities:async()=>({available:true})});try{const p=f.start();await f.toRecording(p.id);f.attach(p.id);
   await f.command(p.id,'video',{assetId:'original',format:'original',editMode:'smart',motion:'intense',authorize:true});
-  await until(()=>['video-review','blocked'].includes(f.run(p.id).stage));const run=f.run(p.id);assert.equal(run.stage,'video-review',run.error);
+  await until(()=>['video-review','blocked'].includes(f.run(p.id).stage));const run=f.run(p.id);
   assert.equal(run.editPreferences.motion,'intense');
   assert(f.prompts.some(x=>x.agent.id==='editor'&&x.prompt.includes('"highlights"')&&x.prompt.includes('MEDE na voz')));
-  // 1,5 s de tom sem fala: nada é inventado e o motivo aparece no resumo.
-  assert.match(run.editPlan.motionSummary,/intenso: 0 momento/);assert.match(run.editPlan.motionSummary,/sem transcrição/);assert.equal(run.editPlan.plan.motion,undefined);
+  // 1,5 s de tom sem fala: nada é inventado; motion pedido sem nenhum momento animável não vira entrega "simples" de sucesso.
+  assert.equal(run.stage,'blocked');assert.equal(run.blockReason,'motion');assert.match(run.error,/não encontrou nenhum momento para animar/);assert.equal(run.videoJobId,undefined);
  }finally{await f.close()}
  const g=await fixture({animate,animationCapabilities:async()=>({available:true})});try{const p=g.start();await g.toRecording(p.id);g.attach(p.id);
   await g.command(p.id,'video',{assetId:'original',format:'original',editMode:'smart',motion:'off',authorize:true});
@@ -110,7 +129,7 @@ test('automatic edit gives the editor the local transcript and lists possible re
  // Stub transcriber: this fixture video is a pure tone. Real whisper.cpp output is covered in transcribe.test.mjs.
  let calls=0;const transcriber={capabilities:async()=>({available:true}),transcribe:async()=>{calls++;return {engine:'whisper.cpp',model:'ggml-base',language:'pt',segments:[{start:0,end:0.6,text:'Hoje vamos falar de automação'},{start:0.7,end:1.4,text:'Hoje vamos falar de automação local'}]}}};
  const f=await fixture({transcriber});try{const p=f.start();await f.toRecording(p.id);f.attach(p.id);
-  await f.command(p.id,'video',{assetId:'original',format:'original',editMode:'smart',authorize:true});
+  await f.command(p.id,'video',{assetId:'original',format:'original',editMode:'smart',motion:'off',authorize:true});
   await until(()=>['video-review','blocked'].includes(f.run(p.id).stage));const run=f.run(p.id);assert.equal(run.stage,'video-review',run.error);
   assert.equal(calls,1,'transcribed once; analysis reused the cached transcript');
   assert(f.prompts.some(x=>x.agent.id==='editor'&&x.prompt.includes('[0.7s] Hoje vamos falar de automação local')));
@@ -121,7 +140,7 @@ test('automatic edit gives the editor the local transcript and lists possible re
 
 test('the user can adjust the automatic cut and use that verified export as the version to approve',async()=>{
  const f=await fixture();try{const p=f.start();await f.toRecording(p.id);f.attach(p.id);
-  await f.command(p.id,'video',{assetId:'original',format:'original',editMode:'smart',authorize:true});
+  await f.command(p.id,'video',{assetId:'original',format:'original',editMode:'smart',motion:'off',authorize:true});
   await until(()=>['video-review','blocked'].includes(f.run(p.id).stage));const automatic=f.run(p.id);assert.equal(automatic.stage,'video-review',automatic.error);
   const ref={contentId:automatic.contentId,assetId:'original',versionId:'original-v1',sha256:f.file.sha256};
   const preview=await f.bridge.media.plan('owner',{...ref,plan:{segments:[{start:0.2,end:1.3}]}});
@@ -148,7 +167,7 @@ test('script gate: no Notion card before approval, edits create versions, record
  const f=await fixture();try{const p=f.start();await waitStage(f,p.id,['script-review']);let r=f.run(p.id);
   assert.equal(r.stage,'script-review',r.error);assert.equal(f.counts().notionWrites,0,'nothing reaches Notion before approval');assert.equal(r.recordingReady,false);
   assert.deepEqual([r.scriptVersions.length,r.scriptVersions[0].source,r.scriptOptions.hooks.length,r.scriptOptions.paths.length],[1,'agent',3,2]);
-  f.attach(p.id);await assert.rejects(()=>f.command(p.id,'video',{assetId:'original',format:'original',authorize:true}),/Confirme a gravação/);
+  f.attach(p.id);await assert.rejects(()=>f.command(p.id,'video',{assetId:'original',format:'original',editMode:'basic',authorize:true}),/Confirme a gravação/);
   const v1=r.scriptVersions[0];await assert.rejects(()=>edit(f,p.id,0,'Texto revisado pelo usuário com detalhes suficientes.'),/mudou desde/);
   await edit(f,p.id,1,'Texto revisado pelo usuário com detalhes suficientes para gravar.');r=f.run(p.id);const v2=r.scriptVersions.at(-1);
   assert.deepEqual([v2.version,v2.source,v2.path.title,v2.cta],[2,'user','Story','Try it']);assert.notEqual(v2.hash,v1.hash);
@@ -161,10 +180,10 @@ test('script gate: no Notion card before approval, edits create versions, record
   await f.command(p.id,'approve-script',{authorize:true,version:2,expectedHash:v2.hash});assert.equal(f.run(p.id).stage,'recording','repeating the approval is idempotent');assert.equal(f.counts().notionWrites,1);
   await edit(f,p.id,2,'Outra versão do texto revisado pelo usuário, com uma mudança real.');r=f.run(p.id);
   assert.deepEqual([r.stage,r.recordingReady,r.scriptApproval],['script-review',false,undefined],'a later change invalidates the approval');assert.equal(r.notion.scriptHash,v2.hash,'the confirmed card stays bound to v2');
-  await assert.rejects(()=>f.command(p.id,'video',{assetId:'original',format:'original',authorize:true}),/Confirme a gravação/);
+  await assert.rejects(()=>f.command(p.id,'video',{assetId:'original',format:'original',editMode:'basic',authorize:true}),/Confirme a gravação/);
   const v3=r.scriptVersions.at(-1);await f.command(p.id,'approve-script',{authorize:true,version:3,expectedHash:v3.hash});await waitStage(f,p.id,['recording']);
   assert.equal(f.run(p.id).stage,'recording');assert.equal(f.counts().notionWrites,2);assert.equal(f.run(p.id).notion.pageId,r.notion.pageId,'the same card is updated');
-  f.notes('NOTION_OLD_SCRIPT');await f.command(p.id,'video',{assetId:'original',format:'original',authorize:true});await waitStage(f,p.id,['video-review']);
+  f.notes('NOTION_OLD_SCRIPT');await f.command(p.id,'video',{assetId:'original',format:'original',editMode:'basic',authorize:true});await waitStage(f,p.id,['video-review']);
   const prompt=f.prompts.filter(x=>x.agent.id==='editor').at(-1).prompt;assert.match(prompt,/Roteiro aprovado pelo usuário \(v3, prevalece/);assert.match(prompt,/só referência; pode estar desatualizado/);assert(prompt.includes('NOTION_OLD_SCRIPT')&&prompt.includes('Outra versão do texto'));
   assert.equal(f.run(p.id).script.text,v3.text,'Notion content never replaces the approved script');
   await assert.rejects(()=>edit(f,p.id,3,'Uma edição tardia depois da gravação já enviada.'),/antes da gravação/);
@@ -208,7 +227,7 @@ test('legacy productions migrate safely: no synthetic approval before recording,
   const legacy=JSON.parse(f.db.prepare('SELECT data_json FROM production_runs WHERE id=?').get(p.id).data_json);for(const key of ['scriptGate','scriptVersions','scriptApproval','scriptOptions'])delete legacy[key];delete legacy.notion.scriptHash;delete legacy.notion.scriptVersion;
   f.db.prepare('UPDATE production_runs SET data_json=? WHERE id=?').run(JSON.stringify(legacy),p.id);
   let r=f.run(p.id);assert.deepEqual([r.stage,r.recordingReady,r.scriptApproval,r.scriptVersions[0].source],['script-review',false,undefined,'legacy']);
-  f.attach(p.id);await assert.rejects(()=>f.command(p.id,'video',{assetId:'original',format:'original',authorize:true}),/Confirme a gravação/);
+  f.attach(p.id);await assert.rejects(()=>f.command(p.id,'video',{assetId:'original',format:'original',editMode:'basic',authorize:true}),/Confirme a gravação/);
   const v=r.scriptVersions[0];await f.command(p.id,'approve-script',{authorize:true,version:1,expectedHash:v.hash});r=f.run(p.id);
   assert.deepEqual([r.stage,r.recordingReady,f.counts().notionWrites],['recording',true,1],'approving the unchanged legacy script reuses the confirmed card');
  }finally{await f.close()}
@@ -226,7 +245,7 @@ test('Claude runs the stages of Claude agents only: Codex keeps its own stages a
   const p=f.start();await f.toRecording(p.id);let r=f.run(p.id);assert.equal(r.stage,'recording',r.error);
   assert.deepEqual([f.claude.sends.length,f.counts().sends],[1,0],'the script ran on Claude, not Codex');assert.deepEqual([f.claude.sends[0].agent.id,f.claude.sends[0].agent.runtimeFirstMessage],['source',true]);
   assert.deepEqual(r.providers,{source:'claude',editor:'codex',publisher:'claude'});assert.equal(r.budget.calls.length,1);
-  f.attach(p.id);await f.command(p.id,'video',{assetId:'original',format:'original',authorize:true});await waitStage(f,p.id,['video-review']);
+  f.attach(p.id);await f.command(p.id,'video',{assetId:'original',format:'original',editMode:'basic',authorize:true});await waitStage(f,p.id,['video-review']);
   assert.deepEqual([f.claude.sends.length,f.counts().sends],[1,1],'the Codex editor keeps the edit stage');
   await f.command(p.id,'approve-video',{authorize:true,expectedVideo:f.run(p.id).outputVideo});await f.command(p.id,'platforms',{platforms:['Instagram','TikTok']});await f.toPackage(p.id);r=f.run(p.id);
   assert.equal(r.stage,'package-review',r.error);assert.deepEqual([f.claude.sends.length,f.counts().sends],[2,1],'captions by Claude; covers rendered locally with no AI call');
@@ -236,7 +255,7 @@ test('Claude runs the stages of Claude agents only: Codex keeps its own stages a
 
 test('local covers gate: three concepts per format, explicit export only, forged/stale/dirty approvals refused, package uses the exact chosen file',async()=>{
  const f=await fixture();try{const p=f.start();await f.toRecording(p.id);f.attach(p.id);
-  await f.command(p.id,'video',{assetId:'original',format:'original',authorize:true});await waitStage(f,p.id,['video-review']);
+  await f.command(p.id,'video',{assetId:'original',format:'original',editMode:'basic',authorize:true});await waitStage(f,p.id,['video-review']);
   await f.command(p.id,'approve-video',{authorize:true,expectedVideo:f.run(p.id).outputVideo});await f.command(p.id,'platforms',{platforms:['Instagram','TikTok']});
   await waitStage(f,p.id,['covers-review']);let r=f.run(p.id);const sends=f.counts().sends;
   assert.equal(r.stage,'covers-review',r.error);assert.deepEqual(r.covers.destinations,[{platform:'Instagram',format:'instagram-reels-cover',confirmed:true},{platform:'TikTok',format:'tiktok-cover',confirmed:true}]);
@@ -269,7 +288,7 @@ test('local covers gate: three concepts per format, explicit export only, forged
 test('cover export cancel, app restart and late results never register partial or stale covers; changed inputs re-render',async()=>{
  let hold,release;const engine={...thumbnailEngine,renderThumbnailSet:async options=>{if(hold){await new Promise(resolve=>release=resolve);}return thumbnailEngine.renderThumbnailSet({...options,signal:undefined});}};
  const f=await fixture({thumbnails:engine});try{const p=f.start();await f.toRecording(p.id);f.attach(p.id);
-  await f.command(p.id,'video',{assetId:'original',format:'original',authorize:true});await waitStage(f,p.id,['video-review']);
+  await f.command(p.id,'video',{assetId:'original',format:'original',editMode:'basic',authorize:true});await waitStage(f,p.id,['video-review']);
   await f.command(p.id,'approve-video',{authorize:true,expectedVideo:f.run(p.id).outputVideo});await f.command(p.id,'platforms',{platforms:['Instagram','TikTok']});await waitStage(f,p.id,['covers-review']);
   let r=f.run(p.id);const format='instagram-reels-cover';
   hold=true;await f.command(p.id,'cover-render',{format,concepts:r.covers.concepts,brand:r.covers.brand});await until(()=>release);
@@ -339,7 +358,7 @@ test('networks without a verified cover preset (LinkedIn) start from an approxim
 
 import * as captionEngine from '../editorial-captions.mjs';
 const fakeTranscriber={capabilities:async()=>({available:true}),transcribe:async({duration})=>({origin:'local-whisper',engine:'whisper.cpp',model:'test',language:'pt',segments:[{start:0.1,end:Math.min(0.8,duration),text:'Olá, edição automática'}],speech:[]})};
-const toVideoReview=async f=>{const p=f.start();await f.toRecording(p.id);f.attach(p.id);await f.command(p.id,'video',{assetId:'original',format:'original',authorize:true});await waitStage(f,p.id,['video-review']);assert.equal(f.run(p.id).stage,'video-review',f.run(p.id).error);return p;};
+const toVideoReview=async f=>{const p=f.start();await f.toRecording(p.id);f.attach(p.id);await f.command(p.id,'video',{assetId:'original',format:'original',editMode:'basic',authorize:true});await waitStage(f,p.id,['video-review']);assert.equal(f.run(p.id).stage,'video-review',f.run(p.id).error);return p;};
 const toCoversApproved=async(f,id)=>{let r=f.run(id);const formats=[...new Set(r.covers.destinations.map(d=>d.format))];for(const format of formats){await f.command(id,'cover-render',{format,concepts:r.covers.concepts,brand:r.covers.brand});await until(()=>f.run(id).covers.render?.status!=='running');assert.equal(f.run(id).covers.render.status,'done',f.run(id).covers.render.error);r=f.run(id);}
  await f.command(id,'approve-covers',{authorize:true,destinations:r.covers.destinations,concepts:r.covers.concepts,brand:r.covers.brand,selections:formats.map(format=>({format,concept:'person',batchId:r.covers.batches[format].batchId}))});};
 
@@ -442,7 +461,7 @@ test('B07 local mode: explicit choice, approved script releases recording withou
   await f.command(p.id,'save-script',{baseVersion:v1.version,hook:v1.hook,cta:v1.cta,path:v1.path,text:`${v1.text} Versão local revisada.`});r=f.run(p.id);
   assert.deepEqual([r.stage,r.recordingReady,r.scriptApproval,r.recordingPrep],['script-review',false,undefined,undefined]);assert.equal(recordingGate(r).ok,false);
   const v2=r.scriptVersions.at(-1);await f.command(p.id,'approve-script',{authorize:true,version:v2.version,expectedHash:v2.hash});assert.equal(f.run(p.id).stage,'recording');
-  f.attach(p.id);await f.command(p.id,'video',{assetId:'original',format:'original',authorize:true});await waitStage(f,p.id,['video-review']);r=f.run(p.id);assert.equal(r.stage,'video-review',r.error);
+  f.attach(p.id);await f.command(p.id,'video',{assetId:'original',format:'original',editMode:'basic',authorize:true});await waitStage(f,p.id,['video-review']);r=f.run(p.id);assert.equal(r.stage,'video-review',r.error);
   const editPrompt=f.prompts.find(x=>x.prompt.includes('Retorne SOMENTE JSON: {"start"')).prompt;assert.match(editPrompt,/Modo local: esta produção não tem card/);assert.doesNotMatch(editPrompt,/Card do Notion \(só referência/);
   assert.equal(f.counts().notionWrites,0,'local mode never contacts Notion');
  }finally{await f.close()}
@@ -515,5 +534,60 @@ test('word-by-word captions: whisper word timings become a normal reviewable ver
   assert.equal(v1.segments.map(item=>item.text).join(' '),kept.map(word=>word.text).join(' '),'recognized words kept verbatim');
   assert(v1.segments.every(item=>item.text.split(' ').length<=3),JSON.stringify(v1.segments));
   captionEngine.validateCaptionSegments(v1.segments,r.captions.durationSeconds);
+ }finally{await f.close();}
+});
+
+test('final caption preview: same engine for one saved version+style, bound to its hash, cached, cancelable, never an asset or AI call',async()=>{
+ const f=await fixture({transcriber:fakeTranscriber});try{const p=await toVideoReview(f);const sends=f.counts().sends,assetsBefore=f.current().assets.length,revision=()=>f.run(p.id).revision;
+  await assert.rejects(()=>f.bridge.production.captionPreview('owner',p.id,{version:1,hash:'x',style:'classic',start:0}),error=>error.status===409,'no captions yet');
+  await f.command(p.id,'captions-save',{baseVersion:0,segments:[{start:0.1,end:0.7,text:'Olá, edição'},{start:0.8,end:1.4,text:'Ação e coração'}]});const v1=f.run(p.id).captions.versions.at(-1),rev=revision();
+  await assert.rejects(()=>f.bridge.production.captionPreview('owner',p.id,{version:1,hash:'0'.repeat(64),style:'classic',start:0}),error=>error.status===409,'preview is bound to the version hash');
+  await assert.rejects(()=>f.bridge.production.captionPreview('owner',p.id,{version:1,hash:v1.hash,style:'brand-x',start:0}),error=>error.status===400);
+  const first=await f.bridge.production.captionPreview('owner',p.id,{version:1,hash:v1.hash,style:'highlight',start:0});
+  assert.equal(first.type,'video/mp4');assert(first.bytes.length>1000);assert.deepEqual([first.version,first.hash,first.style,first.start],[1,v1.hash,'highlight',0]);assert.equal(first.visible,2);
+  const again=await f.bridge.production.captionPreview('owner',p.id,{version:1,hash:v1.hash,style:'highlight',start:0});assert.equal(again.cached,true);assert.equal(Buffer.compare(again.bytes,first.bytes),0);
+  const abort=new AbortController(),pending=f.bridge.production.captionPreview('owner',p.id,{version:1,hash:v1.hash,style:'boxed',start:0},abort.signal);setTimeout(()=>abort.abort(),5);
+  await assert.rejects(pending,error=>error.status===499||error.status===409);
+  assert.equal(revision(),rev,'previews never change the production record');assert.equal(f.current().assets.length,assetsBefore,'previews are not library assets');assert.equal(f.counts().sends,sends,'no AI');
+  await f.command(p.id,'captions-approve',{authorize:true,version:1,hash:v1.hash,style:'highlight'});assert.equal(f.run(p.id).captions.approved.previewed,true);
+  assert.equal(again.font,first.font,'cached answer carries the same metadata');assert.equal(again.visible,first.visible);
+  // A new version saved while a preview renders: the late result is discarded, never returned or cached.
+  const late=f.bridge.production.captionPreview('owner',p.id,{version:1,hash:v1.hash,style:'classic',start:0});
+  await f.command(p.id,'captions-save',{baseVersion:1,segments:[{start:0.1,end:0.7,text:'Outra'}]});const v2=f.run(p.id).captions.versions.at(-1);
+  await assert.rejects(late,error=>error.status===409,'late preview of an older version is discarded');
+  await assert.rejects(()=>f.bridge.production.captionPreview('owner',p.id,{version:1,hash:v1.hash,style:'highlight',start:0}),error=>error.status===409,'only the version under review');
+  await f.command(p.id,'captions-approve',{authorize:true,version:2,hash:v2.hash,style:'highlight'});assert.equal(f.run(p.id).captions.approved.previewed,false,'a preview of v1 does not count for v2');
+  // The registered base file changed on disk: even a cached preview is refused (no stale preview of another file).
+  await f.bridge.production.captionPreview('owner',p.id,{version:2,hash:v2.hash,style:'highlight',start:0});
+  const base=f.current().assets.flatMap(asset=>asset.versions).find(item=>item.sha256===f.run(p.id).captions.base.sha256);appendFileSync(base.path,Buffer.from('tampered'));
+  await assert.rejects(()=>f.bridge.production.captionPreview('owner',p.id,{version:2,hash:v2.hash,style:'highlight',start:0}),error=>error.status===409,'changed source refuses the cached preview');
+ }finally{await f.close();}
+});
+
+test('the recording form may choose the edit director for THIS production only; an invalid choice changes nothing',async()=>{
+ const f=await fixture();try{const p=f.start();await f.toRecording(p.id);f.attach(p.id);
+  await assert.rejects(()=>f.command(p.id,'video',{assetId:'original',format:'original',editMode:'basic',authorize:true,director:{providerId:'gemini'}}),/Escolha quem dirige a edição/);
+  assert.equal(f.run(p.id).stage,'recording');assert.equal(f.run(p.id).editDirector?.choice??'agent','agent');
+  await f.command(p.id,'video',{assetId:'original',format:'original',editMode:'basic',authorize:true,director:{providerId:'claude',modelId:'opus'}});
+  assert.deepEqual(f.run(p.id).editDirector,{name:'Editor de Vídeo',provider:'claude',model:'opus',choice:'claude'});
+  assert.deepEqual(f.bridge.production.editDirector('owner','space'),{providerId:'agent',source:'user'},'the workspace default is unchanged');
+  await until(()=>!['planning-edit','editing'].includes(f.run(p.id).stage));
+ }finally{await f.close();}
+});
+
+test('a usage limit in the script stage (no video yet) waits, survives a restart and Resume continues the SAME stage without asking for a video',async()=>{
+ const f=await fixture();try{
+  f.limit(1);const p=f.start();
+  await until(()=>f.run(p.id).stage==='blocked');let run=f.run(p.id);
+  assert.equal(run.blockReason,'provider-limit',run.error);assert.equal(run.resumeStage,'writing');assert.equal(run.inputVideo,undefined);
+  assert.equal(run.providerWait.providerId,'codex');assert.equal(run.providerWait.resetsAt,null);assert.deepEqual(run.providerWait.remaining,['Roteiro']);
+  assert.equal(f.counts().sends,1);
+  await f.reopen();await new Promise(resolve=>setTimeout(resolve,1200));run=f.run(p.id);assert.equal(run.stage,'blocked');assert.equal(f.counts().sends,1,'no send after restart');
+  await f.bridge.production.command('owner',{id:p.id,revision:run.revision,requestId:'resume-script',action:'resume',authorize:true,waitGeneration:run.providerWait.generation});
+  await until(()=>['script-review','blocked'].includes(f.run(p.id).stage));run=f.run(p.id);
+  assert.equal(run.stage,'script-review',run.error);assert.equal(f.counts().sends,2,'the rejected turn is re-sent once, nothing else');
+  assert.equal(run.budget.calls.length,2);assert.equal(new Set(run.budget.calls.map(call=>call.key)).size,1,'same step: attempt counted');
+  assert.equal(run.scriptVersions.length,1,'one script version (no duplicate)');assert.equal(f.counts().notionWrites,0,'no card written before approval');
+  assert.equal(f.counts().creates,0);assert.equal(run.videoJobId,undefined,'no render');
  }finally{await f.close();}
 });

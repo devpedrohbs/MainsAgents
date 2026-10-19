@@ -13,11 +13,13 @@ export function classifyMcpAction(tool,args={},server) {
  if(['notion-fetch','notion-search','notion-ai-search','notion-get-tool-access','notion-query-data-sources'].includes(name))return 'read';
  if(['notion-create-pages','notion-update-page'].includes(name))return 'write';
  if(/(?:^|_)(delete|remove|cancel|destroy)(?:_|$)/.test(name))return 'delete';
+ // Publora: the arguments, not the verb, decide whether a create/update writes a draft, schedules or publishes.
+ if(['create_post','update_post'].includes(name))return args?.publishNow===true?'publish':args?.scheduledTime||args?.status==='scheduled'?'schedule':'write';
  if(name==='posts_create')return args.is_draft===true?'write':args.publish_now===true?'publish':'schedule';
  if(/(?:^|_)(publish|send|reply)(?:_|$)/.test(name))return 'publish';
  if(/(?:^|_)(schedule|reschedule)(?:_|$)/.test(name))return 'schedule';
  if(/(?:^|_)(create|update|edit|upload|append|insert|set)(?:_|$)/.test(name))return 'write';
- if(['accounts_list','accounts_list_accounts','list_connections','posts_list','posts_list_posts','posts_get','get_social_accounts','list_posts','get_post','list_scheduled_posts','get_scheduled_posts','get_post_analytics','get_account_analytics','get-profile','list-accounts','retrieve-a-page','retrieve-a-database','query-a-data-source'].includes(name))return 'read';
+ if(['account_context','accounts_list','accounts_list_accounts','list_connections','posts_list','posts_list_posts','posts_get','get_social_accounts','list_posts','get_post','list_scheduled_posts','get_scheduled_posts','get_post_analytics','get_account_analytics','get-profile','list-accounts','retrieve-a-page','retrieve-a-database','query-a-data-source'].includes(name))return 'read';
  return 'unknown';
 }
 export function permittedMcpAction(agent,kind){

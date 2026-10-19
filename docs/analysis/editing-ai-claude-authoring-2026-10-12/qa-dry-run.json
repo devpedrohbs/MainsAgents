@@ -1,0 +1,44 @@
+{
+  "contract": "mainsagents.editor-authoring/1",
+  "startedAt": "2026-10-12T20:13:50.918Z",
+  "runModel": false,
+  "declaredStubs": [
+    "synthetic uncut clip (one segment)",
+    "synthetic script used as transcript (no Whisper)",
+    "no profile database / asset registry (assets are files in the temp workdir, hashed)"
+  ],
+  "preflight": {
+    "cliVersion": "2.1.296 (Claude Code)",
+    "loggedIn": true,
+    "authMethod": "claude.ai",
+    "apiProvider": "firstParty",
+    "billedEnvVariables": [],
+    "billedSettings": []
+  },
+  "host": [],
+  "tools": [],
+  "events": [],
+  "checks": {
+    "hostSelfCheck": {
+      "framesImages": 2,
+      "examplePlanAccepted": true,
+      "examplePlanError": null,
+      "stillsImages": 6,
+      "remainingScenes": []
+    }
+  },
+  "fixture": {
+    "source": {
+      "sha256": "e8c55af4c9b2c50be6a1b83664e22f43ce5978b9d1b4ac7b799f110c65869ecc",
+      "width": 1280,
+      "height": 720,
+      "fps": 30,
+      "durationSeconds": 8,
+      "hasAudio": true
+    },
+    "segmentsHash": "27142a4e",
+    "workdir": "<workdir>"
+  },
+  "result": "dry run: no model call (pass --run-model for the real Claude cycle)",
+  "finishedAt": "2026-10-12T20:13:55.852Z"
+}

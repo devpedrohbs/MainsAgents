@@ -3,7 +3,7 @@
 import type {CapabilityRow,Fact} from './runtimeDiagnosticsView.ts';
 
 export type ReadinessState='ready'|'blocked'|'unverified'|'unchecked';
-export type ReadinessId='provider'|'ffmpeg'|'whisper'|'remotion'|'integrations'|'notion';
+export type ReadinessId='provider'|'executor'|'ffmpeg'|'whisper'|'remotion'|'integrations'|'notion';
 export interface ReadinessItem {id:ReadinessId;title:string;state:ReadinessState;stateLabel:string;detail:string;/** Where to fix it, in words; the UI shows the same place as a real control. */next?:string;optional?:boolean}
 export interface ReadinessView {items:ReadinessItem[];summary:string;allChecked:boolean}
 
@@ -30,6 +30,13 @@ export function productionReadiness(rows:CapabilityRow[],pt:boolean):ReadinessVi
  const providerOverall:ReadinessState=states.includes('ready')?'ready':states.every(s=>s==='unchecked')?'unchecked':states.includes('unverified')?'unverified':'blocked';
  const providerDetail=providerRows.map(row=>`${row.title}: ${row.facts.filter(f=>['Runtime','Conta','Account','Login','Instalação','Installation'].includes(f.label)).map(f=>`${f.label} ${f.value}`).join(' · ')}`).join(' | ');
  items.push(item('provider',t('Provedor de IA e login','AI provider and sign-in'),providerOverall,providerDetail||t('Ainda não verificado.','Not checked yet.'),providerOverall==='ready'?undefined:(providerRows.map(row=>row.next?.text).filter(Boolean)[0]??t('Use “Verificar capacidades”.','Use “Check capabilities”.'))));
+
+ // Local executor is separate from sign-in: an authenticated Codex can still be unable to run any command.
+ const executor=find(rows,'executor');
+ if(executor){
+  const state:ReadinessState=executor.level==='unchecked'?'unchecked':executor.level==='ready'?'ready':fromFacts(executor.facts.slice(0,1));
+  items.push(item('executor',t('Executor local (comandos e FFmpeg)','Local executor (commands and FFmpeg)'),state,executor.facts[0]?.value??t('Ainda não verificado.','Not checked yet.'),state==='ready'||state==='unchecked'?undefined:executor.next?.text));
+ }
 
  const media=find(rows,'media');
  const mediaItem=(id:ReadinessId,title:string,labels:string[],optional?:boolean)=>{

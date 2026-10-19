@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { classifyCodexTurnError, limitFailure } from './provider-limits.mjs';
 import { createServer } from 'node:http';
 import {probeMcpAccounts} from './runtime-read-probe.mjs';
 import { createInterface } from 'node:readline';
@@ -10,10 +11,16 @@ import { delegateTool, DelegationCalls } from './agent-delegation-runtime.mjs';
 import {createCodexWorkflowRuntime} from './codex-workflow-runtime.mjs';
 import {chatApprovalPolicy,chatActionConfig} from './codex-action-policy.mjs';
 import {diagnoseCodex} from './runtime-capabilities.mjs';
-import { prepareCodexRuntimeHome, importLegacyCodexThread } from './codex-runtime-home.mjs';
+import { prepareCodexRuntimeHome, importLegacyCodexThread, threadDynamicToolNames } from './codex-runtime-home.mjs';
 import { createChatImageArtifacts, isImageGenerationItem, imageGenerationInstructions } from './chat-image-artifacts.mjs';
 import {notionAutomationInstructions} from './notion-automation-policy.mjs';
+import {paperDesignInstructions} from './paper-design.mjs';
+import {paperImageInstructions} from './paper-image-assets.mjs';
+import {scheduleTool} from './chat-publishing.mjs';
+import {publishingInstructions} from './publishing-automation.mjs';
+import {permittedMcpAction} from './runtime-tool-policy.mjs';
 import {agentFileAccess} from './agent-file-access.mjs';
+import {probeCodexExecutor,skillMarkdownFile,hostSkillContext,executorUnavailableInstructions,classifyThreadError,threadErrorStatus} from './codex-executor-readiness.mjs';
 
 export function codexLaunch({platform=process.platform,cliPath=process.env.CODEX_CLI_PATH,nodePath=process.execPath,appData=process.env.APPDATA??''}={}) {
   const cli=cliPath??(platform==='win32'?join(appData,'npm','node_modules','@openai','codex','bin','codex.js'):'codex');
@@ -63,11 +70,11 @@ class AppServerClient {
     for (const listener of this.listeners) listener(message);
   }
 
-  request(method, params) {
+  request(method, params, timeoutMs = 30000) {
     if(this.closed)return Promise.reject(new Error('Codex app-server is not running'));
     const id = this.nextId++;
     return new Promise((resolve, reject) => {
-      const timer=setTimeout(()=>{this.pending.delete(id);reject(new Error(`Codex ${method} timed out`))},30000);
+      const timer=setTimeout(()=>{this.pending.delete(id);reject(new Error(`Codex ${method} timed out`))},timeoutMs);
       this.pending.set(id, { resolve:(value)=>{clearTimeout(timer);resolve(value)}, reject:(error)=>{clearTimeout(timer);reject(error)} });
       this.process.stdin.write(`${JSON.stringify({ method, id, params })}\n`);
     });
@@ -139,7 +146,21 @@ function itemLabel(item) {
   return null;
 }
 
-function connectNotifications(client, delegationCalls, threadDelegation, imageArtifacts,actions,resolveBinding,delegations) {
+/** Host records from actual tool results: native images and Paper exports become verified receipts of the session. */
+export function recordToolResults(message,{imageArtifacts,resolveBinding,paperAssets}){
+  if(!paperAssets||message.method!=='item/completed')return;
+  const params=message.params??{},item=params.item??{},threadId=params.threadId,turnId=params.turnId??params.turn?.id;
+  const binding=threadId?resolveBinding(threadId):null;if(!binding)return;
+  const failed=error=>console.error(`[MainsAgents] Receipt not recorded: ${error.message}`);
+  if(isImageGenerationItem(item)&&item.status==='completed'&&typeof item.id==='string'){
+    let path;try{path=imageArtifacts.pathForImage({url:imageArtifacts.fromItem(item,turnId)?.image?.url});}catch{return;}
+    paperAssets.recordGeneratedImage({binding,callId:`${threadId}:${item.id}`,path}).catch(failed);
+  }
+  if(item.type==='mcpToolCall'&&item.server==='paper'&&item.tool==='export'&&item.status==='completed'&&!item.error&&item.result&&!item.result.isError)
+    paperAssets.captureExport({binding,callId:`${threadId}:${turnId}:${item.id}`,arguments:item.arguments,result:item.result}).catch(failed);
+}
+
+function connectNotifications(client, delegationCalls, threadDelegation, imageArtifacts,actions,resolveBinding,delegations,{paperAssets,chatPublishing}={}) {
   return client.subscribe((message) => {
     const params = message.params ?? {};
     const turnId = params.turnId ?? params.turn?.id;
@@ -152,7 +173,15 @@ function connectNotifications(client, delegationCalls, threadDelegation, imageAr
     if(message.id!==undefined&&/requestApproval$/.test(message.method)){client.reply(message.id,{decision:'decline'});return;}
     actions?.observe(message);
     delegations?.observeParent(message);
+    if(message.method==='item/tool/call'&&message.id!==undefined&&params.tool===scheduleTool.name){
+      // Authority comes from the saved session (user request + agent preference), resolved by the host here.
+      const binding=chatPublishing?resolveBinding(params.threadId):null,answer=result=>client.reply(message.id,{success:result.success===true,contentItems:[{type:'inputText',text:String(result.content??'').slice(0,64000)}]});
+      if(!binding)answer({success:false,content:'Scheduling is unavailable in this chat. Nothing was scheduled.'});
+      else Promise.resolve().then(()=>chatPublishing.call(binding,params.arguments??{},{executionId:turnId,callId:params.callId})).then(answer,error=>answer({success:false,content:error.message}));
+      return;
+    }
     if(message.method==='item/tool/call'&&message.id!==undefined){delegationCalls.receive(message,threadDelegation.get(params.threadId));return;}
+    recordToolResults(message,{imageArtifacts,resolveBinding,paperAssets});
     if (message.method === 'turn/started') publish(turnId, { type: 'execution.started', executionId: turnId, threadId: params.threadId ?? '' });
     if (message.method === 'item/agentMessage/delta') publish(turnId, { type: 'message.delta', executionId: turnId, delta: params.delta ?? '' });
     if (message.method === 'item/started' || message.method === 'item/completed') {
@@ -173,7 +202,11 @@ function connectNotifications(client, delegationCalls, threadDelegation, imageAr
       const status = params.turn?.status;
       if (status === 'completed') publish(turnId, { type: 'execution.completed', executionId: turnId });
       else if (status === 'interrupted') publish(turnId, { type: 'execution.cancelled', executionId: turnId });
-      else publish(turnId, { type: 'execution.failed', executionId: turnId, code: 'turn_failed', message: params.turn?.error?.message ?? 'Codex execution failed', retryable: true });
+      else {
+        // Usage limits only from the structured codexErrorInfo of the failed turn (never from the error prose).
+        const classified = limitFailure(classifyCodexTurnError(params.turn?.error), 'Codex');
+        publish(turnId, classified ? { type: 'execution.failed', executionId: turnId, ...classified } : { type: 'execution.failed', executionId: turnId, code: 'turn_failed', message: params.turn?.error?.message ?? 'Codex execution failed', retryable: true });
+      }
     }
     if (message.method === 'error') publish(turnId, { type: 'execution.failed', executionId: turnId, code: 'runtime_error', message: params.error?.message ?? 'Codex runtime error', retryable: true });
     if (message.method === 'bridge/error') {actions?.close();for (const record of executions.values()) if (!record.done) publish(record.executionId, { type: 'execution.failed', executionId: record.executionId, code: 'bridge_error', message: params.message, retryable: true });}
@@ -191,7 +224,7 @@ async function body(request) {
   return chunks.length ? JSON.parse(Buffer.concat(chunks).toString('utf8')) : {};
 }
 
-export async function startCodexBridge({ port = 8787, cwd = process.cwd(), runtimeHome = process.env.MAINSAGENTS_CODEX_HOME || join(process.env.APPDATA || join(homedir(), '.local', 'share'), 'mains-agents', 'codex-runtime'), sharedHome, imagesDirectory=join(homedir(),'.mainsagents','storage','images'),actions,getBinding,getAgents,delegations } = {}) {
+export async function startCodexBridge({ port = 8787, cwd = process.cwd(), runtimeHome = process.env.MAINSAGENTS_CODEX_HOME || join(process.env.APPDATA || join(homedir(), '.local', 'share'), 'mains-agents', 'codex-runtime'), sharedHome, imagesDirectory=join(homedir(),'.mainsagents','storage','images'),actions,getBinding,getAgents,delegations,paperAssets,chatPublishing } = {}) {
   const token=randomBytes(32).toString('hex');
   const runtime = prepareCodexRuntimeHome({home:runtimeHome,sharedHome,onError:error=>console.error(`[MainsAgents] Codex connection synchronization: ${error.message}`)});
   // Keep generated media in notifications. Do not change auth, billing or the text model.
@@ -204,9 +237,38 @@ export async function startCodexBridge({ port = 8787, cwd = process.cwd(), runti
   const threadSessions=new Map();
   const managedThreads=new Set(),workflowThreads=new Set();
   let diagnostics;
+  // A successful sandboxed read is reused briefly per policy; failures are re-probed so recovery is noticed.
+  // Concurrent callers share one in-flight probe (the first sandboxed command can take over a minute).
+  const executorReady=new Map(),executorProbes=new Map();
+  const executorReadiness=(cwd,file,sandboxPolicy={type:'readOnly'})=>{
+    const key=JSON.stringify([cwd,sandboxPolicy]);
+    if(Date.now()-(executorReady.get(key)??0)<300000)return Promise.resolve({ready:true,state:'ready'});
+    if(!executorProbes.has(key))executorProbes.set(key,probeCodexExecutor(client,{home:runtime.home,cwd,file,sandboxPolicy}).then(result=>{
+      if(result.ready)executorReady.set(key,Date.now());else console.error(`[MainsAgents] Codex executor ${result.state==='slow'?'still preparing':'unavailable'}: ${result.diagnosis?.summary??result.error}`);
+      return result;
+    }).finally(()=>executorProbes.delete(key)));
+    return executorProbes.get(key);
+  };
+  // Session start waits briefly; a probe still running is unknown, never reported to the agent as a failure.
+  const executorAtSessionStart=(cwd,file,sandboxPolicy)=>Promise.race([executorReadiness(cwd,file,sandboxPolicy),new Promise(resolve=>setTimeout(resolve,8000,{ready:false,state:'pending'}).unref())]);
   const resolveBinding=threadId=>getBinding?.(threadId,threadSessions.get(threadId));
+  // Application tools are fixed at thread/start (resume keeps the stored ones), so scheduling is offered to the model only
+  // when this thread really has the tool; an older thread is told plainly that a new chat of the agent is needed.
+  const scheduleThreads=new Set();
+  const schedulingPrompt=(threadId,binding)=>{
+    if(!chatPublishing||!binding||!permittedMcpAction(binding.agent,'schedule'))return '';
+    if(scheduleThreads.has(threadId)||threadDynamicToolNames(runtime,threadId)?.includes(scheduleTool.name))return publishingInstructions(binding.agent);
+    return '\n\nScheduling posts: this older chat was started before the MainsAgents scheduling tool existed, and a resumed chat cannot gain new app tools. If the user asks to schedule, do not claim to schedule; tell them to open a new chat of this same agent (same saved settings), which has the scheduling tool.';
+  };
+  // 'thread not loaded' alone never proves absence: a resume settles it ('no rollout found' => thread-missing).
+  const readThread=async(threadId,includeTurns)=>{
+    try{return await client.request('thread/read',{threadId,includeTurns});}
+    catch(error){if(classifyThreadError(error)!=='thread-not-loaded')throw error;await client.request('thread/resume',{threadId});return client.request('thread/read',{threadId,includeTurns});}
+  };
   const delegationCalls=new DelegationCalls({reply:(id,result)=>client.reply(id,result),publish,...(delegations?{dispatch:(params,config)=>delegations.dispatch(resolveBinding(params.threadId),params,config),onCancel:executionId=>delegations.cancelSource(executionId)}:{})});
-  connectNotifications(client,delegationCalls,threadDelegation,imageArtifacts,actions,resolveBinding,delegations);
+  connectNotifications(client,delegationCalls,threadDelegation,imageArtifacts,actions,resolveBinding,delegations,{paperAssets,chatPublishing});
+  // Warm-up: the first sandboxed command provisions the Windows sandbox; do it before the first agent needs it.
+  client.ready.then(()=>executorReadiness(cwd)).catch(()=>{});
   try{await client.ready}catch(error){client.close();runtime.close();throw error}
   const server = createServer(async (request, response) => {
     const url = new URL(request.url ?? '/', `http://${request.headers.host ?? '127.0.0.1'}`);
@@ -219,6 +281,12 @@ export async function startCodexBridge({ port = 8787, cwd = process.cwd(), runti
         if(!source||!profileId)return json(response,400,{error:'Choose an existing local Codex agent.'});
         return json(response,200,await probeMcpAccounts(client,{actions,getAgents:()=>getAgents?.()??[],getProfile:()=>actions.profile(),cwd,agentId:input.agentId,server:input.server}));
       }
+      if(request.method==='GET'&&url.pathname==='/api/codex/executor'){
+        // ?refresh=1 forces a new sandboxed probe ("test again"); otherwise a recent success is reused.
+        if(url.searchParams.get('refresh')==='1')executorReady.clear();
+        const result=await executorReadiness(cwd);
+        return json(response,200,{...result,desktopIsolation:{localAppDataIsolated:Boolean(runtime.isolation?.env.LOCALAPPDATA),disabledDesktopMcpServers:runtime.isolation?.desktopServers??[]}});
+      }
       if(request.method==='GET'&&url.pathname==='/api/codex/diagnostics'){
 
         diagnostics??=diagnoseCodex(client,{cwd,agents:getAgents?.()??[],evidence:actions?.evidence()??[]}).finally(()=>{diagnostics=undefined;});
@@ -229,7 +297,7 @@ export async function startCodexBridge({ port = 8787, cwd = process.cwd(), runti
         const threadId=decodeURIComponent(sessionImagesMatch[1]);
         if(!/^[a-f0-9-]{36}$/i.test(threadId))return json(response,400,{error:'Invalid Codex thread.'});
         importLegacyCodexThread(runtime,threadId);
-        const result=await client.request('thread/read',{threadId,includeTurns:true});
+        const result=await readThread(threadId,true);
         const events=[];
         for(const turn of result.thread?.turns??[])for(const item of turn.items??[]){const event=imageArtifacts.fromItem(item,turn.id);if(event)events.push(event);}
         return json(response,200,{events});
@@ -256,11 +324,18 @@ export async function startCodexBridge({ port = 8787, cwd = process.cwd(), runti
         const binding=getBinding?.(input.threadId,input.config?.localSessionId);
         const config = binding?{...binding.agent,agentName:binding.agentName,skills:(binding.agent.skills??[]).filter(skill=>!binding.agent.disabledSkills?.includes(skill)),modelId:input.config?.modelId}:input.config ?? {};
         if(getBinding&&!binding)return json(response,409,{error:'Save the agent and session before connecting the CLI.'});
+        // Resuming names a thread this saved session owns; it never adopts another session's thread.
+        const ownedThreads=[binding?.session?.remoteSessionId,binding?.session?.codexThreadId].filter(Boolean);
+        if(binding&&input.threadId&&ownedThreads.length&&!ownedThreads.includes(input.threadId))return json(response,409,{error:'This Codex thread belongs to another session. Reopen the session.'});
         const skillsContext = Array.isArray(config.skills) && config.skills.length
           ? `\n\nThis agent may use only these associated skills:\n${config.skills.map(name=>`${name}: ${config.skillFiles?.[name]??config.skillsDirectory??'path not configured'}`).join('\n')}. Read the relevant skill Markdown file before using it (a standalone .md or SKILL.md). Do not use unrelated skills.`
           : '';
         const fileAccess=agentFileAccess(config,cwd);
-        const params = { cwd:fileAccess.cwd,historyMode:'legacy',config:{...await chatActionConfig(client),...fileAccess.config}, ...(config.modelId||process.env.MAINSAGENTS_CODEX_MODEL?{model:config.modelId||process.env.MAINSAGENTS_CODEX_MODEL}:{}), approvalPolicy: chatApprovalPolicy, sandbox:fileAccess.sandbox, developerInstructions: `You are ${config.agentName ?? 'a MainsAgents specialist'}. ${config.instructions ?? ''}${skillsContext}\n\n${fileAccess.instructions}\n\n${imageGenerationInstructions}`.trim(), serviceName: 'mainsagents', dynamicTools:[delegateTool] };
+        const skillNames=Array.isArray(config.skills)?config.skills:[];
+        const skillFile=skillNames.map(name=>{try{return skillMarkdownFile(name,config.skillFiles?.[name]??config.skillsDirectory)}catch{return null}}).find(Boolean);
+        const executor=await executorAtSessionStart(fileAccess.cwd,skillFile,fileAccess.sandboxPolicy);
+        const executorContext=executor.state!=='failed'?'':executorUnavailableInstructions(executor,hostSkillContext(skillNames,config));
+        const params = { cwd:fileAccess.cwd,historyMode:'legacy',config:{...await chatActionConfig(client),...fileAccess.config}, ...(config.modelId||process.env.MAINSAGENTS_CODEX_MODEL?{model:config.modelId||process.env.MAINSAGENTS_CODEX_MODEL}:{}), approvalPolicy: chatApprovalPolicy, sandbox:fileAccess.sandbox, developerInstructions: `You are ${config.agentName ?? 'a MainsAgents specialist'}. ${config.instructions ?? ''}${skillsContext}\n\n${fileAccess.instructions}${executorContext}\n\n${imageGenerationInstructions}`.trim(), serviceName: 'mainsagents', dynamicTools:[delegateTool,...(chatPublishing&&binding&&permittedMcpAction(binding.agent,'schedule')?[scheduleTool]:[])] };
         if (input.threadId) {
           if (activeThreadWriters.has(input.threadId)) return json(response, 409, { error: activeWriterMessage });
           importLegacyCodexThread(runtime, input.threadId);
@@ -268,6 +343,7 @@ export async function startCodexBridge({ port = 8787, cwd = process.cwd(), runti
         const {dynamicTools,historyMode,...resumeParams}=params;
         const result = input.threadId ? await client.request('thread/resume', { ...resumeParams,threadId: input.threadId }) : await client.request('thread/start', params);
         if(binding)threadSessions.set(result.thread.id,binding.sessionId);
+        if(!input.threadId&&params.dynamicTools.includes(scheduleTool))scheduleThreads.add(result.thread.id);
         managedThreads.add(result.thread.id);
         if (result.thread?.status?.type === 'active') return json(response, 409, { error: activeWriterMessage });
         return json(response, 200, { threadId: result.thread.id });
@@ -276,7 +352,7 @@ export async function startCodexBridge({ port = 8787, cwd = process.cwd(), runti
         const input = await body(request);
         const threadId = input.threadId;
         if (!threadId) return json(response, 400, { error: 'A Codex thread is required to send a message.' });
-        if(!managedThreads.has(threadId)&&!workflowThreads.has(threadId))return json(response,409,{error:'Resume this session in MainsAgents before sending a message so its tool policy can be verified.'});
+        if(!managedThreads.has(threadId)&&!workflowThreads.has(threadId))return json(response,409,{error:'Resume this session in MainsAgents before sending a message so its tool policy can be verified.',code:'thread-not-loaded'});
         if (activeThreadWriters.has(threadId)) return json(response, 409, { error: activeWriterMessage });
         const context = (input.context ?? []).map((item) => `[${item.kind}] ${item.label}${item.content ? `\n${item.content}` : ''}`).join('\n\n');
         const binding=resolveBinding(threadId);
@@ -290,7 +366,7 @@ export async function startCodexBridge({ port = 8787, cwd = process.cwd(), runti
         const delegationPrompt=catalog.length?`\n\nMainsAgents agent catalog (current workspace): ${JSON.stringify(catalog)}. Use mainsagents_delegate when this requested workflow needs one of these specialists. Send a complete briefing, approved decisions, and absolute local file paths. The tool waits and returns the specialist result. Do not substitute a built-in temporary Codex subagent for these configured agents. Do not invent approval or publish. Respect scope and limit each response to at most 4 handoffs.`:'\n\nMainsAgents delegation is disabled for this turn. Do not call mainsagents_delegate.';
         const connected=catalog.find(agent=>agent.id===delegation?.connectedAgentId);
         const connectionPrompt=connected?`\n\nThe user enabled a persistent connection to ${connected.name} (${connected.id}). Delegate relevant parts of the user's requests to this agent with mainsagents_delegate; formulate useful instructions and include the relevant context. The application reuses the connected agent's existing session. Use sessionMode: "continue" by default. Only use sessionMode: "new" when the user explicitly asks to open another session for the connected agent. Its configured role, instructions and skills remain unchanged. Answer ordinary questions directly when they do not require that specialist. Wait for its actual result before reporting completion.`:'';
-        const text = `${input.content}${context?`\n\nWorkspace context:\n${context}`:''}${delegationPrompt}${connectionPrompt}${notionAutomationInstructions(binding?.agent)}\n${agentFileAccess(binding?.agent,cwd).instructions}\n\nMainsAgents image delivery policy: ${imageGenerationInstructions}`;
+        const text = `${input.content}${context?`\n\nWorkspace context:\n${context}`:''}${delegationPrompt}${connectionPrompt}${notionAutomationInstructions(binding?.agent)}${paperDesignInstructions(binding?.agent)}${paperImageInstructions(binding?.agent)}${schedulingPrompt(threadId,binding)}\n${agentFileAccess(binding?.agent,cwd).instructions}\n\nMainsAgents image delivery policy: ${imageGenerationInstructions}`;
         const lockToken = `pending-${randomBytes(12).toString('hex')}`;
         activeThreadWriters.set(threadId, lockToken);
         try {
@@ -358,6 +434,8 @@ export async function startCodexBridge({ port = 8787, cwd = process.cwd(), runti
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const writerConflict = /already has an active writer|another Codex window is still finishing/i.test(message);
+      const threadCode = writerConflict ? null : classifyThreadError(error);
+      if (threadCode) return json(response, threadErrorStatus[threadCode], { error: message, code: threadCode });
       json(response, writerConflict ? 409 : 500, { error: /another Codex window is still finishing/i.test(message) ? message : writerConflict ? activeWriterMessage : message });
     }
   });
@@ -368,7 +446,7 @@ export async function startCodexBridge({ port = 8787, cwd = process.cwd(), runti
   // Host-only MCP access: deliberately not exposed as an unrestricted HTTP API.
   const notionTools=new Set(['notion-search','notion-fetch','notion-create-pages','notion-update-page']);
   const publicationMcp={async call(tool,args,provider='publora'){
-    const allowed=provider==='publora'?['list_connections','list_posts','create_post','get_post','update_post','get_upload_url','complete_media','delete_media']:provider==='zernio'?['accounts_list_accounts','posts_list_posts']:[];if(!allowed.includes(tool))throw Error('Unsupported publishing operation.');
+    const allowed=provider==='publora'?['account_context','list_connections','list_posts','create_post','get_post','update_post','get_upload_url','complete_media','delete_media']:provider==='zernio'?['accounts_list_accounts','posts_list_posts']:[];if(!allowed.includes(tool))throw Error('Unsupported publishing operation.');
     const {config={}}=await client.request('config/read',{includeLayers:false});
     if(!config.mcp_servers?.[provider]||config.mcp_servers[provider].enabled===false)throw Error(`Configure and authenticate the ${provider} MCP in Codex CLI first.`);
     const clean=value=>Array.isArray(value)?value.filter(item=>item!==null).map(clean):value&&typeof value==='object'?Object.fromEntries(Object.entries(value).filter(([,item])=>item!==null).map(([key,item])=>[key,clean(item)])):value;
@@ -386,7 +464,7 @@ export async function startCodexBridge({ port = 8787, cwd = process.cwd(), runti
     },
   };
   const workflowClient={request:async(method,params)=>{const result=await client.request(method,params);if(['thread/start','thread/resume'].includes(method))workflowThreads.add(result.thread.id);return result;}};
-  const runtimeRequest=async(path,input)=>{const response=await fetch(`http://127.0.0.1:${activePort}${path}`,{method:'POST',headers:{'content-type':'application/json','x-mainsagents-bridge-token':token},body:JSON.stringify(input)});const value=await response.json();if(!response.ok)throw new Error(value.error??'Codex runtime request failed.');return value;};
+  const runtimeRequest=async(path,input)=>{const response=await fetch(`http://127.0.0.1:${activePort}${path}`,{method:'POST',headers:{'content-type':'application/json','x-mainsagents-bridge-token':token},body:JSON.stringify(input)});const value=await response.json();if(!response.ok)throw Object.assign(new Error(value.error??'Codex runtime request failed.'),{status:response.status,...(value.code?{code:value.code}:{})});return value;};
   const runtimeEvents=async function*(executionId,signal){
       const record=executions.get(executionId);if(!record)throw new Error('This execution is not loaded. Reconcile its saved thread.');
       const queue=[...record.events];let wake;
@@ -398,7 +476,7 @@ export async function startCodexBridge({ port = 8787, cwd = process.cwd(), runti
   const chatRuntime={
     connect:async(session,agent)=>{const result=await runtimeRequest('/api/codex/sessions',{...(session.codexThreadId||session.remoteSessionId?{threadId:session.codexThreadId??session.remoteSessionId}:{}),config:{localSessionId:session.id,modelId:session.modelId??agent.modelId}});return result.threadId;},
     send:(threadId,content,agent)=>runtimeRequest('/api/codex/executions',{threadId,content,modelId:agent.modelId,reasoningEffort:agent.reasoningEffort??'medium'}),events:runtimeEvents,
-    readThread:async threadId=>(await client.request('thread/read',{threadId,includeTurns:true})).thread,
+    readThread:async threadId=>(await readThread(threadId,true)).thread,
     cancel:(threadId,executionId)=>client.request('turn/interrupt',{threadId,turnId:executionId}),
   };
   return { port: activePort, token, notionMcp, publicationMcp, workflow,chatRuntime, isAlive:()=>!client.closed, close: async () => { actions?.close();delegationCalls.close(); await new Promise((resolve) => server.close(resolve)); await client.close(); runtime.close(); } };

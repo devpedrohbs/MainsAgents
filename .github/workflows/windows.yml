@@ -25,6 +25,8 @@ jobs:
         run: choco install ffmpeg --yes --no-progress
       - name: Validate TypeScript and generate frontend preview
         run: npm run build
+      - name: Check that every runtime module reachable from the desktop entry is packaged
+        run: node scripts/check-build-files.mjs
       - name: Run isolated tests
         run: npm test
       - name: Build desktop installer
@@ -60,6 +62,25 @@ jobs:
         run: npx electron scripts/test-completion-ui.mjs --disable-gpu
       - name: Validate upgrade data preservation
         run: npx electron scripts/test-desktop-persistence-ui.mjs --disable-gpu
+      - name: Validate content sessions per agent and recorded entry
+        run: npx electron scripts/test-content-sessions-ui.mjs --disable-gpu
+      - name: Validate session recovery when a provider thread is gone
+        run: npx electron scripts/test-session-recovery-ui.mjs --disable-gpu
+      - name: Validate agent handoff to a specialist
+        run: npx electron scripts/test-agent-handoff-ui.mjs --disable-gpu
+      - name: Validate production preflight
+        run: npx electron scripts/test-production-preflight-ui.mjs --disable-gpu
+      - name: Validate execution overview and runtime controls
+        run: |
+          npx electron scripts/test-execution-overview-ui.mjs --disable-gpu
+          npx electron scripts/test-runtime-controls-ui.mjs --disable-gpu
+      - name: Validate Codex/Claude provider choice
+        run: npx electron scripts/test-provider-choice-ui.mjs --disable-gpu
+      - name: Validate smart edit, edit preview and caption frames
+        run: |
+          npx electron scripts/test-smart-edit-ui.mjs --disable-gpu
+          npx electron scripts/test-edit-preview-ui.mjs --disable-gpu
+          npx electron scripts/test-captions-frames-ui.mjs --disable-gpu
       - uses: actions/upload-artifact@v4
         with:
           name: MainsAgents-Windows

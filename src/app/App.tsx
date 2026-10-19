@@ -21,6 +21,7 @@ import { Settings } from '../pages/Settings';
 import { useCanvas } from '../components/canvas/CanvasProvider';
 import { useWorkspaces } from './WorkspaceProvider';
 import { useChat } from '../features/chat/ChatProvider';
+import { contentLink, contentScopeKey, scopeContentId } from '../features/chat/contentScopes';
 import { usePersistentState, updatePersistentValue } from '../data/localPersistence';
 import { useLanguage } from './LanguageProvider';
 import { TaskEditorDialog, type TaskDraft } from '../components/tasks/TaskEditorDialog';
@@ -58,10 +59,17 @@ export function App() {
       setExecutionId(current.id);
     }
   };
-  const { sessions, createSession, openSession } = useChat();
+  const { sessions, createSession, openSession, contentScopes, selectScope } = useChat();
   const chatInbox=useChatInbox(sessions,allAgents,currentWorkspaceId);
   const { state: editorialState, ready: editorialReady, jobs: editorialJobs } = useContentWorkflow();
   const { attachNodesToAgent, addNode, allNodes, selectNode } = useCanvas();
+  // "New session" from anywhere inherits the content selected in that agent's workspace (General stays General).
+  const scopedLink = (agentId: string) => {
+    const workspaceId = getAgentById(agentId)?.workspaceId;
+    const id = workspaceId ? scopeContentId(contentScopes.selected[workspaceId]) : undefined;
+    const content = editorialState.contents.find((item) => item.id === id && item.workspaceId === workspaceId);
+    return content ? contentLink(content) : undefined;
+  };
   const deferredWorkspaceAction = useRef<(() => void) | null>(null);
   const inWorkspace = (workspaceId: string, action: () => void) => {
     if (workspaceId === currentWorkspaceId) action();
@@ -79,10 +87,17 @@ export function App() {
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [selectedContentId, setSelectedContentId] = useState<string | null>(null);
   const [selectedEditorialTopicId, setSelectedEditorialTopicId] = useState<string | null>(null);
+  // Explicit "open content" actions also select that content's space, so the chat beside the Studio shows the SAME content
+  // (its shown chat or the empty state), never the previously selected one. Background refreshes never call this.
+  const selectContentScope = (contentId?: string | null) => {
+    const content = contentId ? editorialState.contents.find((item) => item.id === contentId) : undefined;
+    if (content) selectScope(content.workspaceId, contentScopeKey(content.id));
+  };
   const openEditorialItem = (item: EditorialInboxItem) => {
     const current = editorialInbox(editorialState, editorialJobs, currentWorkspaceId).find(candidate => candidate.id === item.id);
     if (!current) { notify(locale === 'pt-BR' ? 'Esta pendência já mudou. Confira a lista atualizada.' : 'This item has changed. Check the updated list.'); return; }
     setSelectedContentId(current.contentId ?? null);
+    selectContentScope(current.contentId);
     setSelectedEditorialTopicId(current.topicId);
     updatePersistentValue('studio-view','studio','studio');navigate('content');
   };
@@ -91,11 +106,11 @@ export function App() {
       const detail=(event as CustomEvent<{contentId?:string;topicId?:string}>).detail;
       const id=detail?.contentId;
       const item=editorialState.contents.find(content=>content.id===id);
-      if(!item){const topic=editorialState.topics.find(topic=>topic.id===detail?.topicId);if(topic){setCurrentWorkspaceId(topic.workspaceId);setSelectedContentId(topic.contentId??null);setSelectedEditorialTopicId(topic.id);updatePersistentValue('studio-view','studio','studio');navigate('content');}return;}
-      setCurrentWorkspaceId(item.workspaceId);setSelectedContentId(item.id);setSelectedEditorialTopicId(item.topicId);updatePersistentValue('studio-view','studio','studio');navigate('content');
+      if(!item){const topic=editorialState.topics.find(topic=>topic.id===detail?.topicId);if(topic){setCurrentWorkspaceId(topic.workspaceId);setSelectedContentId(topic.contentId??null);selectContentScope(topic.contentId);setSelectedEditorialTopicId(topic.id);updatePersistentValue('studio-view','studio','studio');navigate('content');}return;}
+      setCurrentWorkspaceId(item.workspaceId);setSelectedContentId(item.id);selectScope(item.workspaceId,contentScopeKey(item.id));setSelectedEditorialTopicId(item.topicId);updatePersistentValue('studio-view','studio','studio');navigate('content');
     };
     window.addEventListener('mainsagents:open-content',open);return()=>window.removeEventListener('mainsagents:open-content',open);
-  },[editorialState.contents,editorialState.topics,setCurrentWorkspaceId,navigate]);
+  },[editorialState.contents,editorialState.topics,setCurrentWorkspaceId,navigate,selectScope]);
   const [panelOpen, setPanelOpen] = useState(false);
   const [chatPresentation, setChatPresentation] = usePersistentState<'side' | 'floating'>(
     'chat-presentation',
@@ -157,7 +172,7 @@ export function App() {
       return;
     }
     if (intent.kind === 'session')
-      createSession(agentId, undefined, agent?.providerId ?? 'codex', agent?.modelId);
+      createSession(agentId, undefined, agent?.providerId ?? 'codex', agent?.modelId, scopedLink(agentId));
     else attachNodesToAgent(agentId, intent.nodeIds ?? []);
     setPanelOpen(true);
   };
@@ -171,7 +186,7 @@ export function App() {
           else {
             if (pendingCreation.kind === 'context')
               attachNodesToAgent(created.id, pendingCreation.nodeIds ?? []);
-            else createSession(created.id, undefined, created.providerId ?? 'codex', created.modelId);
+            else createSession(created.id, undefined, created.providerId ?? 'codex', created.modelId, scopedLink(created.id));
             setPanelOpen(true);
           }
         } else {
@@ -200,6 +215,7 @@ export function App() {
   const openTask = (task: Task) => {
     if (task.contentId) {
       setSelectedContentId(task.contentId);
+      selectContentScope(task.contentId);
       setSelectedEditorialTopicId(null);
       updatePersistentValue('studio-view','studio','studio');navigate('content');
       return;
@@ -215,7 +231,7 @@ export function App() {
       (session) => session.id === task.sessionId && session.agentId === agent.id,
     );
     const session =
-      existing ?? createSession(agent.id, draft.title, agent.providerId ?? 'codex', agent.modelId);
+      existing ?? createSession(agent.id, draft.title, agent.providerId ?? 'codex', agent.modelId, undefined, 'select');
     if (existing) openSession(agent.id, session.id);
     if (!existing && !readChatDraft(agent.id, session.id).text)
       writeChatDraft(agent.id, session.id, {

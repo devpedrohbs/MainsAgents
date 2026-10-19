@@ -12,7 +12,7 @@ import { createNotionEditorialConnector } from './notion-editorial-connector.mjs
 import {createCalendarConnector} from './publication-calendar-connector.mjs';
 import {createPublicationConnector} from './publication-connector.mjs';
 
-const claudeBridge = createClaudeCodeBridge({getApprovals:()=>({actions:contentWorkflowBridge.actions,claudeBinding:contentWorkflowBridge.claudeBinding})});
+const claudeBridge = createClaudeCodeBridge({getApprovals:()=>({actions:contentWorkflowBridge.actions,claudeBinding:contentWorkflowBridge.claudeBinding,paperAssets:contentWorkflowBridge.paperAssets,chatPublishing:contentWorkflowBridge.chatPublishing})});
 const canvasRuntimeBridge = createCanvasRuntimeBridge({ cwdRoot: join(process.cwd(), '.mainsagents-workspaces') });
 const contentWorkflowBridge = createContentWorkflowBridge({ dbPath: join(process.cwd(), '.mainsagents-workspaces', 'editorial.sqlite'),mediaOptions:{...createRemotionAnimator(),transcriber:createWhisperTranscriber()},getConnector:()=>bridge?.isAlive()?createNotionEditorialConnector(()=>bridge.notionMcp):null,getRuntime:()=>bridge?.isAlive()?bridge.workflow:null,getChatRuntime:provider=>provider==='claude'?claudeBridge.runtime:null,getProviderStatus:provider=>provider==='claude'?claudeBridge.status():undefined,getPublicationConnector:()=>bridge?.isAlive()?createPublicationConnector(()=>bridge.publicationMcp):null,getCalendarConnector:provider=>bridge?.isAlive()?createCalendarConnector(()=>bridge.publicationMcp,provider):null });
 const codexOptions = { port: 0, runtimeHome: join(process.cwd(), '.mainsagents-workspaces', 'codex-runtime'), imagesDirectory:join(process.cwd(),'.mainsagents-workspaces','images') };

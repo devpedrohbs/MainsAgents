@@ -2,6 +2,8 @@
 
 Atualizado em 22/09/2026. Este arquivo contém tarefas independentes para executar em conversas futuras do Codex. A ordem abaixo evita construir novos provedores sobre uma experiência difícil de usar ou um modelo de dados frágil.
 
+> **Estado local em 11/10/2026:** versão do código **0.3.61** (build/instalação local, **não** é release pública; a última prévia pública continua 0.3.42). Concluído nesta rodada: isolamento do executor Codex frente ao Codex Desktop, contrato de sessão ausente, correção de `sessionMode:'new'` nas delegações, prévia fiel curta das legendas gravadas, `check-build-files` antes do empacotamento. Pendências e limites em [runtime-session-fix-2026-10-10.md](docs/analysis/runtime-session-fix-2026-10-10.md).
+
 ## Decisões de produto
 
 - A conta **MainsAgents** identifica a pessoa e libera o uso do app. Cada perfil mantém os próprios dados localmente neste computador.

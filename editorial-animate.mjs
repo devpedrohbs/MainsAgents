@@ -1,6 +1,6 @@
 import {existsSync} from 'node:fs';
 import {join} from 'node:path';
-import {getRemotionCapabilities,renderAnimatedVideo,resolveFfprobe} from './editorial-remotion.mjs';
+import {getRemotionCapabilities,renderAnimatedVideo,renderStoryboardStills,resolveFfprobe} from './editorial-remotion.mjs';
 
 /** Native binaries cannot be spawned from inside app.asar; Electron reports them there but they live in app.asar.unpacked. */
 export const unpackedPath=path=>typeof path==='string'?path.replace(/([\\/])app\.asar([\\/])/,'$1app.asar.unpacked$2'):path;
@@ -25,8 +25,10 @@ export function resolveAnimationBrowser({browserExecutable,env=process.env,platf
   return found?{path:found,source:'system'}:{path:null,source:'none',reason:'Nenhum Chrome ou Edge instalado foi encontrado. Instale um deles ou defina MAINSAGENTS_BROWSER; o app não baixa navegador sozinho.'};
 }
 
+/** Keeps `code` and `details` (QA report, hash mismatch) so the caller can show what blocked the render. */
+const wrapped=(error,label)=>Object.assign(new Error(error?.code==='cancelled'?'Media operation canceled.':`${label}${error?.code?` (${error.code})`:''}: ${error?.message??error}`),{code:error?.code,details:error?.details});
 /** Media options that plug the local Remotion overlay template into editorial-media. Never downloads a browser. */
-export function createRemotionAnimator({browserExecutable,bundleDir,ffprobePath,render=renderAnimatedVideo,capabilities=getRemotionCapabilities,cacheMs=60000,resolveBrowser=resolveAnimationBrowser}={}){
+export function createRemotionAnimator({browserExecutable,bundleDir,ffprobePath,render=renderAnimatedVideo,renderStills=renderStoryboardStills,capabilities=getRemotionCapabilities,cacheMs=60000,resolveBrowser=resolveAnimationBrowser}={}){
   let cached,checkedAt=0,browser;
   const probe=ffprobePath??unpackedPath(resolveFfprobe());
   const options=()=>{browser??=resolveBrowser({browserExecutable});return {...(browser.path?{browserExecutable:browser.path}:{}),...(bundleDir?{bundleDir}:{}),...(probe&&probe!=='ffprobe'&&probe!=='ffprobe.exe'?{ffprobePath:probe}:{})};};
@@ -41,7 +43,13 @@ export function createRemotionAnimator({browserExecutable,bundleDir,ffprobePath,
     async animate(input){
       const resolved=options();if(!browser.path)throw new Error(`Animation render unavailable: ${browser.reason}`);
       try{return await render({...input,...resolved});}
-      catch(error){throw new Error(error?.code==='cancelled'?'Media operation canceled.':`Animation render failed${error?.code?` (${error.code})`:''}: ${error?.message??error}`);}
+      catch(error){throw wrapped(error,'Animation render failed');}
+    },
+    /** Stills + contact sheet da MESMA composição do export (storyboard: entrada/meio/saída por cena) para revisar antes do MP4. */
+    async stills(input){
+      const resolved=options();if(!browser.path)throw new Error(`Animation render unavailable: ${browser.reason}`);
+      try{return await renderStills({...input,...resolved});}
+      catch(error){throw wrapped(error,'Animation stills failed');}
     },
   };
 }

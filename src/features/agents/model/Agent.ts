@@ -16,6 +16,9 @@ export interface Agent {
   mcpPermissions?:Array<'read'|'write'|'schedule'|'publish'|'delete'|'unknown'>;
   notionAutomation?:{enabled:boolean;dataSourceId:string};
   fileAccess?:{enabled:boolean;outputDirectory:string};
+  paperDesign?:{enabled:boolean;automatic:boolean;fileId:string;fileName:string;signature:string;visualStyle:string};
+  /** Saved by the person: an explicit scheduling request in chat authorizes that exact future post (see publishing-automation.mjs). */
+  publishingAutomation?:{enabled:boolean;provider:''|'publora'|'zernio';timeZone:string};
   modelId?: string;
   avatarImage?: string;
   skillsDirectory?: string;
@@ -40,7 +43,7 @@ export const agentToolDetails: Record<AgentTool, { label: string; description: s
   subagents: { label: 'Agent collaboration', description: 'Send briefings to agents in this workspace and follow both chats.' },
 };
 
-export type AgentEditorValues = Pick<Agent, 'name' | 'role' | 'description' | 'instructions' | 'workspaceId' | 'tools' | 'skillsDirectory' | 'skills' | 'skillFiles' | 'disabledSkills' | 'skillsInstallKey' | 'providerId' | 'modelId' | 'avatarImage'|'mcpPermissions'|'notionAutomation'|'fileAccess'>;
+export type AgentEditorValues = Pick<Agent, 'name' | 'role' | 'description' | 'instructions' | 'workspaceId' | 'tools' | 'skillsDirectory' | 'skills' | 'skillFiles' | 'disabledSkills' | 'skillsInstallKey' | 'providerId' | 'modelId' | 'avatarImage'|'mcpPermissions'|'notionAutomation'|'fileAccess'|'paperDesign'|'publishingAutomation'>;
 
 export function getAgentInitials(agent: Pick<Agent, 'name'>): string {
   return agent.name

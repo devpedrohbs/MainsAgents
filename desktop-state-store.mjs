@@ -6,6 +6,7 @@ import {executionSnapshot,executionRevision,restoreExecution} from './editorial-
 import {validateEditorialAssets} from './editorial-assets-validation.mjs';
 import {validateInspirationState} from './editorial-inspiration.mjs';
 import {validatePublications} from './editorial-publications.mjs';
+import {ensureContentFences,deletedIds,sanitizeLinkedValue,linkedStateKeys,stripDeletedFromRestore} from './content-deletion.mjs';
 
 // This file lives in userData, never in the application installation directory.
 export function createDesktopStateStore(directory, version) {
@@ -13,6 +14,12 @@ export function createDesktopStateStore(directory, version) {
   const db = new DatabaseSync(join(directory, 'workspace-state.sqlite'));
   db.exec('PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; CREATE TABLE IF NOT EXISTS state (profile TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL, PRIMARY KEY(profile,key)); CREATE TABLE IF NOT EXISTS profiles (profile TEXT PRIMARY KEY); CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY,value TEXT NOT NULL);');
   db.exec('CREATE TABLE IF NOT EXISTS agent_revisions (id INTEGER PRIMARY KEY AUTOINCREMENT,profile TEXT NOT NULL,value TEXT NOT NULL,saved_at TEXT NOT NULL);');
+  ensureContentFences(db);
+  // Deleted contents/chats never come back through a stale renderer copy of a linked key (sessions, pointers, drafts, flows).
+  const sanitize=(profile,key,value)=>linkedStateKeys.includes(key)?sanitizeLinkedValue(key,value,deletedIds(db,profile)):value;
+  // Revision a window held right before a local deletion rewrote the key: its next write is the same data minus the deleted
+  // ids (sanitized again below), so it is accepted instead of reporting a false "newer data" conflict.
+  const purgeAliases=new Map();
   const previous = db.prepare("SELECT value FROM metadata WHERE key='app-version'").get()?.value;
   if (previous !== version) {
     const rows = db.prepare('SELECT profile,key,value FROM state ORDER BY profile,key').all();
@@ -61,7 +68,10 @@ export function createDesktopStateStore(directory, version) {
       if(!this.hasProfile(profile))throw new Error('Storage profile has not been restored');
       if(nextEditorial?.schemaVersion!==1||!['topics','contents','runs','artifacts','approvals'].every(key=>Array.isArray(nextEditorial[key]))||!validateInspirationState(nextEditorial)||!validateEditorialAssets(nextEditorial)||!validatePublications(nextEditorial))throw new Error('Invalid editorial backup');
       if(nextEditorial.assets)nextEditorial={...nextEditorial,assets:nextEditorial.assets.map(asset=>({...asset,status:'unchecked',checkedAt:undefined,lastError:undefined}))};
+      let omitted={contents:0,sessions:0};
       transaction(()=>{
+        // A backup older than a local deletion: everything else is restored, the deleted contents/chats stay deleted.
+        ({values,editorial:nextEditorial,execution:nextExecution,omitted}=stripDeletedFromRestore(db,profile,{values,editorial:nextEditorial,execution:nextExecution}));
         const current=this.readAllVersioned(profile);
         const execution=executionSnapshot(db,profile);
         if(execution.jobs.some(job=>['queued','running'].includes(job.status)))throw new Error('Wait for active editorial work to finish before restoring a backup.');
@@ -82,6 +92,7 @@ export function createDesktopStateStore(directory, version) {
         db.prepare('INSERT OR REPLACE INTO editorial_state VALUES (?,?,?,?)').run(profile,expected.editorialRevision+1,JSON.stringify(nextEditorial),new Date().toISOString());
         if(nextExecution)restoreExecution(db,profile,nextExecution.state,nextExecution.mode);
       });
+      return {omittedDeleted:omitted};
     },
     currentProfile() { return db.prepare("SELECT value FROM metadata WHERE key='active-profile'").get()?.value; },
     selectProfile(profile) { validateProfile(profile); db.prepare("INSERT OR REPLACE INTO metadata VALUES ('active-profile',?)").run(profile); },
@@ -104,13 +115,16 @@ export function createDesktopStateStore(directory, version) {
     write(profile, key, value, expectedRevision) {
       validateProfile(profile); validateKey(key);
       if (!this.hasProfile(profile)) throw new Error('Storage profile has not been restored');
-      const serialized=JSON.stringify(value);
+      const serialized=JSON.stringify(sanitize(profile,key,value));
       transaction(()=>{
         const previous=db.prepare('SELECT value FROM state WHERE profile=? AND key=?').get(profile,key)?.value;
-        if(expectedRevision!==undefined && expectedRevision!==hash(previous)) throw new Error('Newer saved data exists. Your changes are still in memory; export a backup and reload before continuing.');
+        const alias=purgeAliases.get(`${profile}\u0000${key}`);
+        if(expectedRevision!==undefined && expectedRevision!==hash(previous) && !(alias&&alias.from===expectedRevision&&alias.to===hash(previous))) throw new Error('Newer saved data exists. Your changes are still in memory; export a backup and reload before continuing.');
         if(previous===serialized) return;
         if(key==='agents') preserveAgents(profile);
         put.run(profile,key,serialized);
+        // The alias covers only the first write after the deletion; a later one must match the current revision.
+        purgeAliases.delete(`${profile}\u0000${key}`);
         db.prepare("INSERT OR REPLACE INTO metadata VALUES ('last-saved-at',?)").run(new Date().toISOString());
       });
       return {revision:hash(serialized),savedAt:new Date().toISOString()};
@@ -122,9 +136,11 @@ export function createDesktopStateStore(directory, version) {
       transaction(() => {
         preserveAgents(profile);
         db.prepare('DELETE FROM state WHERE profile=?').run(profile);
-        for (const [key,value] of Object.entries(values)) { validateKey(key); put.run(profile,key,JSON.stringify(value)); }
+        for (const [key,value] of Object.entries(values)) { validateKey(key); put.run(profile,key,JSON.stringify(sanitize(profile,key,value))); }
       });
     },
+    /** Records the revisions a local content/chat deletion rewrote (same database file, written by the bridge connection). */
+    notePurge(profile,changes){validateProfile(profile);for(const [key,change] of Object.entries(changes??{}))if(change?.from&&change?.revision)purgeAliases.set(`${profile}\u0000${key}`,{from:change.from,to:change.revision});},
     checkpoint() { db.exec('PRAGMA wal_checkpoint(FULL)'); },
     recoverySnapshot() {
       const backupDirectory=join(directory,'backups'); mkdirSync(backupDirectory,{recursive:true});

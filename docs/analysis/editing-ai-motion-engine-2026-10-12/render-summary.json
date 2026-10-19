@@ -1,0 +1,26 @@
+[
+  {
+    "id": "edicao-creator-9x16",
+    "summary": "5 cenas (Criador (energia alta)), 10 camadas: text, chapter, steps, counter; 3 SFX.",
+    "qa": true,
+    "warnings": 0,
+    "seconds": 25.7,
+    "audio": "mixed-sfx"
+  },
+  {
+    "id": "juros-editorial-16x9",
+    "summary": "5 cenas (Editorial (calmo, revista)), 8 camadas: text, process, image, counter, compare; 1 SFX.",
+    "qa": true,
+    "warnings": 0,
+    "seconds": 23.8,
+    "audio": "mixed-sfx"
+  },
+  {
+    "id": "juros-technical-9x16",
+    "summary": "5 cenas (Técnico (diagrama, blueprint)), 11 camadas: text, chapter, process, arrow, callout, image, spotlight, bars, compare; 3 SFX.",
+    "qa": true,
+    "warnings": 0,
+    "seconds": 23.8,
+    "audio": "mixed-sfx"
+  }
+]

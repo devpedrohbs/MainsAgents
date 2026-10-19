@@ -319,7 +319,16 @@ export function Settings({ initialSection = 'interface' }: { initialSection?: Se
     if (!selectedBackup) return;
     setWorking(true);
     try {
-      await importBackup(selectedBackup, mode);
+      const result = await importBackup(selectedBackup, mode);
+      const omitted = result?.omittedDeleted;
+      if (omitted && (omitted.contents || omitted.sessions)) {
+        // Contents/chats deleted on this computer stay deleted: say so before reloading instead of reviving them silently.
+        setFeedback(locale === 'pt-BR'
+          ? `Backup importado. ${omitted.contents} conteúdo(s) e ${omitted.sessions} conversa(s) que você excluiu neste computador continuam excluídos e não foram restaurados. Recarregando…`
+          : `Backup imported. ${omitted.contents} content item(s) and ${omitted.sessions} chat(s) you deleted on this computer stay deleted and were not restored. Reloading…`);
+        window.setTimeout(() => window.location.reload(), 6000);
+        return;
+      }
       setFeedback(t('Backup imported. Reloading…'));
       window.location.reload();
     } catch (error) {

@@ -1,0 +1,214 @@
+{
+ "kind": "real-render",
+ "renderer": {
+  "remotion": true,
+  "ffmpeg": true,
+  "bundle": {
+   "version": "3404bdd9a71e549b",
+   "sha256": "3404bdd9a71e549bd83dfb80a08e7c384d2019f8a2774d652dbf28aaa2fc5fe5"
+  }
+ },
+ "fixture": "synthetic: camera testsrc2 640x360@24 + common non-periodic audio; screen smptehdbars 1280x720@30 + moving red marker + yellow box, gain/noise/Opus",
+ "simulated": [
+  "editor decisions (script calling the real tools)",
+  "no transcription"
+ ],
+ "seconds": 47,
+ "sync": {
+  "measured": {
+   "origin": "measured",
+   "verified": true,
+   "driftSeconds": -0.003,
+   "score": 0.737,
+   "measuredAt": "2026-10-16T16:58:40.909Z"
+  },
+  "offsetSeconds": 2.39,
+  "known": 2.4,
+  "errorMs": -10
+ },
+ "voice": "camera",
+ "layout": "camera-corner",
+ "pairHash": "d49c959cb6670aaa6685726a402d962ae4e21e943b996f2d71cbf74183da0277",
+ "director": [
+  {
+   "screenRecording": {
+    "roles": {
+     "camera": "the primary timeline (cuts are camera times)",
+     "screen": "the real screen recording, follows the camera through the offset"
+    },
+    "voice": "camera",
+    "layout": "camera-corner",
+    "defaultSceneScreen": "with-camera",
+    "offsetSeconds": 2.39,
+    "convention": "screenTime = cameraTime − offsetSeconds",
+    "screen": {
+     "duration": 22.008,
+     "width": 1280,
+     "height": 720,
+     "hasAudio": true
+    },
+    "overlap": {
+     "start": 2.39,
+     "end": 24.398,
+     "seconds": 22.008,
+     "coverage": 0.846
+    },
+    "editedScreenWindows": [
+     {
+      "start": 2.39,
+      "end": 24.398
+     }
+    ],
+    "screenSeconds": 22.008,
+    "gapSeconds": 3.992,
+    "sceneScreen": {
+     "off": "camera only (its own camera.layout)",
+     "full": "the screen recording fills the frame (camera hidden)",
+     "with-camera": "the screen recording plus the camera in the top-right corner (the screen is placed left/below it, never covered)"
+    },
+    "note": "Two sources of the SAME content: the camera is the primary timeline (segments are camera times; voice, cuts and retakes apply to both). Choose per scene with storyboard scene.screen. The screen is always shown contained (real interface, aspect preserved). Where the edited timeline has no screen (editedScreenWindows), the camera is shown full automatically. Inspect the screen with get_frames/contact_sheet target \"screen\" (camera timeline times)."
+   }
+  },
+  {
+   "screenFrames": 2
+  }
+ ],
+ "output": {
+  "width": 640,
+  "height": 360,
+  "duration": 17,
+  "audioStreams": 1,
+  "sha256": "47529d27d717131996e14aca613db5ca01078e17a92fa7d7b640c3dece0e12ef",
+  "receipt": {
+   "sha256": "47529d27d717131996e14aca613db5ca01078e17a92fa7d7b640c3dece0e12ef",
+   "name": "evidence-camera-editado-1.mp4"
+  }
+ },
+ "screenTrack": {
+  "windows": [
+   {
+    "start": 0,
+    "end": 15.5
+   }
+  ],
+  "width": 1280,
+  "height": 720,
+  "screenSeconds": 15.5,
+  "gapSeconds": 1.5
+ },
+ "checks": [
+  {
+   "t": 2,
+   "mode": "with-camera",
+   "frame": "01-tela-com-camera.png",
+   "piece": "screen",
+   "screenVisible": true,
+   "yellowBox": {
+    "x": 16,
+    "y": 70,
+    "w": 36,
+    "h": 10
+   },
+   "yellowAspect": 3.6,
+   "screenRect": {
+    "x": 11,
+    "y": 65,
+    "w": 407,
+    "h": 229
+   },
+   "marker": {
+    "xScreen": 230,
+    "expected": 229,
+    "screenTime": 2.61
+   },
+   "cameraSpot": {
+    "x": 439,
+    "y": 34,
+    "rgb": [
+     214,
+     225,
+     231
+    ]
+   },
+   "cameraVisible": true,
+   "cameraPlacement": "corner"
+  },
+  {
+   "t": 7,
+   "mode": "full",
+   "frame": "02-so-tela.png",
+   "piece": "screen",
+   "screenVisible": true,
+   "yellowBox": {
+    "x": 6,
+    "y": 6,
+    "w": 60,
+    "h": 18
+   },
+   "yellowAspect": 3.33,
+   "screenRect": {
+    "x": 0,
+    "y": 0,
+    "w": 640,
+    "h": 360
+   },
+   "marker": {
+    "xScreen": 950,
+    "expected": 949,
+    "screenTime": 11.61
+   },
+   "cameraSpot": {
+    "x": 38,
+    "y": 20,
+    "rgb": [
+     253,
+     253,
+     0
+    ]
+   },
+   "cameraVisible": false,
+   "cameraPlacement": "hidden"
+  },
+  {
+   "t": 11.5,
+   "mode": "off",
+   "frame": "03-so-camera.png",
+   "piece": "screen",
+   "screenVisible": false,
+   "cameraSpot": {
+    "x": 38,
+    "y": 20,
+    "rgb": [
+     255,
+     254,
+     255
+    ]
+   },
+   "cameraVisible": true,
+   "cameraPlacement": "full"
+  },
+  {
+   "t": 16.2,
+   "mode": "with-camera",
+   "frame": "04-sem-tela-camera-cheia.png",
+   "piece": "gap",
+   "screenVisible": false,
+   "cameraSpot": {
+    "x": 38,
+    "y": 20,
+    "rgb": [
+     253,
+     255,
+     255
+    ]
+   },
+   "cameraVisible": true,
+   "cameraPlacement": "full"
+  }
+ ],
+ "sources": {
+  "camera": "a519122c90ec87e88aabfff1afea2a421dba7221bbedba986c6f317ec6e0e6e5",
+  "screen": "c4d25efc34125c171f2d10ae3d54cae7f15b31e8f3d17c0084bea4e917759326",
+  "unchanged": true
+ }
+}

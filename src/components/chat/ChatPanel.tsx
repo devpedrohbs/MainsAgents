@@ -11,13 +11,14 @@ import { AgentAvatar } from '../agents/AgentAvatar';
 import type { ProviderId, ProviderConnectionState } from '../../features/chat/AiProvider';
 import { sessionProviderId } from '../../features/chat/AiProvider';
 import { SelectMenu } from '../common/SelectMenu';
-import { readChatDraft, writeChatDraft, useChatDraft } from '../../features/chat/chatDrafts';
+import { draftSlot, readChatDraft, writeChatDraft, useChatDraft } from '../../features/chat/chatDrafts';
 import { matchingSkills, slashSkillToken, removeSlashSkillToken, typedSkillCommand } from '../../features/chat/skillCommands';
 import { useAgents } from '../../features/agents/AgentsProvider';
 import { AgentHandoffDialog } from './AgentHandoffDialog';
 import { AgentConnectionBar } from './AgentConnectionBar';
 import { ChatMessageImages } from './ChatMessageImages';
 import {ChatDeliveryCard,ScriptDeliveryReview} from './ChatDeliveryCard';
+import {DeliveryReceiptCard} from './DeliveryReceiptCard';
 import {useContentWorkflow} from '../../features/content/ContentWorkflowProvider';
 import type {EditorialArtifact} from '../../features/content/model';
 import {editorialReviewCommand} from '../../features/content/reviewCommands';
@@ -33,11 +34,27 @@ import {FileDeliveryReview} from './FileDeliveryReview';
 import {RunStatusLine} from './ResponseTimer';
 import {chatFeed} from '../../features/chat/responseTiming';
 import {ComparisonLauncher} from './ComparisonLauncher';
-import {ProviderChoice, choiceStatus} from './ProviderChoice';
+import {ProviderChoice, ConversationProviderBar} from './ProviderChoice';
+import {editingLabel,productionSessionIds,providerSwitchPlan} from '../../features/chat/providerChoice';
+import {executionText,lastExecution} from '../../features/production/editorExecutions';
+import type {EditDirector} from '../../features/production/ProductionProvider';
 import {MessageMarkdown} from './MessageMarkdown';
 import {ContentSessionCard} from './ContentSessionCard';
 import {RecordedEntry} from '../production/RecordedEntry';
+import {AdjustPreview,ChatEditCard,MessageAttachments} from './ChatEditCard';
+import {classifyEditRequest,withTimeWindow} from '../../../chat-edit-intent.mjs';
+import {attachmentOf,isVideoPath,messageVideos,type ChatEditAction} from '../../features/chat/chatEdits';
+import {providerGateNotice,type ProviderGateView} from '../../features/production/providerWait';
+import {storageProfile} from '../../data/IndexedDbStateStore';
+import type {ChatMessageItem} from '../../features/chat/model/Chat';
+import type {ChatAttachment} from '../../features/chat/model/Chat';
 import {contentBinding,contentSessionSummary,linkedRun,sessionListLabel} from '../../features/chat/contentSessions';
+import {contentLink,contentSpaces,effectiveScope,linkOf,resolveScopeSession,scopeContentId,scopeOfSession,scopeSessions} from '../../features/chat/contentScopes';
+import type {AgentSession} from '../../features/chat/model/Chat';
+import {ContentScopeBar} from './ContentScopeBar';
+import {ContentDeletionDialog} from '../content/ContentDeletionDialog';
+import {DeletionRefused} from '../../features/content/contentDeletion';
+import {OrganizeChatDialog} from './OrganizeChatDialog';
 
 type ChatTab = 'chat' | 'sessions' | 'context';
 const stateLabels: Record<ChatRunState, string> = {
@@ -113,6 +130,8 @@ export function ChatPanel({
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deleteError,setDeleteError]=useState<{sessionId:string;message:string}|null>(null),[deletingSessionId,setDeletingSessionId]=useState<string|null>(null);
+  const [contentToDelete,setContentToDelete]=useState<{contentId:string;workspaceId:string;title:string}|null>(null);
   const [connection, setConnection] = useState<ProviderConnectionState | 'checking'>('checking');
   const [models, setModels] = useState<readonly { id: string; name: string }[]>([]);
   const [modelsLoading, setModelsLoading] = useState(false);
@@ -120,8 +139,6 @@ export function ChatPanel({
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const followLatestRef = useRef(true);
   const {
-    getAgentSessions,
-    getActiveSession,
     getRunState,
     createSession,
     openSession,
@@ -132,6 +149,8 @@ export function ChatPanel({
     listModels,
     getProviderStatus,
     setSessionModel,
+    setSessionProvider,
+    isSessionBusy,
     setSessionReasoningEffort,
     sessions,
     handoffs,
@@ -139,16 +158,50 @@ export function ChatPanel({
     refreshSessionImages,
     comparisons,
     showComparison,
+    contentScopes,
+    selectScope,
+    legacyActiveSessionId,
+    reportFocusedSession,
+    pinVisibleSession,
+    sendEditRequest,
+    chatEditRequests,
+    admitChatEdit,
+    cancelChatEditMeasure,
+    refreshChatEdits,
   } = useChat();
   const { addAgentResponse, hasMessageNode, getAgentContext, clearAgentContext, allNodes } =
     useCanvas();
-  const agentSessions = getAgentSessions(agent.id);
-  const activeSession = sessionId?sessions.find(item=>item.id===sessionId&&item.agentId===agent.id):getActiveSession(agent.id);
+  const pt=locale==='pt-BR';
+  // Content space of this chat: chosen per workspace and saved; the chat shown is this agent's chat of THAT scope only.
+  // Until saved contents AND productions are loaded the saved scope is kept as is (never Recovery or a General chat by mistake)
+  // and scope actions wait.
+  const scopePending=!editorial.ready||(!production.ready&&!production.error);
+  const scopeCtx={workspaceId:agent.workspaceId,contents:editorialState.contents,runs:production.runs,pending:scopePending};
+  const legacySession=sessions.find(item=>item.id===legacyActiveSessionId(agent.id)&&item.agentId===agent.id);
+  const scope=effectiveScope(contentScopes,scopeCtx,legacySession?scopeOfSession(legacySession,scopeCtx):undefined);
+  const scopeContent=editorialState.contents.find(item=>item.id===scopeContentId(scope)&&item.workspaceId===agent.workspaceId);
+  const workspaceAgents=agents.filter(item=>item.workspaceId===agent.workspaceId);
+  const spaces=contentSpaces(sessions,workspaceAgents.map(item=>item.id),scopeCtx,pt);
+  // While saved contents load, the saved choice is kept (shown as loading), never reported as an invalid link.
+  if(!spaces.some(space=>space.scope===scope))spaces.push({scope,kind:'content',title:pt?'Carregando conteúdo…':'Loading content…',chats:agentSessionsCount(sessions,scope),agents:[]});
+  const scopeTitle=spaces.find(space=>space.scope===scope)?.title??(pt?'Geral':'General');
+  const agentSessions = scopeSessions(sessions,agent.id,scope,scopeCtx);
+  const activeSession = sessionId?sessions.find(item=>item.id===sessionId&&item.agentId===agent.id):resolveScopeSession(sessions,contentScopes,agent.id,scope,scopeCtx,legacySession?.id);
+  // New chats inherit the selected content (General stays General; the recovery bucket never receives new chats).
+  const newChatLink=scopeContent?contentLink(scopeContent):undefined;
+  const [organizing,setOrganizing]=useState<AgentSession|null>(null);
+  useEffect(()=>{if(sessionId)return;reportFocusedSession(activeSession?.id);return()=>reportFocusedSession(undefined);},[sessionId,activeSession?.id,reportFocusedSession]);
+  // The chat on screen becomes its slot's saved pointer: a newer background sibling (native/production import) never replaces it.
+  useEffect(()=>{if(sessionId||comparisonMode||scopePending||!activeSession)return;pinVisibleSession(agent.workspaceId,agent.id,scope,activeSession.id);},[sessionId,comparisonMode,scopePending,activeSession?.id,agent.workspaceId,agent.id,scope,pinVisibleSession]);
+  // Unsent text lives in the shown chat, else in THIS scope's own "no chat yet" slot (General keeps the legacy one).
+  const slot=draftSlot(activeSession?.id,agent.workspaceId,scope);
   const pairedComparison=activeSession?.comparison,comparisonAvailable=comparisons.some(pair=>pair.id===pairedComparison?.id);
   const comparisonModelLocked=pairedComparison?.mode==='same-agent';
   // A content session only ever shows and commands its own content's production (validated by workspace + contentId + sessionId).
   const binding=contentBinding(activeSession,{workspaceId:agent.workspaceId,contents:editorialState.contents,runs:production.runs});
   const linkedProduction=binding.kind==='invalid'?undefined:binding.kind==='content'?binding.run:linkedRun(production.runs,activeSession,agent.workspaceId);
+  // Another chat of the same content acts on THAT content's production through its main session (same run, same receipts); never a new run.
+  const productionTarget=binding.kind==='content'&&!binding.run&&binding.mainRun?{sessionId:binding.mainRun.sourceSession.id,agentId:binding.mainRun.sourceSession.agentId}:{sessionId:activeSession?.id,agentId:agent.id};
   const contentSummary=contentSessionSummary(binding,editorialState.assets??[],locale==='pt-BR');
   const [recordedOpen,setRecordedOpen]=useState(false),[newContentOpen,setNewContentOpen]=useState(false),[newContentTitle,setNewContentTitle]=useState(''),[creatingContent,setCreatingContent]=useState(false);
   useEffect(()=>{setRecordedOpen(false);},[activeSession?.id]);
@@ -157,7 +210,7 @@ export function ChatPanel({
     try{
       // Own content + own session: never adopts a filled generic chat, the "new" draft or another content's remote thread.
       const content=await editorial.createSessionContent(agent.workspaceId,title);
-      createSession(agent.id,title,agent.providerId??'codex',agent.modelId,{contentId:content.id,topicId:content.topicId,contentTitle:content.title});
+      createSession(agent.id,title,agent.providerId??'codex',agent.modelId,{contentId:content.id,topicId:content.topicId,contentTitle:content.title},'select');
       setNewContentOpen(false);setTab('chat');onToast(locale==='pt-BR'?`Conteúdo “${title}” criado em ${agent.name}`:`Content “${title}” created in ${agent.name}`);
     }catch(error){onToast(error instanceof Error?error.message:String(error));}finally{setCreatingContent(false);}
   };
@@ -169,7 +222,7 @@ export function ChatPanel({
     .slice()
     .reverse()
     .find((item) => item.type === 'activity' && item.kind !== 'run' && item.status === 'error');
-  const draft = useChatDraft(agent.id, activeSession?.id);
+  const draft = useChatDraft(agent.id, slot);
   const message = draft.text;
   const selectedSkill = draft.skill;
   const pendingContext = getAgentContext(agent.id);
@@ -181,12 +234,12 @@ export function ChatPanel({
   const pendingContextKey = pendingContext.map(item => item.nodeId).join('\n');
   useEffect(() => {
     if (!pendingContext.length) return;
-    const latest = readChatDraft(agent.id, activeSession?.id);
+    const latest = readChatDraft(agent.id, slot);
     const refs = new Map((latest.context ?? []).map(ref => [ref.nodeId, ref]));
     pendingContext.forEach(item => refs.set(item.nodeId, { nodeId: item.nodeId, label: item.label, workspaceId: agent.workspaceId }));
-    writeChatDraft(agent.id, activeSession?.id, { ...latest, context: [...refs.values()] });
+    writeChatDraft(agent.id, slot, { ...latest, context: [...refs.values()] });
     clearAgentContext(agent.id);
-  }, [agent.id, agent.workspaceId, activeSession?.id, pendingContextKey, clearAgentContext]);
+  }, [agent.id, agent.workspaceId, activeSession?.id, scope, pendingContextKey, clearAgentContext]);
   const runState = getRunState(activeSession?.id);
   const busy = runState === 'thinking' || runState === 'searching' || runState === 'using-tool';
   const providerId: ProviderId = activeSession
@@ -197,6 +250,15 @@ export function ChatPanel({
     void refreshSessionImages(activeSession.id).catch(()=>{/* Existing local images and messages remain available offline. */});
   },[connection,activeSession?.id,activeSession?.codexThreadId,refreshSessionImages]);
   const selectedModelId = activeSession?.modelId ?? '';
+  // Provider of THIS chat vs who directs the edit of its production: two separate choices, each read from its own record.
+  const editRun=linkedProduction??(binding.kind==='content'?binding.mainRun:undefined);
+  const [workspaceDirector,setWorkspaceDirector]=useState<EditDirector>();
+  const needsDefault=!!editRun&&!editRun.editDirector&&editRun.editPreferences?.mode!=='basic';
+  useEffect(()=>{if(!needsDefault)return;let live=true;void production.editDirector(agent.workspaceId).then(value=>{if(live)setWorkspaceDirector(value)}).catch(()=>{});return()=>{live=false};},[needsDefault,agent.workspaceId,providerChoiceOpen]);// eslint-disable-line react-hooks/exhaustive-deps
+  const editing=editingLabel(editRun,needsDefault?workspaceDirector:undefined);
+  const editingExecution=editRun&&lastExecution(editRun),editingRun=editingExecution?executionText(editingExecution,pt):undefined;
+  const switchBusy=busy||!!activeSession&&isSessionBusy(activeSession.id);
+  const switchPlan=providerSwitchPlan(activeSession,{busy:switchBusy,productionSessionIds:productionSessionIds(production.runs)});
   const selectedEffort: ReasoningEffort = activeSession?.reasoningEffort ?? 'medium';
   const slashToken = composerSelection.start===composerSelection.end ? slashSkillToken(message,composerSelection.end) : null;
   const slashKey = slashToken ? `${slashToken.start}:${composerSelection.end}:${slashToken.query}` : null;
@@ -250,21 +312,22 @@ export function ChatPanel({
   }, [agent.id]);
 
   useEffect(() => {
-    const restored = readChatDraft(agent.id, activeSession?.id);
+    const restored = readChatDraft(agent.id, slot);
     setComposerSelection({ start:restored.text.length, end:restored.text.length });
     setDismissedSlash(null);
     setShowLatest(false);
     setSkillMenuIndex(0);
-  }, [agent.id, activeSession?.id]);
+  }, [agent.id, activeSession?.id, scope]);
   const updateDraft = (text: string, skill: string | null = selectedSkill) => {
     setComposerSelection({ start:text.length, end:text.length });
-    writeChatDraft(agent.id, activeSession?.id, { ...readChatDraft(agent.id, activeSession?.id), text, skill });
+    writeChatDraft(agent.id, slot, { ...readChatDraft(agent.id, slot), text, skill });
   };
   const ensureSession = () => {
     if (activeSession) return activeSession;
-    const session = createSession(agent.id, undefined, providerId, agent.modelId);
+    if (scopePending) throw new Error(pt ? 'Aguarde: os conteúdos ainda estão carregando.' : 'Wait: contents are still loading.');
+    const session = createSession(agent.id, undefined, providerId, agent.modelId, newChatLink, 'select');
     writeChatDraft(agent.id, session.id, draft);
-    writeChatDraft(agent.id, undefined, { text: '', skill: null });
+    writeChatDraft(agent.id, slot, { text: '', skill: null });
     return session;
   };
   useEffect(() => {
@@ -294,10 +357,14 @@ export function ChatPanel({
     }
   }, [contextNodes.length]);
 
-  const startSession = () => {
-    createSession(agent.id, undefined, agent.providerId ?? 'codex', agent.modelId);
+  const startSession = (target=scopeContent) => {
+    if (scopePending) return;
+    // A new chat opens in the selected content (own thread, same content link) or in General; never in another content.
+    const content=target;
+    // Untitled: the first message names it, so several chats of one content stay distinguishable (the content is shown above).
+    createSession(agent.id, undefined, agent.providerId ?? 'codex', agent.modelId, content?contentLink(content):undefined, 'select');
     setTab('chat');
-    onToast(locale === 'pt-BR' ? `Nova conversa com ${agent.name}` : `New conversation with ${agent.name}`);
+    onToast(content?(locale==='pt-BR'?`Nova conversa sobre “${content.title}”`:`New conversation about “${content.title}”`):locale === 'pt-BR' ? `Nova conversa com ${agent.name}` : `New conversation with ${agent.name}`);
   };
 
   const changeModel = (modelId: string) => {if(!comparisonModelLocked)setSessionModel(ensureSession().id, modelId || undefined);};
@@ -315,9 +382,66 @@ export function ChatPanel({
     });
   };
 
+  // Videos attached to the message being written (absolute local paths; the host inspects them when the request is sent).
+  const native=window.mainsAgentsDesktop;
+  const slotKey=JSON.stringify(slot??null);
+  const [videoAttachments,setVideoAttachments]=useState<{slot:string;items:ChatAttachment[]}>({slot:'',items:[]});
+  const attachments=videoAttachments.slot===slotKey?videoAttachments.items:[];
+  // Camera + screen: with two attached videos the person marks each one (Câmera / Tela). Nothing is inferred from order or name.
+  const [pairDraft,setPairDraft]=useState<{slot:string;roles:Record<string,'camera'|'screen'>;voice?:'camera'|'screen';layout:'camera-corner'|'screen-full'|'alternate'}>({slot:'',roles:{},layout:'camera-corner'});
+  const pair=pairDraft.slot===slotKey?pairDraft:{slot:slotKey,roles:{} as Record<string,'camera'|'screen'>,layout:'camera-corner' as const};
+  const roleOf=(path:string)=>pair.roles[path.toLowerCase()];
+  const setRole=(path:string,role:'camera'|'screen')=>setPairDraft(()=>{const roles:Record<string,'camera'|'screen'>={};for(const [key,value] of Object.entries(pair.roles))if(value!==role)roles[key]=value;roles[path.toLowerCase()]=role;return {...pair,slot:slotKey,roles};});
+  const pairReady=attachments.length===2&&attachments.every(item=>roleOf(item.path))&&new Set(attachments.map(item=>roleOf(item.path))).size===2;
+  const pairStarted=attachments.length===2&&attachments.some(item=>roleOf(item.path));
+  const resetPair=()=>setPairDraft({slot:slotKey,roles:{},layout:'camera-corner'});
+  const [dropping,setDropping]=useState(false),[editWorking,setEditWorking]=useState<string|null>(null);
+  const addVideos=(paths:readonly string[])=>{
+    const valid=paths.filter(path=>typeof path==='string'&&path&&isVideoPath(path));
+    if(paths.length&&valid.length<paths.length)onToast(pt?'Só arquivos de vídeo (mp4, mov, m4v, mkv, webm, avi) podem ser anexados aqui.':'Only video files (mp4, mov, m4v, mkv, webm, avi) can be attached here.');
+    if(!valid.length)return;
+    setVideoAttachments(current=>{const base=current.slot===slotKey?current.items:[];return {slot:slotKey,items:[...new Map([...base,...valid.map(attachmentOf)].map(item=>[item.path.toLowerCase(),item])).values()].slice(0,5)};});
+  };
+  const pickVideos=async()=>{try{addVideos(await native?.files?.selectVideos?.()??[]);}catch(error){onToast(error instanceof Error?error.message:String(error));}};
+  const editIntent=!comparisonMode&&!selectedSkill&&native?.state?classifyEditRequest(message):null;
+  const directEdit=editIntent?.kind==='edit'||editIntent?.kind==='adjust';
+  const startEdit=(text:string,videos:readonly ChatAttachment[],kind:'edit'|'adjust',sessionId?:string,sourcePair?:ChatMessageItem['sourcePair'])=>{
+    if(scopePending)return;
+    const target=sessionId??ensureSession().id;
+    setEditWorking(target);void sendEditRequest(agent,text,videos,target,kind,sourcePair).catch(error=>onToast(error instanceof Error?error.message:String(error))).finally(()=>setEditWorking(null));
+  };
+  // Open usage-limit waits of this profile (host facts; the provider itself is never contacted to check).
+  const [gates,setGates]=useState<ProviderGateView[]>([]);
+  useEffect(()=>{if(!native?.state)return;let alive=true;const load=async()=>{try{const response=await fetch(`/api/content/provider-waits?profile=${encodeURIComponent(storageProfile())}`,{cache:'no-store'});if(!response.ok)return;const body=await response.json() as {waits?:ProviderGateView[]};if(alive&&Array.isArray(body.waits))setGates(body.waits);}catch{/* last known */}};void load();const timer=window.setInterval(()=>void load(),15000);return()=>{alive=false;window.clearInterval(timer);};},[native?.state]);
+  const gate=gates.find(item=>item.providerId===providerId);
+  const runEditAction=async(action:ChatEditAction,run:import('../../features/production/model').ProductionRun|undefined,messageId?:string)=>{
+    if(action==='open-production'){setProductionText(undefined);setProductionOpen(true);return;}
+    if(action==='cancel-measure'){if(activeSession&&messageId)try{await cancelChatEditMeasure(activeSession.id,messageId);}catch(error){onToast(error instanceof Error?error.message:String(error));}return;}
+    if(!run)return;
+    try{
+      // Explicit Resume of a usage-limit wait: carries the wait generation the person saw (a newer limit is never cleared by it).
+      if(action==='resume')await production.command(run,'resume',{authorize:true,...(run.providerWait?{waitGeneration:run.providerWait.generation}:{})});
+      if(action==='cancel-edit')await production.command(run,'cancel');
+      if(action==='cancel-adjust')await production.command(run,'cancel-local-adjust');
+      if(action==='revert')await production.command(run,'revert-local-adjust',{authorize:true,expectedOutputSha256:run.outputVideo?.sha256});
+    }catch(error){onToast(error instanceof Error?error.message:String(error));}
+  };
+  const sessionHasEdits=Boolean(activeSession?.messages.some(item=>item.type==='message'&&item.chatEdit));
+  useEffect(()=>{if(!activeSession?.id||!sessionHasEdits)return;const id=activeSession.id;void refreshChatEdits(id);const timer=window.setInterval(()=>void refreshChatEdits(id),3000);return()=>window.clearInterval(timer);},[activeSession?.id,sessionHasEdits,refreshChatEdits]);
+
   const send = () => {
     const productionIntent=!comparisonMode&&!selectedSkill&&!contextNodes.length?productionChatIntent(message):null;
-    if(productionIntent&&(linkedProduction||productionIntent.type==='idea')){setProductionText(productionIntent.text);setProductionOpen(true);return;}
+    if(productionIntent&&(linkedProduction||binding.kind==='content'&&binding.mainRun||productionIntent.type==='idea')){setProductionText(productionIntent.text);setProductionOpen(true);return;}
+    // An unequivocal edit request goes to the local edit engine (host-decided), never as a chat turn the model cannot execute.
+    if(directEdit&&editIntent){
+      if(scopePending)return;
+      if(pairStarted&&!pairReady){onToast(pt?'Marque um vídeo como Câmera e o outro como Tela (ou desmarque os dois para escolher um só vídeo).':'Mark one video as Camera and the other as Screen (or clear both to pick a single video).');return;}
+      const target=ensureSession();
+      const videos=pairReady?attachments.map(item=>({...item,role:roleOf(item.path)})):attachments;
+      startEdit(message.trim(),videos,editIntent.kind as 'edit'|'adjust',target.id,pairReady?{...(pair.voice?{voice:pair.voice}:{}),layout:pair.layout}:undefined);
+      setVideoAttachments({slot:slotKey,items:[]});resetPair();clearAgentContext(agent.id);writeChatDraft(agent.id,target.id,{text:'',skill:null,context:[]});
+      return;
+    }
     if (busy || connection !== 'connected') return;
     const decision=!comparisonMode&&!selectedSkill&&!contextNodes.length?editorialReviewCommand(message):null;
     const targets=decision?editorialState.artifacts.filter(artifact=>artifact.type===(decision.target==='files'?'file-delivery':'script-options')&&artifact.source?.sessionId===activeSession?.id&&editorialState.contents.some(content=>content.id===artifact.contentId&&content.workspaceId===agent.workspaceId&&(decision.target==='files'?content.fileDeliveryArtifactId:content.scriptOptionsArtifactId)===artifact.id)):[];
@@ -332,9 +456,15 @@ export function ChatPanel({
       if (typed) chooseSkill(typed.skill);
       return;
     }
-    sendMessage(agent, content, contextNodes, activeSession?.id, skill ?? undefined);
+    // Sending without a chat opens one in the selected content (never a General chat for a content scope).
+    if (scopePending) return;
+    const target = ensureSession();
+    // Attached videos travel as file references (path + name) for the model to read with its own tools; never as authorization.
+    const files=attachments.map((item,index)=>({nodeId:`video-${index}-${item.path}`,kind:'file',label:item.name,content:item.path}));
+    sendMessage(agent, content, [...contextNodes,...files], target.id, skill ?? undefined);
+    setVideoAttachments({slot:slotKey,items:[]});
     clearAgentContext(agent.id);
-    writeChatDraft(agent.id, activeSession?.id, { text: '', skill: null, context: [] });
+    writeChatDraft(agent.id, target.id, { text: '', skill: null, context: [] });
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -389,6 +519,7 @@ export function ChatPanel({
           <div className="chat-head-identity">
           {sessionId?<strong className="collaboration-agent-name">{agent.name}</strong>:<SelectMenu className="conversation-agent-picker" value={agent.id} onChange={onSelectAgent} ariaLabel={locale==='pt-BR'?'Conversar com':'Chat with'} options={agents.filter(item=>item.workspaceId===agent.workspaceId).map(item=>({value:item.id,label:item.name}))}/>}
           {activeSession&&<span className="chat-head-subtitle">{activeSession.title} · {countMessages(activeSession.messages.filter(item=>item.type==='message').length, locale)}</span>}
+          {!comparisonMode&&<ConversationProviderBar providerId={providerId} modelLabel={models.find(model=>model.id===selectedModelId)?.name||selectedModelId||undefined} connection={connection} editing={editing} editingRun={editingRun} busy={switchBusy} readOnly={!!sessionId} onChoose={()=>setProviderChoiceOpen(true)} onOpenProduction={sessionId?undefined:()=>{setProductionText(undefined);setProductionOpen(true)}}/>}
           </div>
           <div className="chat-head-actions">
             <details className="conversation-options" onClick={event=>{if((event.target as HTMLElement).closest('button'))event.currentTarget.open=false;}} onKeyDown={event=>{if(event.key==='Escape'&&event.currentTarget.open){event.preventDefault();event.currentTarget.open=false;event.currentTarget.querySelector('summary')?.focus();}}}><summary aria-label={locale==='pt-BR'?'Opções da conversa':'Conversation options'} title={locale==='pt-BR'?'Opções da conversa':'Conversation options'}><Icon name="more"/></summary><div>
@@ -399,7 +530,7 @@ export function ChatPanel({
               aria-label={t('New session')}
               title={t('New session')}
               disabled={!!sessionId}
-              onClick={startSession}
+              onClick={()=>startSession()}
             >
               <Icon name="plus" />
             </button>
@@ -443,6 +574,14 @@ export function ChatPanel({
             </button>
           </div>
         </header>
+        {!sessionId&&!comparisonMode&&<ContentScopeBar spaces={spaces} scope={scope} agents={workspaceAgents} currentAgentId={agent.id} pt={pt} disabled={creatingContent||scopePending}
+          onSelect={next=>{selectScope(agent.workspaceId,next);setNewContentOpen(false);}} onNewContent={()=>{setNewContentTitle('');setNewContentOpen(true);}} onSelectAgent={onSelectAgent}
+          onDeleteContent={scopeContent?()=>setContentToDelete({contentId:scopeContent.id,workspaceId:agent.workspaceId,title:scopeContent.title}):undefined}/>}
+        {newContentOpen&&<form className="new-content-session" onSubmit={event=>{event.preventDefault();void startContentSession();}}>
+          <label>{pt?'Nome do conteúdo':'Content name'}<input autoFocus aria-label={pt?'Nome do novo conteúdo':'New content name'} value={newContentTitle} maxLength={120} disabled={creatingContent} onChange={event=>setNewContentTitle(event.target.value)} onKeyDown={event=>{if(event.key==='Escape'){event.preventDefault();setNewContentOpen(false);}}} placeholder={pt?'Ex.: Tutorial de automação no Excel':'E.g. Excel automation tutorial'}/></label>
+          <small>{pt?`Só o nome basta: não precisa de ideia aprovada. Abre uma conversa nova com ${agent.name} (mesmas skills e fluxo); conversa, arquivos e produção ficam separados por conteúdo.`:`A name is enough: no approved idea needed. Opens a fresh chat with ${agent.name} (same skills and flow); chat, files and production stay separate per content.`}</small>
+          <div><button type="button" className="text-link" disabled={creatingContent} onClick={()=>setNewContentOpen(false)}>{t('Cancel')}</button><button type="submit" className="primary-button" disabled={creatingContent||!newContentTitle.trim()}>{creatingContent?(pt?'Criando…':'Creating…'):(pt?'Criar conteúdo':'Create content')}</button></div>
+        </form>}
         <AgentConnectionBar agent={agent} session={activeSession} ensureSession={ensureSession}
           busy={busy} providerId={providerId} onError={onToast}/>
         <nav className="chat-tabs" hidden={tab==='chat'} aria-label={`${agent.name} panel`}>
@@ -478,13 +617,27 @@ export function ChatPanel({
             <div className="active-session-bar">
               <span>{activeSession.title}</span>
               {activeSession.contentId&&<button type="button" onClick={()=>window.dispatchEvent(new CustomEvent('mainsagents:open-content',{detail:{contentId:activeSession.contentId}}))}>{locale==='pt-BR'?'Abrir conteúdo':'Open content'}</button>}
+              {!sessionId&&!comparisonMode&&!scopePending&&binding.kind==='generic'&&<button type="button" onClick={()=>setOrganizing(activeSession)}>{pt?'Organizar em conteúdo':'Organize into content'}</button>}
               {!sessionId&&<button onClick={() => setTab('sessions')}>{t('All sessions')}</button>}
             </div>
           )}
-          {contentSummary?<ContentSessionCard summary={contentSummary} pt={locale==='pt-BR'} onProduction={()=>{setProductionText(undefined);setProductionOpen(true)}} onScript={()=>{setProductionText(undefined);setProductionOpen(true)}} onRecorded={()=>setRecordedOpen(true)}/>
+          {contentSummary?<ContentSessionCard summary={contentSummary} pt={locale==='pt-BR'} onProduction={()=>{setProductionText(undefined);setProductionOpen(true)}} onScript={()=>{setProductionText(undefined);setProductionOpen(true)}} onRecorded={()=>setRecordedOpen(true)} onMainSession={target=>{openSession(target.agentId,target.sessionId);if(target.agentId!==agent.id)onSelectAgent?.(target.agentId);setTab('chat');}}/>
           :<div className="production-summary"><span>{linkedProduction?productionStageLabel(linkedProduction.stage,locale==='pt-BR'):(locale==='pt-BR'?'Ideia → vídeo → publicação':'Idea → video → publication')}</span><button className="text-link" onClick={()=>{setProductionText(undefined);setProductionOpen(true)}}>{locale==='pt-BR'?'Ver produção':'View production'}</button></div>}
           {activeSession&&<NativeDelegationWork sessionId={activeSession.id}/>}
-          {(!activeSession || activeSession.messages.length === 0) && (
+          {!activeSession&&!sessionId&&scope!=='general'&&(
+            <div className="chat-empty scope-empty" role="status">
+              {scopeContent?<>
+                <h3>{pt?`${agent.name} ainda não conversou sobre “${scopeContent.title}”`:`${agent.name} has no chat about “${scopeContent.title}” yet`}</h3>
+                <p>{pt?'A conversa nova já nasce ligada a este conteúdo, sem misturar com outros vídeos. As conversas dos outros agentes deste conteúdo estão logo acima.':'The new chat is linked to this content from the start, never mixed with other videos. Other agents’ chats of this content are listed above.'}</p>
+                <button type="button" className="primary-button" onClick={()=>startSession()}>{pt?`Começar conversa sobre “${scopeContent.title}”`:`Start a chat about “${scopeContent.title}”`}</button>
+              </>:<>
+                <h3>{pt?`Nenhuma conversa de ${agent.name} precisa de atenção`:`No ${agent.name} chat needs attention`}</h3>
+                <p>{pt?'Escolha um conteúdo ou Geral para continuar.':'Choose a content or General to continue.'}</p>
+                <button type="button" className="soft-button" onClick={()=>selectScope(agent.workspaceId,'general')}>{pt?'Ir para Geral':'Go to General'}</button>
+              </>}
+            </div>
+          )}
+          {(activeSession ? activeSession.messages.length === 0 : sessionId || scope==='general') && (
             <div className="chat-empty">
               <AgentAvatar name={agent.name} image={agent.avatarImage} />
               <h3>
@@ -513,6 +666,19 @@ export function ChatPanel({
                   <summary>{locale==='pt-BR'?`Tarefa recebida de ${item.sourceAgentName}`:`Task received from ${item.sourceAgentName}`}</summary>
                   <MessageMarkdown className="message-content" text={item.content}/>
                 </details>:item.content&&(item.role==='agent'&&activeSession?<ChatDeliveryCard agent={agent} session={activeSession} message={item}/>:item.role==='agent'?<MessageMarkdown className="message-content" text={item.content}/>:<p className="message-content">{item.content}</p>)}
+                {item.role==='user'?<MessageAttachments message={item} pt={pt}/>:null}
+                {item.adjustPreview?<AdjustPreview message={item} pt={pt}/>:null}
+                {item.role==='user'&&item.chatEdit&&activeSession?(()=>{const request=chatEditRequests[item.id],run=request?.runId?production.runs.find(entry=>entry.id===request.runId):undefined;
+                  return <ChatEditCard request={request} run={run} mediaJobs={editorial.mediaJobs} pt={pt} working={editWorking===activeSession.id||request?.status==='pending'}
+                    onAdmit={extra=>void admitChatEdit(activeSession.id,item.id,extra)}
+                    onOption={window=>startEdit(withTimeWindow(item.content,window),[],'adjust',activeSession.id)}
+                    onAction={action=>void runEditAction(action,run,item.id)}/>;})():null}
+                {item.role==='user'&&!item.chatEdit&&!item.sourceAgentName&&native?.state&&!comparisonMode&&activeSession?(()=>{const intent=classifyEditRequest(item.content);if(intent.kind!=='ambiguous')return null;
+                  const videos=messageVideos(item),adjust=intent.window&&intent.window.end>intent.window.start;
+                  if(!adjust&&!videos.length&&!linkedProduction&&!editorialState.assets?.some(asset=>asset.contentId===activeSession.contentId&&asset.kind==='video'&&asset.role==='source'))return null;
+                  const text=adjust?withTimeWindow(item.content.replace(/\?/g,'').replace(/^\s*(?:pode|poderia|consegue|você pode|voce pode|vc pode|can you|could you)\s+/i,''),intent.window!):(pt?'Editar este vídeo':'Edit this video');
+                  return <div className="chat-edit-cta"><span>{pt?'Quer que o app faça isso agora?':'Should the app do this now?'}</span><button type="button" className="soft-button" disabled={editWorking===activeSession.id} onClick={()=>startEdit(text,videos,adjust?'adjust':'edit',activeSession.id)}>{adjust?(pt?'Fazer este ajuste':'Make this adjustment'):(pt?'Editar este vídeo':'Edit this video')}</button></div>;})():null}
+                {item.receipts?.length ? <DeliveryReceiptCard receipts={item.receipts}/> : null}
                 {item.images?.length ? <ChatMessageImages images={item.images} onLoad={()=>{if(followLatestRef.current&&bodyRef.current)bodyRef.current.scrollTop=bodyRef.current.scrollHeight;}}/>:null}
                 {item.selectedSkill && (
                   <div className="message-skill-used">
@@ -567,7 +733,7 @@ export function ChatPanel({
             );
           })}
           {linkedHandoffs.map(item=><div className={`handoff-card ${item.status}`} key={item.id}>
-            <div><span>{agents.find(candidate=>candidate.id===item.sourceAgentId)?.name??'Agent'} → {agents.find(candidate=>candidate.id===item.targetAgentId)?.name??'Agent'}</span><small>{locale==='pt-BR'?({running:'Trabalhando',completed:'Concluído',error:'Erro',cancelled:'Interrompido',interrupted:'Interrompido ao fechar o app'}[item.status]):item.status}</small></div>
+            <div><span>{agents.find(candidate=>candidate.id===item.sourceAgentId)?.name??'Agent'} → {agents.find(candidate=>candidate.id===item.targetAgentId)?.name??'Agent'}</span><small>{/* "completed" only means the specialist answered; its answer (not this label) says whether a file was produced. */}{locale==='pt-BR'?({running:'Trabalhando',completed:'Especialista respondeu',error:'Erro',cancelled:'Interrompido',interrupted:'Interrompido ao fechar o app'}[item.status]):item.status==='completed'?'specialist replied':item.status}</small></div>
             <b>{item.title}</b>
             {item.files.length>0&&<small>{item.files.length} {locale==='pt-BR'?'arquivo(s) referenciado(s)':'file reference(s)'}</small>}
             {item.error&&<p>{item.error}</p>}
@@ -591,10 +757,10 @@ export function ChatPanel({
         <div className="chat-body chat-tab-body">
           <div className="chat-tab-heading sessions-heading">
             <div>
-              <b>{t('Sessions')}</b>
+              <b>{scopeTitle}</b>
               <span>
                 {agentSessions.length}{' '}
-                {locale === 'pt-BR' ? 'conversas independentes' : 'independent conversations'}
+                {pt ? `conversas de ${agent.name} neste espaço` : `${agent.name} chats in this space`}
               </span>
             </div>
             <div className="sessions-heading-actions">
@@ -602,17 +768,13 @@ export function ChatPanel({
                 <Icon name="plus" />
                 {locale==='pt-BR'?'Novo conteúdo':'New content'}
               </button>
-              <button className="soft-button" onClick={startSession}>
+              {scope!=='recovery'&&<button className="soft-button" onClick={()=>startSession()}>
                 <Icon name="plus" />
                 {t('New')}
-              </button>
+              </button>}
             </div>
           </div>
-          {newContentOpen&&<form className="new-content-session" onSubmit={event=>{event.preventDefault();void startContentSession();}}>
-            <label>{locale==='pt-BR'?'Nome do conteúdo':'Content name'}<input autoFocus aria-label={locale==='pt-BR'?'Nome do novo conteúdo':'New content name'} value={newContentTitle} maxLength={120} disabled={creatingContent} onChange={event=>setNewContentTitle(event.target.value)} onKeyDown={event=>{if(event.key==='Escape'){event.preventDefault();setNewContentOpen(false);}}} placeholder={locale==='pt-BR'?'Ex.: Tutorial de automação no Excel':'E.g. Excel automation tutorial'}/></label>
-            <small>{locale==='pt-BR'?`Nova conversa com ${agent.name}, com as mesmas skills e o mesmo fluxo. Conversa, arquivos e produção ficam separados por conteúdo.`:`New chat with ${agent.name}, same skills and flow. Chat, files and production stay separate per content.`}</small>
-            <div><button type="button" className="text-link" disabled={creatingContent} onClick={()=>setNewContentOpen(false)}>{t('Cancel')}</button><button type="submit" className="primary-button" disabled={creatingContent||!newContentTitle.trim()}>{creatingContent?(locale==='pt-BR'?'Criando…':'Creating…'):(locale==='pt-BR'?'Criar conteúdo':'Create content')}</button></div>
-          </form>}
+          {!agentSessions.length&&<p className="panel-sessions-empty" role="status">{scope==='general'?(pt?`${agent.name} não tem conversas em Geral. Use “Novo” para uma ideia solta.`:`${agent.name} has no General chats. Use “New” for a loose idea.`):scope==='recovery'?(pt?'Nada precisa de atenção aqui.':'Nothing needs attention here.'):(pt?`${agent.name} ainda não tem conversa neste conteúdo. Use “Novo” para começar.`:`${agent.name} has no chat in this content yet. Use “New” to start.`)}</p>}
           <div className="panel-sessions">
             {agentSessions.map((session) => (
               <article
@@ -652,20 +814,33 @@ export function ChatPanel({
                 )}
                 {editingSessionId !== session.id && (
                   <div className="session-actions">
-                    {confirmDeleteId === session.id ? (
-                      <>
-                        {session.contentId&&<small className="session-delete-note">{locale==='pt-BR'?'Remove só esta conversa. Conteúdo, arquivos e produção continuam salvos no Estúdio.':'Removes only this chat. Content, files and production stay saved in Studio.'}</small>}
+                    {confirmDeleteId === session.id ? ((()=>{
+                      // A chat that conducts a production is part of the content: removing only this projection would come back.
+                      const role=production.runs.find(run=>[run.sourceSession.id,run.editorSession.id,run.publisherSession?.id].includes(session.id));
+                      const roleContent=role&&editorialState.contents.find(item=>item.id===role.contentId);
+                      return role?<>
+                        <small className="session-delete-note session-role-note">{pt?'Esta conversa conduz a produção deste conteúdo. Para removê-la, exclua o conteúdo inteiro.':'This chat conducts this content’s production. To remove it, delete the whole content.'}</small>
                         <button onClick={() => setConfirmDeleteId(null)}>{t('Cancel')}</button>
+                        <button className="danger" onClick={()=>{setConfirmDeleteId(null);setContentToDelete({contentId:role.contentId,workspaceId:role.workspaceId,title:roleContent?.title??role.name});}}>{pt?'Excluir conteúdo inteiro…':'Delete whole content…'}</button>
+                      </>:<>
+                        {session.contentId&&<small className="session-delete-note">{pt?'Remove só esta conversa. O conteúdo e as outras conversas dele continuam.':'Removes only this chat. The content and its other chats stay.'}</small>}
+                        {deleteError?.sessionId===session.id&&<small className="session-delete-note" role="alert">{deleteError.message}</small>}
+                        <button disabled={deletingSessionId===session.id} onClick={() => {setConfirmDeleteId(null);setDeleteError(null);}}>{t('Cancel')}</button>
                         <button
                           className="danger"
+                          disabled={deletingSessionId===session.id}
+                          aria-busy={deletingSessionId===session.id}
                           onClick={() => {
-                            deleteSession(session.id);
-                            setConfirmDeleteId(null);
+                            setDeletingSessionId(session.id);setDeleteError(null);
+                            deleteSession(session.id).then(()=>{setConfirmDeleteId(null);onToast(pt?'Conversa excluída':'Chat deleted');},error=>{
+                              if(error instanceof DeletionRefused&&error.code==='production-role'&&error.contentId){setConfirmDeleteId(null);setContentToDelete({contentId:error.contentId,workspaceId:error.workspaceId??agent.workspaceId,title:editorialState.contents.find(item=>item.id===error.contentId)?.title??session.title});return;}
+                              setDeleteError({sessionId:session.id,message:error instanceof Error?error.message:String(error)});
+                            }).finally(()=>setDeletingSessionId(null));
                           }}
                         >
-                          {t('Confirm')}
+                          {deletingSessionId===session.id?(pt?'Excluindo…':'Deleting…'):t('Confirm')}
                         </button>
-                      </>
+                      </>;})()
                     ) : (
                       <>
                         <button
@@ -674,6 +849,7 @@ export function ChatPanel({
                         >
                           {t('Rename')}
                         </button>
+                        {!session.contentId&&!comparisonMode&&<button aria-label={pt?`Organizar ${session.title} em um conteúdo`:`Organize ${session.title} into a content`} onClick={()=>setOrganizing(session)}>{pt?'Organizar':'Organize'}</button>}
                         <button
                           aria-label={`${t('Delete')} ${session.title}`}
                           onClick={() => {
@@ -766,8 +942,10 @@ export function ChatPanel({
               {locale === 'pt-BR' ? 'Ir para a última mensagem' : 'Jump to latest message'} ↓
             </button>
           )}
-          <div className="composer">
-            {!comparisonMode&&!sessionId&&<div className="provider-choice-trigger"><button className="soft-button" data-od-id="generate-with" disabled={busy} onClick={()=>setProviderChoiceOpen(true)}>{locale==='pt-BR'?'Gerar com':'Generate with'}: {providerId==='claude'?'Claude':providerId==='codex'?'Codex':'Gemini'}{selectedModelId?` · ${selectedModelId}`:''}</button><span>{choiceStatus(connection,locale==='pt-BR')}</span></div>}
+          <div className={`composer${dropping?' is-dropping':''}`}
+            onDragOver={event=>{if(!native?.files||!event.dataTransfer.types.includes('Files'))return;event.preventDefault();event.dataTransfer.dropEffect='link';setDropping(true);}}
+            onDragLeave={event=>{if(!event.currentTarget.contains(event.relatedTarget as Node))setDropping(false);}}
+            onDrop={event=>{if(!native?.files||!event.dataTransfer.files.length)return;event.preventDefault();setDropping(false);const paths=Array.from(event.dataTransfer.files).map(file=>{try{return native.files!.pathForFile(file);}catch{return '';}});addVideos(paths.filter(Boolean));}}>
             {skillMenuOpen && (
               <div
                 className="skill-command-menu"
@@ -845,7 +1023,7 @@ export function ChatPanel({
                           ? `Remover ${context.label} do contexto`
                           : `Remove ${context.label} from context`
                       }
-                      onClick={() => writeChatDraft(agent.id, activeSession?.id, { ...draft, context: draft.context?.filter(ref => ref.nodeId !== context.nodeId) })}
+                      onClick={() => writeChatDraft(agent.id, slot, { ...draft, context: draft.context?.filter(ref => ref.nodeId !== context.nodeId) })}
                     >
                       {context.label}
                       <b aria-hidden="true">×</b>
@@ -854,9 +1032,26 @@ export function ChatPanel({
                 </div>
               </div>
             )}
+            {attachments.length>0&&<div className="composer-attachments">
+              <span>{pt?'Vídeo':'Video'}</span>
+              {attachments.map(item=><button key={item.path} type="button" title={item.path} aria-label={pt?`Remover ${item.name} da mensagem`:`Remove ${item.name} from the message`} onClick={()=>{setVideoAttachments({slot:slotKey,items:attachments.filter(other=>other.path!==item.path)});resetPair();}}>🎞 {item.name}<b aria-hidden="true">×</b></button>)}
+            </div>}
+            {attachments.length===2&&<fieldset className="composer-pair" data-od-id="composer-pair">
+              <legend>{pt?'Câmera + tela? Marque cada vídeo (opcional)':'Camera + screen? Mark each video (optional)'}</legend>
+              {attachments.map(item=><div className="composer-pair-row" key={item.path} role="radiogroup" aria-label={pt?`Papel de ${item.name}`:`Role of ${item.name}`}>
+                <span title={item.path}>{item.name}</span>
+                {(['camera','screen'] as const).map(role=><label key={role} className={`composer-role${roleOf(item.path)===role?' is-on':''}`}><input type="radio" name={`role-${item.path}`} checked={roleOf(item.path)===role} onChange={()=>setRole(item.path,role)}/>{role==='camera'?(pt?'Câmera':'Camera'):(pt?'Tela':'Screen')}</label>)}
+              </div>)}
+              {pairReady&&<div className="composer-pair-options">
+                <label>{pt?'Voz':'Voice'}<select value={pair.voice??''} onChange={event=>setPairDraft({...pair,slot:slotKey,voice:(event.target.value||undefined) as 'camera'|'screen'|undefined})}><option value="" title={pt?'Câmera se tiver áudio; senão, tela':'Camera if it has audio, else screen'}>{pt?'Automática':'Automatic'}</option><option value="camera">{pt?'Câmera':'Camera'}</option><option value="screen">{pt?'Tela':'Screen'}</option></select></label>
+                <label>{pt?'Layout':'Layout'}<select value={pair.layout} onChange={event=>setPairDraft({...pair,slot:slotKey,layout:event.target.value as 'camera-corner'|'screen-full'|'alternate'})}><option value="camera-corner">{pt?'Tela com câmera no canto':'Screen with camera in the corner'}</option><option value="screen-full">{pt?'Tela inteira':'Full screen'}</option><option value="alternate">{pt?'Alternar câmera e tela':'Alternate camera and screen'}</option></select></label>
+              </div>}
+              {pairStarted&&!pairReady&&<p className="composer-pair-hint" role="note">{pt?'Marque um como Câmera e o outro como Tela.':'Mark one as Camera and the other as Screen.'}</p>}
+            </fieldset>}
+            {gate&&<div className="composer-provider-wait" role="status" data-od-id="composer-provider-wait">{providerGateNotice(gate,pt,locale)}</div>}
             {missingContext.length > 0 && <div className="composer-draft-warning" role="status">
               <span>{locale === 'pt-BR' ? 'Contexto indisponível: ' : 'Unavailable context: '}{missingContext.map(ref => ref.label).join(', ')}. {locale === 'pt-BR' ? 'Não será enviado.' : 'Will not be sent.'}</span>
-              <button type="button" className="text-link" onClick={() => writeChatDraft(agent.id, activeSession?.id, { ...draft, context: draft.context?.filter(ref => contextNodes.some(item => item.nodeId === ref.nodeId)) })}>{locale === 'pt-BR' ? 'Remover referências' : 'Remove references'}</button>
+              <button type="button" className="text-link" onClick={() => writeChatDraft(agent.id, slot, { ...draft, context: draft.context?.filter(ref => contextNodes.some(item => item.nodeId === ref.nodeId)) })}>{locale === 'pt-BR' ? 'Remover referências' : 'Remove references'}</button>
             </div>}
             <textarea
               ref={composerRef}
@@ -941,7 +1136,8 @@ export function ChatPanel({
                 </div>}
               </div>
               <button className="composer-model-summary" type="button" onClick={()=>setComposerOptionsOpen(true)} title={locale==='pt-BR'?'Alterar modelo e esforço':'Change model and effort'}>{models.find(model=>model.id===selectedModelId)?.name || selectedModelId || (providerId==='codex'?'Codex':providerId==='claude'?'Claude':'Gemini')}<span>{selectedEffort==='low'?(locale==='pt-BR'?'Leve':'Light'):selectedEffort==='high'?(locale==='pt-BR'?'Alto':'High'):selectedEffort==='xhigh'?(locale==='pt-BR'?'Extra alto':'Extra High'):(locale==='pt-BR'?'Médio':'Medium')}</span></button>
-              {busy ? (
+              {native?.files?.selectVideos&&<button type="button" className="composer-attach" onClick={()=>void pickVideos()} aria-label={pt?'Anexar vídeo à mensagem':'Attach a video to the message'}>{pt?'Anexar vídeo':'Attach video'}</button>}
+              {busy&&!directEdit ? (
                 <button
                   className="send-button stop"
                   onClick={() => cancelExecution(activeSession?.id)}
@@ -952,7 +1148,7 @@ export function ChatPanel({
               ) : (
                 <button
                   className="send-button"
-                  disabled={!message.trim() || skillMenuOpen || connection !== 'connected'}
+                  disabled={!message.trim() || skillMenuOpen || (connection !== 'connected'&&!directEdit) || scopePending}
                   onClick={send}
                   aria-label={t('Send')}
                 >
@@ -970,9 +1166,31 @@ export function ChatPanel({
       )}
       {handoffBrief!==null&&<AgentHandoffDialog agent={agent} sessionId={handoffBrief.sessionId} initialBriefing={handoffBrief.text} context={contextNodes} onClose={()=>setHandoffBrief(null)}/>}
       {!comparisonMode&&pairedComparison&&!comparisonAvailable&&<p className="comparison-unavailable" role="status">{locale==='pt-BR'?'Não é possível reabrir: um agente ou uma sessão do par foi excluído ou está indisponível. Esta conversa continua disponível.':'Cannot reopen: an agent or paired session was deleted or is unavailable. This chat remains available.'}</p>}
-      {providerChoiceOpen&&<ProviderChoice agentName={agent.name} currentProvider={providerId} currentModel={selectedModelId} busy={busy} onClose={()=>setProviderChoiceOpen(false)} onCreate={(provider,model)=>{const session=createSession(agent.id,undefined,provider,model);writeChatDraft(agent.id,session.id,structuredClone(draft));setProviderChoiceOpen(false);setTab('chat');onToast(locale==='pt-BR'?'Nova conversa preparada. Revise o rascunho antes de enviar.':'New chat prepared. Review the draft before sending.');requestAnimationFrame(()=>composerRef.current?.focus())}} onBoth={models=>{if(missingContext.length){onToast(locale==='pt-BR'?'Revise as referências de contexto ausentes antes de consultar ambos.':'Review missing context references before consulting both.');return;}setProviderChoiceOpen(false);setSameAgentModels(models);setComparisonBrief(message)}}/>}
-      {comparisonBrief!==null&&<ComparisonLauncher workspaceId={agent.workspaceId} agentId={agent.id} briefing={comparisonBrief} context={contextNodes} mode={sameAgentModels?'same-agent':'agents'} initialModels={sameAgentModels??undefined} onClose={()=>{setComparisonBrief(null);setSameAgentModels(null);requestAnimationFrame(()=>composerRef.current?.focus())}}/>}
-      {productionOpen&&<ProductionDialog workspaceId={agent.workspaceId} sessionId={activeSession?.id} agentId={agent.id} initialText={productionText} onSelectAgent={onSelectAgent} onClose={()=>setProductionOpen(false)}/>}
+      {contentToDelete&&<ContentDeletionDialog contentId={contentToDelete.contentId} workspaceId={contentToDelete.workspaceId} fallbackTitle={contentToDelete.title} pt={pt} onClose={()=>setContentToDelete(null)}
+        onDeleted={({title,chats})=>{setContentToDelete(null);selectScope(contentToDelete.workspaceId,'general');setTab('chat');onToast(pt?`“${title}” e ${chats} ${chats===1?'conversa excluídos':'conversas excluídos'} deste computador`:`“${title}” and ${chats} ${chats===1?'chat':'chats'} deleted from this computer`);
+          // The trigger is gone with the content: focus lands on the content picker (now General).
+          window.requestAnimationFrame(()=>document.querySelector<HTMLElement>('.content-scope-picker .select-menu-trigger')?.focus());}}/>}
+      {organizing&&<OrganizeChatDialog session={organizing} pt={pt} onClose={()=>setOrganizing(null)} onDone={(content,count)=>{setOrganizing(null);onToast(pt?`${count} ${count===1?'conversa organizada':'conversas organizadas'} em “${content.title}”`:`${count} chat(s) organized into “${content.title}”`);}} onFreshChat={content=>{setOrganizing(null);startSession(content);}}/>}
+      {providerChoiceOpen&&<ProviderChoice agentName={agent.name} currentProvider={providerId} currentModel={selectedModelId} busy={switchBusy} plan={switchPlan} editing={editing} onClose={()=>setProviderChoiceOpen(false)} onCreate={(provider,model)=>{
+        try{
+          if(activeSession&&switchPlan.kind==='in-place'){
+            // Same chat, same draft slot: only its provider binding changes (re-checked against the live chat).
+            setSessionProvider(activeSession.id,provider,model,{productionSessionIds:productionSessionIds(production.runs)});
+            onToast(pt?`Esta conversa agora usa ${provider==='claude'?'Claude':'Codex'}. Nada foi enviado.`:`This chat now uses ${provider==='claude'?'Claude':'Codex'}. Nothing was sent.`);
+          }else if(switchPlan.kind==='blocked'){onToast(pt?'Aguarde a resposta atual para trocar o provedor.':'Wait for the current response to change the provider.');return;}
+          else{
+            if(scopePending){onToast(pt?'Aguarde: os conteúdos ainda estão carregando.':'Wait: contents are still loading.');return;}
+            // A chat with history keeps its provider and thread; the new chat lives in the same content and gets a copy of the draft.
+            const session=createSession(agent.id,undefined,provider,model,binding.kind==='content'?linkOf(activeSession):activeSession?undefined:newChatLink,'select');
+            writeChatDraft(agent.id,session.id,structuredClone(draft));
+            if(!activeSession)writeChatDraft(agent.id,slot,{text:'',skill:null});
+            onToast(pt?'Nova conversa preparada. O histórico anterior foi mantido; revise o rascunho antes de enviar.':'New chat prepared. The earlier history was kept; review the draft before sending.');
+          }
+          setProviderChoiceOpen(false);setTab('chat');requestAnimationFrame(()=>composerRef.current?.focus());
+        }catch(error){onToast(error instanceof Error?error.message:String(error));}
+      }} onBoth={models=>{if(missingContext.length){onToast(locale==='pt-BR'?'Revise as referências de contexto ausentes antes de consultar ambos.':'Review missing context references before consulting both.');return;}setProviderChoiceOpen(false);setSameAgentModels(models);setComparisonBrief(message)}}/>}
+      {comparisonBrief!==null&&<ComparisonLauncher link={binding.kind==='content'?linkOf(activeSession):activeSession?undefined:newChatLink} workspaceId={agent.workspaceId} agentId={agent.id} briefing={comparisonBrief} context={contextNodes} mode={sameAgentModels?'same-agent':'agents'} initialModels={sameAgentModels??undefined} onClose={()=>{setComparisonBrief(null);setSameAgentModels(null);requestAnimationFrame(()=>composerRef.current?.focus())}}/>}
+      {productionOpen&&<ProductionDialog workspaceId={agent.workspaceId} sessionId={productionTarget.sessionId} agentId={productionTarget.agentId} initialText={productionText} onSelectAgent={onSelectAgent} onClose={()=>setProductionOpen(false)}/>}
       {recordedOpen&&activeSession&&binding.kind==='content'&&!binding.run&&<RecordedEntry agent={agent} session={activeSession} content={binding.content} onClose={()=>setRecordedOpen(false)} onStarted={()=>{setRecordedOpen(false);onToast(locale==='pt-BR'?'Edição iniciada neste conteúdo. Acompanhe a próxima etapa aqui.':'Editing started for this content. Follow the next step here.');}}/>}
       {reviewRequest&&(reviewRequest.confirmedTarget?(reviewRequest.artifacts.find(item=>item.id===reviewRequest.selectedId)?.type==='file-delivery'?<FileDeliveryReview artifact={reviewRequest.artifacts.find(item=>item.id===reviewRequest.selectedId)!} initialDecision={reviewRequest.decision} initialNotes={reviewRequest.notes} onClose={()=>setReviewRequest(null)}/>:<ScriptDeliveryReview artifact={reviewRequest.artifacts.find(item=>item.id===reviewRequest.selectedId)!} initialDecision={reviewRequest.decision} initialNotes={reviewRequest.notes} onClose={()=>setReviewRequest(null)}/>):<FlowDialog title={locale==='pt-BR'?'Qual roteiro você quer revisar?':'Which script do you want to review?'} onClose={()=>setReviewRequest(null)}><div className="delivery-review-fields"><SelectMenu ariaLabel={locale==='pt-BR'?'Roteiro para revisar':'Script to review'} value={reviewRequest.selectedId} onChange={selectedId=>setReviewRequest({...reviewRequest,selectedId})} options={reviewRequest.artifacts.map(item=>({value:item.id,label:`${editorialState.contents.find(content=>content.id===item.contentId)?.title} · v${item.version}`}))}/><button className="primary-button" onClick={()=>setReviewRequest({...reviewRequest,confirmedTarget:true})}>{locale==='pt-BR'?'Revisar esta versão':'Review this version'}</button></div></FlowDialog>)}
     </div>
@@ -987,6 +1205,8 @@ function formatTime(value: string, locale: string): string {
     new Date(value),
   );
 }
+const agentSessionsCount=(sessions:readonly AgentSession[],scope:string)=>sessions.filter(session=>(session.contentId?`content:${session.contentId}`:'general')===scope).length;
+
 function formatSessionDate(value: string, locale: string): string {
   return new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric' }).format(new Date(value));
 }

@@ -3,6 +3,12 @@ import { createPortal } from 'react-dom';
 import { Icon } from './Icon';
 import { useLanguage } from '../../app/LanguageProvider';
 
+/**
+ * Open dialogs, innermost last. Only the topmost one reacts to Escape/Tab, so a nested dialog closes alone and a menu open
+ * inside it (SelectMenu handles Escape at window capture, before this) closes before the dialog.
+ */
+const openDialogs:symbol[]=[];
+
 /** Shared dialog with contained keyboard focus and restoration to its trigger. */
 export function FlowDialog({
   title,
@@ -17,12 +23,15 @@ export function FlowDialog({
   closeRef.current = onClose;
   useEffect(() => {
     const origin = document.activeElement as HTMLElement | null;
+    const layer = Symbol('flow-dialog');
+    openDialogs.push(layer);
     (
       ref.current?.querySelector<HTMLElement>('[data-autofocus],input') ??
       ref.current?.querySelector<HTMLElement>('.flow-option') ??
       ref.current?.querySelector<HTMLElement>('button')
     )?.focus();
     const key = (event: KeyboardEvent) => {
+      if (openDialogs.at(-1) !== layer || event.defaultPrevented) return;
       if (event.key === 'Escape') {
         event.preventDefault();
         event.stopPropagation();
@@ -47,6 +56,7 @@ export function FlowDialog({
     document.addEventListener('keydown', key, true);
     return () => {
       document.removeEventListener('keydown', key, true);
+      openDialogs.splice(openDialogs.indexOf(layer), 1);
       if (origin?.isConnected) origin.focus();
     };
   }, []);

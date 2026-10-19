@@ -6,6 +6,15 @@ import { AgentAvatar } from '../components/agents/AgentAvatar';
 import { SelectMenu } from '../components/common/SelectMenu';
 import { useWorkspaces } from '../app/WorkspaceProvider';
 import { useLanguage } from '../app/LanguageProvider';
+import { useContentWorkflow } from '../features/content/ContentWorkflowProvider';
+import { useProduction } from '../features/production/ProductionProvider';
+import { contentSpaces, effectiveScope, scopeOfSession, type ScopeKey } from '../features/chat/contentScopes';
+import { contentBinding, sessionListLabel } from '../features/chat/contentSessions';
+import type { AgentSession } from '../features/chat/model/Chat';
+import { OrganizeChatDialog } from '../components/chat/OrganizeChatDialog';
+import { ContentActionsMenu } from '../components/content/ContentActionsMenu';
+import { ContentDeletionDialog } from '../components/content/ContentDeletionDialog';
+import { DeletionRefused } from '../features/content/contentDeletion';
 
 export function Sessions({
   onActivateAgent,
@@ -20,7 +29,9 @@ export function Sessions({
 }) {
   const { agents, getAgentById } = useAgents();
   const { currentWorkspaceId, currentWorkspace } = useWorkspaces();
-  const { sessions, openSession, renameSession, deleteSession, getRunState } = useChat();
+  const { sessions, openSession, renameSession, deleteSession, getRunState, contentScopes, selectScope } = useChat();
+  const { state: editorialState, ready: editorialReady } = useContentWorkflow();
+  const { runs, ready: productionReady, error: productionError } = useProduction();
   const { locale, t } = useLanguage();
   const pt = locale === 'pt-BR';
   const [query, setQuery] = useState('');
@@ -28,12 +39,28 @@ export function Sessions({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [organizing, setOrganizing] = useState<AgentSession | null>(null);
+  const [contentToDelete, setContentToDelete] = useState<{ contentId: string; title: string } | null>(null);
+  const [deleteError, setDeleteError] = useState<{ sessionId: string; message: string } | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
+  const [announcement, setAnnouncement] = useState('');
+  const [showQuiet, setShowQuiet] = useState(false);
   const workspaceAgents = agents.filter((agent) => agent.workspaceId === currentWorkspaceId);
   const agentIds = new Set(workspaceAgents.map((agent) => agent.id));
+  // Same saved selection as the chat panel: choosing a content here opens the chat in that content too.
+  const scopeCtx = { workspaceId: currentWorkspaceId, contents: editorialState.contents, runs, pending: !editorialReady || (!productionReady && !productionError) };
+  const scope = effectiveScope(contentScopes, scopeCtx);
+  const spaces = contentSpaces(sessions, [...agentIds], scopeCtx, pt);
+  const currentSpace = spaces.find((space) => space.scope === scope) ?? spaces[0];
+  const busySpaces = new Set(sessions.filter((session) => agentIds.has(session.agentId) && ['thinking', 'searching', 'using-tool'].includes(getRunState(session.id))).map((session) => scopeOfSession(session, scopeCtx)));
+  const visibleSpaces = spaces.filter((space) => showQuiet || space.kind !== 'content' || space.chats > 0 || space.scope === scope);
+  const quietCount = spaces.length - spaces.filter((space) => space.kind !== 'content' || space.chats > 0 || space.scope === scope).length;
+  const pick = (next: ScopeKey) => selectScope(currentWorkspaceId, next);
   const ordered = sessions
     .filter(
       (session) =>
         agentIds.has(session.agentId) &&
+        scopeOfSession(session, scopeCtx) === scope &&
         (agentFilter === 'all' || session.agentId === agentFilter) &&
         [session.title, getAgentById(session.agentId)?.name ?? '']
           .join(' ')
@@ -84,6 +111,42 @@ export function Sessions({
           </div>
         ))}
       </div>
+      <section className="content-spaces" aria-labelledby="content-spaces-heading">
+        <div className="content-spaces-head">
+          <h2 id="content-spaces-heading">{pt ? 'Espaços de conteúdo' : 'Content spaces'}</h2>
+          <p>{pt ? 'Cada vídeo tem seu espaço: as conversas de todos os agentes sobre ele ficam juntas e separadas dos outros. Geral guarda ideias soltas.' : 'Each video has its own space: every agent’s chats about it stay together and apart from the others. General keeps loose ideas.'}</p>
+        </div>
+        <div className="content-space-grid" role="group" aria-label={pt ? 'Escolher espaço' : 'Choose space'}>
+          {visibleSpaces.map((space) => (
+            <div className="content-space-cell" key={space.scope}>
+            <button
+              type="button"
+              className={`content-space-box kind-${space.kind}`}
+              aria-pressed={space.scope === scope}
+              onClick={() => pick(space.scope)}
+            >
+              <span className="content-space-title"><b>{space.title}</b>{busySpaces.has(space.scope) && <i>{t('Running')}</i>}</span>
+              <span className="content-space-stage">
+                {space.kind === 'general' ? (pt ? 'Ideias sem conteúdo' : 'Ideas without content') : space.kind === 'recovery' ? (pt ? 'Vínculo inválido · nada foi apagado' : 'Invalid link · nothing was deleted') : space.stage}
+              </span>
+              <small>
+                {space.chats} {pt ? (space.chats === 1 ? 'conversa' : 'conversas') : space.chats === 1 ? 'chat' : 'chats'}
+                {space.agents.length > 0 && ` · ${space.agents.map((item) => getAgentById(item.agentId)?.name ?? t('Deleted agent')).join(', ')}`}
+                {space.lastActivity && ` · ${new Date(space.lastActivity).toLocaleDateString(locale, { month: 'short', day: 'numeric' })}`}
+              </small>
+            </button>
+            {space.kind === 'content' && space.content && (
+              <ContentActionsMenu title={space.title} pt={pt} disabled={!editorialReady} onDelete={() => setContentToDelete({ contentId: space.content!.id, title: space.title })} />
+            )}
+            </div>
+          ))}
+        </div>
+        {quietCount > 0 && (
+          <button type="button" className="text-link content-spaces-more" aria-expanded={showQuiet} onClick={() => setShowQuiet(!showQuiet)}>
+            {showQuiet ? (pt ? 'Ocultar conteúdos sem conversa' : 'Hide contents without chats') : pt ? `Mostrar ${quietCount} conteúdos sem conversa` : `Show ${quietCount} contents without chats`}
+          </button>
+        )}
+      </section>
       <div className="collection-toolbar">
         <label className="search-field">
           <Icon name="search" />
@@ -105,7 +168,7 @@ export function Sessions({
           ]}
         />
         <span className="result-count" role="status">
-          {ordered.length} {pt ? 'conversas' : 'conversations'}
+          {ordered.length} {pt ? 'conversas em' : 'conversations in'} {currentSpace?.title}
         </span>
       </div>
       {!ordered.length && (
@@ -116,14 +179,20 @@ export function Sessions({
           <h2>
             {query || agentFilter !== 'all'
               ? t('No results')
-              : pt
-                ? 'Sua próxima conversa começa aqui'
-                : 'Your next conversation starts here'}
+              : currentSpace?.kind === 'content'
+                ? pt ? `Nenhuma conversa sobre “${currentSpace.title}” ainda` : `No chats about “${currentSpace.title}” yet`
+                : currentSpace?.kind === 'recovery'
+                  ? pt ? 'Nada precisa de atenção' : 'Nothing needs attention'
+                  : pt
+                    ? 'Sua próxima conversa começa aqui'
+                    : 'Your next conversation starts here'}
           </h2>
           <p>
-            {pt
-              ? 'Escolha um agente e abra uma sessão para guardar suas ideias e respostas.'
-              : 'Choose an agent and open a session to keep your ideas and responses together.'}
+            {currentSpace?.kind === 'content'
+              ? pt ? 'Escolha um agente: a conversa nova já nasce dentro deste conteúdo.' : 'Choose an agent: the new chat starts inside this content.'
+              : pt
+                ? 'Escolha um agente e abra uma sessão para guardar suas ideias e respostas.'
+                : 'Choose an agent and open a session to keep your ideas and responses together.'}
           </p>
           {query || agentFilter !== 'all' ? (
             <button
@@ -195,6 +264,7 @@ export function Sessions({
                     }}
                   >
                     <b>{session.title}</b>
+                    {(() => { const label = sessionListLabel(contentBinding(session, scopeCtx), pt); return label && <em className="conversation-scope">{label}</em>; })()}
                     <span>
                       {last?.type === 'message'
                         ? last.content
@@ -228,24 +298,42 @@ export function Sessions({
                 {busy ? t('Running') : pt ? 'Ociosa' : 'Idle'}
               </span>
               <div className="conversation-actions">
-                {deletingId === session.id ? (
+                {deletingId === session.id ? ((() => {
+                  const role = runs.find((run) => [run.sourceSession.id, run.editorSession.id, run.publisherSession?.id].includes(session.id));
+                  if (role) return (
+                    <>
+                      <span className="session-role-note">{pt ? 'Conduz a produção deste conteúdo: exclua o conteúdo inteiro.' : 'Conducts this content’s production: delete the whole content.'}</span>
+                      <button className="soft-button" onClick={() => setDeletingId(null)}>{t('Cancel')}</button>
+                      <button className="danger-button" onClick={() => { setDeletingId(null); setContentToDelete({ contentId: role.contentId, title: editorialState.contents.find((item) => item.id === role.contentId)?.title ?? role.name }); }}>
+                        {pt ? 'Excluir conteúdo inteiro…' : 'Delete whole content…'}
+                      </button>
+                    </>
+                  );
+                  return (
                   <>
                     <span>{pt ? 'Excluir histórico?' : 'Delete history?'}</span>
-                    <button className="soft-button" onClick={() => setDeletingId(null)}>
+                    {deleteError?.sessionId === session.id && <span role="alert" className="session-role-note">{deleteError.message}</span>}
+                    <button className="soft-button" disabled={pendingDelete === session.id} onClick={() => { setDeletingId(null); setDeleteError(null); }}>
                       {t('Cancel')}
                     </button>
                     <button
                       className="danger-button"
-                      disabled={busy}
+                      disabled={busy || pendingDelete === session.id}
+                      aria-busy={pendingDelete === session.id}
                       onClick={() => {
-                        deleteSession(session.id);
-                        setDeletingId(null);
-                        onToast(pt ? 'Conversa excluída' : 'Conversation deleted');
+                        setPendingDelete(session.id); setDeleteError(null);
+                        // Announced only after the host confirmed the removal; a refusal stays here with its reason.
+                        deleteSession(session.id).then(() => { setDeletingId(null); onToast(pt ? 'Conversa excluída' : 'Conversation deleted'); }, (error) => {
+                          if (error instanceof DeletionRefused && error.code === 'production-role' && error.contentId) { setDeletingId(null); setContentToDelete({ contentId: error.contentId, title: editorialState.contents.find((item) => item.id === error.contentId)?.title ?? session.title }); return; }
+                          setDeleteError({ sessionId: session.id, message: error instanceof Error ? error.message : String(error) });
+                        }).finally(() => setPendingDelete(null));
                       }}
                     >
-                      {t('Delete')}
+                      {pendingDelete === session.id ? (pt ? 'Excluindo…' : 'Deleting…') : t('Delete')}
                     </button>
                   </>
+                  );
+                })()
                 ) : (
                   <>
                     <button
@@ -260,6 +348,16 @@ export function Sessions({
                     >
                       <Icon name="edit" />
                     </button>
+                    {!session.contentId && (
+                      <button
+                        className="soft-button conversation-organize"
+                        title={pt ? 'Mover esta conversa para um conteúdo' : 'Move this chat into a content'}
+                        aria-label={pt ? `Organizar ${session.title} em um conteúdo` : `Organize ${session.title} into a content`}
+                        onClick={() => setOrganizing(session)}
+                      >
+                        {pt ? 'Organizar' : 'Organize'}
+                      </button>
+                    )}
                     <button
                       className="icon-button"
                       disabled={busy}
@@ -285,6 +383,40 @@ export function Sessions({
           );
         })}
       </div>
+      {organizing && (
+        <OrganizeChatDialog
+          session={organizing}
+          pt={pt}
+          onClose={() => setOrganizing(null)}
+          onDone={(content, count) => {
+            setOrganizing(null);
+            onToast(pt ? `${count} ${count === 1 ? 'conversa organizada' : 'conversas organizadas'} em “${content.title}”` : `${count} chat(s) organized into “${content.title}”`);
+          }}
+          onFreshChat={(content) => {
+            setOrganizing(null);
+            pick(`content:${content.id}`);
+            onNewSession();
+          }}
+        />
+      )}
+      {contentToDelete && (
+        <ContentDeletionDialog
+          contentId={contentToDelete.contentId}
+          workspaceId={currentWorkspaceId}
+          fallbackTitle={contentToDelete.title}
+          pt={pt}
+          onClose={() => setContentToDelete(null)}
+          onDeleted={({ title, chats }) => {
+            setContentToDelete(null);
+            pick('general');
+            const message = pt ? `“${title}” e ${chats} ${chats === 1 ? 'conversa excluídos' : 'conversas excluídos'} deste computador` : `“${title}” and ${chats} ${chats === 1 ? 'chat' : 'chats'} deleted from this computer`;
+            setAnnouncement(message); onToast(message);
+            // The content box is gone: focus moves to the General box (now selected).
+            window.requestAnimationFrame(() => document.querySelector<HTMLElement>('.content-space-box.kind-general')?.focus());
+          }}
+        />
+      )}
+      <p className="content-deletion-status" role="status" aria-live="polite">{announcement}</p>
     </div>
   );
 }

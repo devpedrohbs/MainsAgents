@@ -1,0 +1,50 @@
+{
+  "engine": "legacy overlays + heuristic motion",
+  "summary": "intenso: 5 momento(s) — 0 aproximação(ões), 4 texto(s) animado(s), 1 cartão(ões) com tela dividida; 0 apoiado(s) na voz medida; 1 efeito(s) sonoro(s) suave(s). ênfase da voz não medida (sem áudio utilizável); destaques vêm só do texto.",
+  "cues": [
+    {
+      "kind": "kineticText",
+      "layout": "camera-full",
+      "text": "mais rápido O",
+      "start": 3.74,
+      "end": 5.676
+    },
+    {
+      "kind": "kineticText",
+      "layout": "camera-full",
+      "text": "nunca cortar",
+      "start": 6.036,
+      "end": 7.436
+    },
+    {
+      "kind": "kineticText",
+      "layout": "camera-full",
+      "text": "Primeiro você",
+      "start": 8.586,
+      "end": 10.186
+    },
+    {
+      "kind": "keyPoint",
+      "layout": "split",
+      "text": "economiza 90% do",
+      "start": 18.194,
+      "end": 21.714
+    },
+    {
+      "kind": "kineticText",
+      "layout": "camera-full",
+      "text": "mais importante rivais",
+      "start": 22.156,
+      "end": 24.356
+    }
+  ],
+  "durationSeconds": 25.7,
+  "frames": [
+    "frame-6.42.jpg",
+    "frame-10.28.jpg",
+    "frame-14.14.jpg",
+    "frame-17.99.jpg",
+    "frame-21.84.jpg",
+    "frame-24.93.jpg"
+  ]
+}

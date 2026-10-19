@@ -12,6 +12,7 @@ import {ProductionPreflight} from './ProductionPreflight';
 import {storageProfile} from '../../data/IndexedDbStateStore';
 import {useStudioDraftField,clearStudioDraft,studioDraftKey} from '../../features/content/studioDrafts';
 import {MotionIntensityField,motionIntensity} from './MotionIntensity';
+import {EditDirectorField} from './EditDirector';
 import type {PreflightReport} from '../../../production-preflight.mjs';
 import './production.css';
 
@@ -69,7 +70,7 @@ export function RecordedEntry({agent,session,content,onClose,onStarted}:{agent:A
    <div className="production-section"><h3>{pt?'3. Edição':'3. Editing'}</h3>
     {flows.length>1&&<label>{pt?'Fluxo':'Flow'}<SelectMenu ariaLabel={pt?'Fluxo do conteúdo':'Content flow'} value={flowId} disabled={busy} onChange={setFlow} options={flows.map(item=>({value:item.id,label:item.name}))}/></label>}
     <label>{pt?'Tipo de edição':'Editing mode'}<SelectMenu ariaLabel={pt?'Tipo de edição do vídeo gravado':'Recorded video editing mode'} value={editMode==='basic'?'basic':'smart'} disabled={busy} onChange={setEditMode} options={[{value:'smart',label:pt?'Automática: cortar silêncios e animar':'Automatic: cut silences and animate'},{value:'basic',label:pt?'Básica: um corte contínuo':'Basic: one continuous cut'}]}/></label>
-    {editMode!=='basic'&&<MotionIntensityField value={motion} onChange={setMotion} pt={pt} disabled={busy} ariaLabel={pt?'Movimento na edição do vídeo gravado':'Recorded video motion'}/>}
+    {editMode!=='basic'&&<MotionIntensityField value={motion} onChange={setMotion} pt={pt} disabled={busy} ariaLabel={pt?'Movimento na edição do vídeo gravado':'Recorded video motion'}/>}{editMode!=='basic'&&<EditDirectorField pt={pt} busy={busy} workspaceId={content.workspaceId} editorName={agentName('video-agent')}/>}
     <label>{pt?'Formato autorizado':'Authorized format'}<SelectMenu ariaLabel={pt?'Formato do vídeo gravado':'Recorded video format'} value={format==='portrait'?'portrait':'original'} disabled={busy} onChange={setFormat} options={[{value:'original',label:pt?'Preservar enquadramento':'Keep framing'},{value:'portrait',label:pt?'Recortar para vertical 9:16':'Crop to vertical 9:16'}]}/></label></div>
    <div className="production-section recorded-entry-review" aria-label={pt?'Revisão antes de iniciar':'Review before starting'}><h3>{pt?'Revisão':'Review'}</h3>
     <ul>
@@ -78,7 +79,7 @@ export function RecordedEntry({agent,session,content,onClose,onStarted}:{agent:A
      <li>{pt?'Contexto':'Context'}: {origin==='notion'?(card?(pt?`card ${card.url} (lido, sem alterações)`:`card ${card.url} (read, unchanged)`):'—'):(text.trim()?(pt?`texto colado (${text.trim().length} caracteres)`:`pasted text (${text.trim().length} characters)`):'—')}</li>
      <li>{pt?'Quem executa':'Who runs it'}: {pt?'conversa':'chat'} {agent.name} · {pt?'edição':'editing'} {agentName('video-agent')??'—'} · {pt?'publicação':'publishing'} {agentName('publishing-agent')??agent.name}</li>
     </ul>
-    <p className="editorial-hint">{pt?'O editor recebe metadados, a transcrição local quando houver e este contexto; nenhum agente vê a imagem do vídeo. Você revisa o vídeo editado antes de aprovar; nada é publicado sem sua autorização.':'The editor gets metadata, the local transcript when available and this context; no agent sees the video image. You review the edited video before approving; nothing is published without your authorization.'}</p>
+    <p className="editorial-hint">{pt?'Quem dirige a edição recebe metadados, a transcrição local quando houver e este contexto. Com Claude Code dirigindo, ele também vê frames reais da gravação e das prévias renderizadas; Codex e o modo do próprio agente não veem a imagem. Você revisa o vídeo editado antes de aprovar; nada é publicado sem sua autorização.':'Whoever directs the edit gets metadata, the local transcript when available and this context. With Claude Code directing, it also sees real frames of the recording and of the rendered previews; Codex and the editor-agent mode do not see the image. You review the edited video before approving; nothing is published without your authorization.'}</p>
     {preflight&&<ProductionPreflight report={preflight} pt={pt} busy={busy}/>}
     <label className="production-check"><input type="checkbox" checked={authorize} disabled={busy||missing.length>0} onChange={event=>setAuthorize(event.target.checked)}/>{pt?'Revisei os vínculos e autorizo iniciar a edição deste vídeo.':'I reviewed the links and authorize editing this video.'}</label>
     {missing.length>0&&<ul className="editorial-hint" aria-live="polite">{missing.map(item=><li key={item}>{item}</li>)}</ul>}

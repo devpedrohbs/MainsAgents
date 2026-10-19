@@ -2,13 +2,12 @@
 // Uso: node scripts/test-remotion-video.mjs [pastaDeFrames]   (exit 1 em falha; exit 2 se dependência local faltar)
 import {spawn} from 'node:child_process';
 import {createHash} from 'node:crypto';
-import {existsSync} from 'node:fs';
 import {mkdir, mkdtemp, readFile, rm, stat} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {buildRemotionBundle, remotionBundleDir} from './build-remotion-video.mjs';
-import {getRemotionCapabilities, probeVideo, renderAnimatedVideo} from '../editorial-remotion.mjs';
+import {getRemotionCapabilities, probeVideo, renderAnimatedVideo, resolveRemotionBundle} from '../editorial-remotion.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const SMOKE = Object.freeze({width: 320, height: 180, fps: 15, seconds: 6, frames: {start: 1.0, middle: 3.5, end: 5.5}});
@@ -83,7 +82,7 @@ export async function runSmoke({framesDir, log = () => {}, bundleDir, source = {
     const metadata = await probeVideo(input);
     const hashBefore = await sha256(input);
     log(`entrada: ${metadata.width}x${metadata.height} ${metadata.fps}fps ${metadata.durationSeconds}s áudio=${metadata.hasAudio}`);
-    const bundle = bundleDir ?? (existsSync(path.join(remotionBundleDir, 'index.html')) ? remotionBundleDir : await buildRemotionBundle({outDir: path.join(work, 'bundle')}));
+    const bundle = bundleDir ?? (resolveRemotionBundle(remotionBundleDir).ready ? remotionBundleDir : await buildRemotionBundle({outDir: path.join(work, 'bundle')}));
     const capabilities = await getRemotionCapabilities({bundleDir: bundle});
     if (!capabilities.available) {
       const error = new Error(`Dependência ausente: ${capabilities.reasons.join(' ')}`);

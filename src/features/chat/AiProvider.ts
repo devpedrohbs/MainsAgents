@@ -1,4 +1,5 @@
 import type { AgentTool } from '../agents/model/Agent';
+import type {PaperDesign} from '../../../paper-design.mjs';
 import type { CodexEvent } from './CodexService';
 import type { DelegationRuntimeConfig } from './CodexService';
 import type { ReasoningEffort } from './model/Chat';
@@ -34,9 +35,9 @@ export interface AiProvider {
   readonly id: ProviderId;
   getStatus(): Promise<ProviderStatus>;
   listModels(): Promise<readonly {id:string; name:string}[]>;
-  createSession(input:{localSessionId?:string;agentId:string;agentName:string;workspaceId:string;instructions:string;modelId?:string;tools:readonly AgentTool[];skillsDirectory?:string;skills?:readonly string[]}):Promise<ProviderSessionHandle>;
+  createSession(input:{localSessionId?:string;agentId:string;agentName:string;workspaceId:string;instructions:string;modelId?:string;tools:readonly AgentTool[];skillsDirectory?:string;skills?:readonly string[];paperDesign?:PaperDesign}):Promise<ProviderSessionHandle>;
   resumeSession(remoteSessionId:string):Promise<ProviderSessionHandle>;
-  sendMessage(input:{remoteSessionId:string;content:string;modelId?:string;reasoningEffort?:ReasoningEffort;instructions?:string;agentId?:string;agentName?:string;role?:string;workspaceId?:string;tools?:readonly AgentTool[];skillsDirectory?:string;skills?:readonly string[];firstMessage?:boolean;history?:readonly {role:'user'|'agent';content:string}[];context?:readonly {id:string;kind:string;label:string;content?:string}[];delegation?:DelegationRuntimeConfig}):Promise<ProviderExecutionHandle>;
+  sendMessage(input:{remoteSessionId:string;content:string;modelId?:string;reasoningEffort?:ReasoningEffort;instructions?:string;agentId?:string;agentName?:string;role?:string;workspaceId?:string;tools?:readonly AgentTool[];skillsDirectory?:string;skills?:readonly string[];paperDesign?:PaperDesign;firstMessage?:boolean;history?:readonly {role:'user'|'agent';content:string}[];context?:readonly {id:string;kind:string;label:string;content?:string}[];delegation?:DelegationRuntimeConfig}):Promise<ProviderExecutionHandle>;
   cancelExecution(executionId:string):Promise<void>;
   streamEvents(input:{executionId:string;signal?:AbortSignal}):AsyncIterable<CodexEvent>;
   resolveDelegation?(executionId:string,callId:string,result:{success:boolean;content:string}):Promise<void>;

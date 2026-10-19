@@ -15,7 +15,9 @@ const root=resolve(import.meta.dirname,'..'),packaged=resolve(root,process.argv.
 const out=resolve(root,'.mainsagents-workspaces/packaged-media',String(Date.now()));mkdirSync(out,{recursive:true});app.setPath('userData',join(out,'electron'));
 const load=name=>import(pathToFileURL(join(asar,name)).href);
 app.whenReady().then(async()=>{const log=[];try{
-  for(const path of [asar,join(resources,'app.asar.unpacked','dist','remotion','index.html'),join(resources,'app.asar.unpacked','node_modules','@remotion','compositor-win32-x64-msvc','ffprobe.exe'),join(resources,'tools','whispercpp','bin','Release','whisper-cli.exe'),join(resources,'tools','whispercpp','ggml-base.bin')])assert(existsSync(path),`missing packaged ${path}`);
+  // Remotion bundle through the official resolver (versioned current.json layout; legacy flat accepted by the resolver).
+  const {resolveRemotionBundle}=await load('editorial-remotion.mjs'),bundle=resolveRemotionBundle(join(resources,'app.asar.unpacked','dist','remotion'));assert(bundle.ready,`packaged Remotion bundle not ready: ${bundle.reason}`);log.push(`remotion bundle ${bundle.layout} ${bundle.version??''}`);
+  for(const path of [asar,join(bundle.dir,'index.html'),join(resources,'app.asar.unpacked','node_modules','@remotion','compositor-win32-x64-msvc','ffprobe.exe'),join(resources,'tools','whispercpp','bin','Release','whisper-cli.exe'),join(resources,'tools','whispercpp','ggml-base.bin')])assert(existsSync(path),`missing packaged ${path}`);
   const {createContentWorkflowBridge}=await load('content-workflow-bridge.mjs'),{createRemotionAnimator}=await load('editorial-animate.mjs'),{createWhisperTranscriber}=await load('editorial-transcribe.mjs');
   const {inspectLocalAsset}=await load('editorial-local-files.mjs'),{runMediaProcess,probeVideo}=await load('editorial-media.mjs'),{resolveFfprobe}=await load('editorial-remotion.mjs'),{unpackedPath}=await load('editorial-animate.mjs');
   // editorial-remotion resolves the compositor ffprobe inside app.asar (not spawnable); the animator passes the unpacked copy.

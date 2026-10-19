@@ -11,6 +11,9 @@ const persistentState = new PersistentState(indexedDbStateStore, (key, error) =>
 });
 
 export function restoreLocalPersistence(): Promise<void> { return persistentState.restore(); }
+/** Replaces keys with values the host committed (local deletion); never writes them again. */
+export function adoptPersistentValues(values: Record<string, unknown>): void { persistentState.adopt(values); }
+export function setPersistentFilter(filter: (key: string, value: unknown) => unknown): void { persistentState.setFilter(filter); }
 export function persistentSnapshot(): Record<string, unknown> { return persistentState.snapshot(); }
 export function readPersistentValue<T>(key: string, initial: T): T { return persistentState.get(key, initial); }
 export function updatePersistentValue<T>(key: string, initial: T, update: T | ((current: T) => T)): void {

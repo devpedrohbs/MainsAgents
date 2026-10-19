@@ -1,0 +1,28 @@
+{
+  "engine": "legacy overlays + heuristic motion",
+  "summary": "intenso: 2 momento(s) — 0 aproximação(ões), 1 texto(s) animado(s), 0 cartão(ões) com tela dividida; 0 apoiado(s) na voz medida; 1 efeito(s) sonoro(s) suave(s); 1 explicativo(s) com base no que foi dito. ênfase da voz não medida (sem áudio utilizável); destaques vêm só do texto.",
+  "cues": [
+    {
+      "kind": "kineticText",
+      "layout": "camera-full",
+      "text": "Com 1% ao",
+      "start": 10.314,
+      "end": 12.254
+    },
+    {
+      "kind": "explainer",
+      "layout": "split",
+      "start": 12.354,
+      "end": 20.405
+    }
+  ],
+  "durationSeconds": 23.8,
+  "frames": [
+    "frame-5.95.jpg",
+    "frame-9.52.jpg",
+    "frame-13.09.jpg",
+    "frame-16.66.jpg",
+    "frame-20.23.jpg",
+    "frame-23.09.jpg"
+  ]
+}

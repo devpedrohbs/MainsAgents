@@ -30,3 +30,53 @@ test('manual transfer from Claude preserves its configured role and is independe
  const f=fixture();f.agents[0]={...source,providerId:'claude'};f.sessions[0].agentConnection.enabled=false;
  try{const job=f.service.manual('owner',manualInput);await wait(()=>f.service.snapshot('owner').jobs[0].status==='completed');assert.equal(f.calls(),1);assert.equal(f.service.snapshot('owner').jobs[0].id,job.id);assert.match(job.briefing,/My workflow|Reply with the exact result/);}finally{await f.service.close();f.db.close();}
 });
+for(const providerId of ['codex','claude'])test(`sessionMode new opens a new ${providerId} specialist session; continue reuses it; a stale link to another agent opens a new one`,async()=>{
+ const f=fixture();f.agents[1]={...target,providerId};
+ try{
+  assert.equal((await f.service.dispatch(binding,params,config)).success,true);
+  const first=f.service.snapshot('owner').jobs[0].targetSessionId;
+  assert.equal((await f.service.dispatch(binding,{...params,callId:'continue'},config)).success,true);
+  assert.equal(f.service.snapshot('owner').jobs[1].targetSessionId,first,'continue reuses the last specialist session');
+  assert.equal((await f.service.dispatch(binding,{...params,callId:'new',arguments:{...params.arguments,sessionMode:'new'}},config)).success,true);
+  const fresh=f.service.snapshot('owner').jobs[2];assert.notEqual(fresh.targetSessionId,first);assert.equal(fresh.sessionMode,'new');
+  assert.equal(f.service.snapshot('owner').sessions.find(item=>item.id===fresh.targetSessionId).agentId,'video');
+  // A connection pointing at the source agent's own session (another agent) is stale: never reused, never a failure.
+  f.sessions[0].agentConnection={enabled:true,targetAgentId:'video',targetSessionId:'source-session'};
+  assert.equal((await f.service.dispatch(binding,{...params,callId:'stale'},config)).success,true);
+  const stale=f.service.snapshot('owner').jobs[3];assert.notEqual(stale.targetSessionId,'source-session');assert.match(stale.notice,/new session/);
+  assert.equal(f.calls(),4,'each dispatch sends exactly once');
+ }finally{await f.service.close();f.db.close();}
+});
+test('a specialist session missing in the CLI is replaced only before any send',async()=>{
+ const connects=[];const f=fixture(undefined,{connect:async session=>{connects.push(session.codexThreadId);if(session.codexThreadId)throw Object.assign(Error('no rollout found for thread id gone'),{});return 'thread-new';}});
+ try{
+  assert.equal((await f.service.dispatch(binding,params,config)).success,true);
+    assert.equal((await f.service.dispatch(binding,{...params,callId:'again'},config)).success,true);
+  // The saved specialist thread is gone: reconnect without it once, then send exactly once.
+  assert.deepEqual(connects,[undefined,'thread-new',undefined]);assert.equal(f.service.snapshot('owner').jobs[1].targetSessionId,f.service.snapshot('owner').jobs[0].targetSessionId);assert.equal(f.calls(),2);
+ }finally{await f.service.close();f.db.close();}
+});
+test('a recreated specialist thread gets the first-message setup; a link to another content is never reused and the user is told',async()=>{
+ const firsts=[];let fail=false;const f=fixture(undefined,{connect:async session=>{if(fail&&session.codexThreadId)throw Error('no rollout found for thread id old');return 'thread-'+Math.random().toString(16).slice(2)},send:async(thread,text,agent)=>{firsts.push(agent.runtimeFirstMessage);return {executionId:'turn-'+firsts.length}}});
+ try{
+  assert.equal((await f.service.dispatch(binding,params,config)).success,true);fail=true;
+  assert.equal((await f.service.dispatch(binding,{...params,callId:'after-loss'},config)).success,true);
+  assert.deepEqual(firsts,[true,true],'the replacement thread is treated as a first message');
+  // The connected specialist chat now belongs to another content: a new session for this content, with a visible notice.
+  const reused=f.service.snapshot('owner').jobs[0].targetSessionId;f.sessions.push({...f.service.snapshot('owner').sessions.find(item=>item.id===reused),contentId:'other-content'});
+  f.sessions[0]={...f.sessions[0],contentId:'this-content',agentConnection:{enabled:true,targetAgentId:'video',targetSessionId:reused}};
+  assert.equal((await f.service.dispatch(binding,{...params,callId:'other-content'},config)).success,true);
+  const job=f.service.snapshot('owner').jobs.at(-1),sessions=f.service.snapshot('owner').sessions;
+  assert.notEqual(job.targetSessionId,reused);assert.match(job.notice,/another content/);
+  const fresh=sessions.find(item=>item.id===job.targetSessionId);assert.equal(fresh.contentId,'this-content','the new session carries only this content');
+  for(const id of ['source-session',job.targetSessionId]){const item=sessions.find(value=>value.id===id),notice=item.messages.find(message=>message.id===`delegation-notice-${job.id}`);assert(notice&&item.nativeMessageIds.includes(notice.id),`notice visible in ${id}`);}
+ }finally{await f.service.close();f.db.close();}
+});
+test('a specialist thread that vanished after the send is never resent automatically',async()=>{
+ let sends=0;const f=fixture(undefined,{send:async()=>{sends++;throw Error('Lost receipt');},readThread:async()=>{throw Error('no rollout found for thread id gone');},connect:async session=>{if(session.codexThreadId)throw Error('no rollout found for thread id gone');return 'thread-1'}});
+ try{
+  assert.equal((await f.service.dispatch(binding,params,config)).success,false);const id=f.service.snapshot('owner').jobs[0].id;
+  f.service.retry('owner',id,{});await wait(()=>['error','interrupted','completed'].includes(f.service.snapshot('owner').jobs[0].status)&&sends>=1);
+  await new Promise(resolve=>setTimeout(resolve,50));assert.equal(sends,1,'no automatic resend');assert.notEqual(f.service.snapshot('owner').jobs[0].status,'completed');
+ }finally{await f.service.close();f.db.close();}
+});

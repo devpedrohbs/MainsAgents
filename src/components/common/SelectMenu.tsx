@@ -35,8 +35,20 @@ export function SelectMenu({ value, options, onChange, ariaLabel, className = ''
     const closeOutside = (event: PointerEvent) => {
       if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
     };
+    // Escape closes the open menu FIRST: window capture runs before any dialog/drawer listener, which then never sees it.
+    const closeOnEscape = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopPropagation();
+      setOpen(false);
+      rootRef.current?.querySelector<HTMLButtonElement>('.select-menu-trigger')?.focus();
+    };
     document.addEventListener('pointerdown', closeOutside);
-    return () => document.removeEventListener('pointerdown', closeOutside);
+    window.addEventListener('keydown', closeOnEscape, true);
+    return () => {
+      document.removeEventListener('pointerdown', closeOutside);
+      window.removeEventListener('keydown', closeOnEscape, true);
+    };
   }, [open]);
 
   const showMenu = (initialIndex?: number) => {
@@ -79,11 +91,6 @@ export function SelectMenu({ value, options, onChange, ariaLabel, className = ''
         setFocusedIndex(nextIndex);
         optionRefs.current[nextIndex]?.focus();
       }
-    } else if (event.key === 'Escape') {
-      event.preventDefault();
-      event.stopPropagation();
-      setOpen(false);
-      rootRef.current?.querySelector<HTMLButtonElement>('.select-menu-trigger')?.focus();
     } else if (event.key === 'Tab') {
       setOpen(false);
     }

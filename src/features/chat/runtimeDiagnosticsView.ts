@@ -26,6 +26,22 @@ export function codexRow(data:CodexDiagnostics|null,error:string,pt:boolean):Cap
  return row(pt,{id:'codex',kind:'cli',title:'Codex CLI',level:next?'attention':'ready',facts,next});
 }
 
+/** Shape of GET /api/codex/executor: one real sandboxed command (no AI turn). Sign-in is a separate fact (codexRow). */
+export interface ExecutorReadiness {ready:boolean;/** 'slow': no answer yet (first sandbox setup can take ~1 min); only 'failed' proves commands cannot run. */state?:'ready'|'failed'|'slow'|'pending';checkedAt?:string;error?:string;diagnosis?:{code:string;message?:string;path?:string;osError?:number;summary:string};desktopIsolation?:{localAppDataIsolated:boolean;disabledDesktopMcpServers:string[]}}
+
+export function executorRow(executor:ExecutorReadiness|null,error:string,checked:boolean,pt:boolean):CapabilityRow{
+ const t=(a:string,b:string)=>pt?a:b,title=t('Executor local do Codex','Codex local executor'),label=t('Comando no sandbox','Sandboxed command'),retry=t('Use “Testar executor novamente” abaixo.','Use “Test executor again” below.');
+ if(!checked)return row(pt,{id:'executor',kind:'cli',title,level:'unchecked',facts:[fact(label,t('Ainda não verificado','Not checked yet'),'unchecked')]});
+ if(!executor)return row(pt,{id:'executor',kind:'cli',title,level:'attention',facts:[fact(label,error||t('Não foi possível verificar','Could not check'),'unknown')],next:{text:retry}});
+ const isolation=executor.desktopIsolation,off=isolation?.disabledDesktopMcpServers.join(', ');
+ const slow=!executor.ready&&(executor.state==='slow'||executor.state==='pending');
+ const facts=[fact(label,slow?t('Ainda preparando o sandbox do Windows (a primeira execução pode levar cerca de 1 min)','Still preparing the Windows sandbox (the first run can take about 1 min)'):executor.ready?t('Executou (leitura real, sem IA)','Ran (real read, no AI)'):executor.diagnosis?.summary??executor.error??t('Falhou','Failed'),executor.ready?'yes':slow?'unknown':'no')];
+ if(isolation)facts.push(fact(t('Isolamento do Codex Desktop','Codex Desktop isolation'),isolation.localAppDataIsolated?(off?t(`Ativo · ${off} desativado(s) só neste app`,`On · ${off} off for this app only`):t('Ativo','On')):t('Não aplicado','Not applied'),isolation.localAppDataIsolated?'yes':'unknown'));
+ const locked=executor.diagnosis?.osError===32;
+ const next:NextAction|undefined=executor.ready?undefined:slow?{text:t(`Aguarde e ${retry.toLowerCase()}`,`Wait, then ${retry.toLowerCase()}`)}:{text:locked?t(`Um arquivo do Codex Desktop está em uso e o sandbox não conseguiu validá-lo. Reinicie o MainsAgents para aplicar o isolamento; depois, ${retry.toLowerCase()} O sandbox não é desativado.`,`A Codex Desktop file is in use and the sandbox could not validate it. Restart MainsAgents to apply the isolation; then, ${retry.toLowerCase()} The sandbox is not disabled.`):t(`O agente não consegue rodar comandos locais (leitura, FFmpeg). ${retry}`,`The agent cannot run local commands (reads, FFmpeg). ${retry}`)};
+ return row(pt,{id:'executor',kind:'cli',title,level:executor.ready?'ready':slow?'unverified':'attention',facts,next});
+}
+
 export function claudeRow(claude:ClaudeDiagnostics|null,pt:boolean):CapabilityRow{
  const t=(a:string,b:string)=>pt?a:b,state=claude?.state;
  const servers=claude?.mcpServers??[],ok=servers.filter(server=>server.status==='connected'),auth=servers.filter(server=>server.status==='login-required');

@@ -30,6 +30,8 @@ import {ContentMediaEditor} from '../components/content/ContentMediaEditor';
 import {ScriptDeliveryReview} from '../components/chat/ChatDeliveryCard';
 import type {EditorialArtifact} from '../features/content/model';
 import {networkLogos} from '../assets/networkLogos';
+import {ContentActionsMenu} from '../components/content/ContentActionsMenu';
+import {ContentDeletionDialog} from '../components/content/ContentDeletionDialog';
 
 const platforms: Platform[] = ['Instagram', 'TikTok', 'YouTube', 'LinkedIn'];
 const topicStatus: Record<EditorialTopic['status'], [string, string]> = {
@@ -65,6 +67,7 @@ export function ContentStudio({
   const pt = locale === 'pt-BR';
   const [view,setView]=usePersistentState<'studio'|'calendar'|'references'>('studio-view','studio');
   const [reviewArtifact,setReviewArtifact]=useState<EditorialArtifact|null>(null);
+  const [contentToDelete,setContentToDelete]=useState<{contentId:string;title:string}|null>(null);
   useEffect(()=>{const open=()=>setView('calendar');window.addEventListener('mainsagents:publication-calendar',open);return()=>window.removeEventListener('mainsagents:publication-calendar',open)},[]);
   useEffect(()=>{if(selectedContentId||requestedTopicId)setView('studio')},[selectedContentId,requestedTopicId]);
   const { agents: allAgents } = useAgents();
@@ -292,7 +295,7 @@ useEffect(() => {
         </p>
       )}
       {feedback && (
-        <p className="editorial-alert" role="status">
+        <p className="editorial-alert" role="status" tabIndex={-1}>
           {feedback}
         </p>
       )}
@@ -676,6 +679,7 @@ useEffect(() => {
                     <span className={`editorial-state ${content.status}`}>
                       {pt ? contentStatus[content.status][0] : contentStatus[content.status][1]}
                     </span>
+                    <ContentActionsMenu title={content.title} pt={pt} onDelete={()=>setContentToDelete({contentId:content.id,title:content.title})}/>
                   </div>
                   {content.lastError && (
                     <p className="editorial-alert" role="alert">
@@ -959,6 +963,9 @@ useEffect(() => {
       </div>
       </>}
       {reviewArtifact&&<ScriptDeliveryReview artifact={reviewArtifact} initialDecision="revision-requested" onClose={()=>setReviewArtifact(null)}/>}
+      {contentToDelete&&<ContentDeletionDialog contentId={contentToDelete.contentId} workspaceId={currentWorkspaceId} fallbackTitle={contentToDelete.title} pt={pt} onClose={()=>setContentToDelete(null)}
+        onDeleted={({title,chats})=>{setContentToDelete(null);setFeedback(pt?`“${title}” e ${chats} ${chats===1?'conversa excluídos':'conversas excluídos'} deste computador. A ideia continua na pauta.`:`“${title}” and ${chats} ${chats===1?'chat':'chats'} deleted from this computer. The idea stays in the backlog.`);
+          window.requestAnimationFrame(()=>document.querySelector<HTMLElement>('.editorial-alert[role="status"]')?.focus());}}/>}
     </div>
   );
 }

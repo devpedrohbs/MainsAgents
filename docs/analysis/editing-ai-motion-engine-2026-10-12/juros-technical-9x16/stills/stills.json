@@ -1,0 +1,500 @@
+{
+  "tags": {
+    "storyboard": "juros-technical-9x16",
+    "segmentsHash": "c6fcb845"
+  },
+  "stills": [
+    {
+      "sceneId": "definicao",
+      "moment": "entrada",
+      "frame": 33,
+      "position": "in",
+      "seconds": 1.1,
+      "tags": {
+        "storyboard": "juros-technical-9x16",
+        "segmentsHash": "c6fcb845"
+      },
+      "file": "still-000.png"
+    },
+    {
+      "sceneId": "definicao",
+      "moment": "meio",
+      "frame": 51,
+      "position": "mid",
+      "seconds": 1.7,
+      "tags": {
+        "storyboard": "juros-technical-9x16",
+        "segmentsHash": "c6fcb845"
+      },
+      "file": "still-001.png"
+    },
+    {
+      "sceneId": "definicao",
+      "moment": "saida",
+      "frame": 97,
+      "position": "out",
+      "seconds": 3.233,
+      "tags": {
+        "storyboard": "juros-technical-9x16",
+        "segmentsHash": "c6fcb845"
+      },
+      "file": "still-002.png"
+    },
+    {
+      "sceneId": "ciclo",
+      "moment": "entrada",
+      "frame": 129,
+      "position": "in",
+      "seconds": 4.3,
+      "tags": {
+        "storyboard": "juros-technical-9x16",
+        "segmentsHash": "c6fcb845"
+      },
+      "file": "still-003.png"
+    },
+    {
+      "sceneId": "ciclo",
+      "moment": "meio",
+      "frame": 203,
+      "position": "mid",
+      "seconds": 6.767,
+      "tags": {
+        "storyboard": "juros-technical-9x16",
+        "segmentsHash": "c6fcb845"
+      },
+      "file": "still-004.png"
+    },
+    {
+      "sceneId": "ciclo",
+      "moment": "saida",
+      "frame": 297,
+      "position": "out",
+      "seconds": 9.9,
+      "tags": {
+        "storyboard": "juros-technical-9x16",
+        "segmentsHash": "c6fcb845"
+      },
+      "file": "still-005.png"
+    },
+    {
+      "sceneId": "dados",
+      "moment": "entrada",
+      "frame": 330,
+      "position": "in",
+      "seconds": 11,
+      "tags": {
+        "storyboard": "juros-technical-9x16",
+        "segmentsHash": "c6fcb845"
+      },
+      "file": "still-006.png"
+    },
+    {
+      "sceneId": "dados",
+      "moment": "meio",
+      "frame": 394,
+      "position": "mid",
+      "seconds": 13.133,
+      "tags": {
+        "storyboard": "juros-technical-9x16",
+        "segmentsHash": "c6fcb845"
+      },
+      "file": "still-007.png"
+    },
+    {
+      "sceneId": "dados",
+      "moment": "saida",
+      "frame": 479,
+      "position": "out",
+      "seconds": 15.967,
+      "tags": {
+        "storyboard": "juros-technical-9x16",
+        "segmentsHash": "c6fcb845"
+      },
+      "file": "still-008.png"
+    },
+    {
+      "sceneId": "versus",
+      "moment": "entrada",
+      "frame": 515,
+      "position": "in",
+      "seconds": 17.167,
+      "tags": {
+        "storyboard": "juros-technical-9x16",
+        "segmentsHash": "c6fcb845"
+      },
+      "file": "still-009.png"
+    },
+    {
+      "sceneId": "versus",
+      "moment": "meio",
+      "frame": 539,
+      "position": "mid",
+      "seconds": 17.967,
+      "tags": {
+        "storyboard": "juros-technical-9x16",
+        "segmentsHash": "c6fcb845"
+      },
+      "file": "still-010.png"
+    },
+    {
+      "sceneId": "versus",
+      "moment": "saida",
+      "frame": 587,
+      "position": "out",
+      "seconds": 19.567,
+      "tags": {
+        "storyboard": "juros-technical-9x16",
+        "segmentsHash": "c6fcb845"
+      },
+      "file": "still-011.png"
+    },
+    {
+      "sceneId": "regra",
+      "moment": "entrada",
+      "frame": 623,
+      "position": "in",
+      "seconds": 20.767,
+      "tags": {
+        "storyboard": "juros-technical-9x16",
+        "segmentsHash": "c6fcb845"
+      },
+      "file": "still-012.png"
+    },
+    {
+      "sceneId": "regra",
+      "moment": "meio",
+      "frame": 653,
+      "position": "mid",
+      "seconds": 21.767,
+      "tags": {
+        "storyboard": "juros-technical-9x16",
+        "segmentsHash": "c6fcb845"
+      },
+      "file": "still-013.png"
+    },
+    {
+      "sceneId": "regra",
+      "moment": "saida",
+      "frame": 707,
+      "position": "out",
+      "seconds": 23.567,
+      "tags": {
+        "storyboard": "juros-technical-9x16",
+        "segmentsHash": "c6fcb845"
+      },
+      "file": "still-014.png"
+    }
+  ],
+  "contactSheets": [
+    {
+      "path": "contact-sheet-00.jpg",
+      "frames": [
+        33,
+        51,
+        97,
+        129,
+        203,
+        297,
+        330,
+        394,
+        479,
+        515,
+        539,
+        587,
+        623,
+        653,
+        707
+      ]
+    }
+  ],
+  "storyboard": {
+    "qa": {
+      "ok": true,
+      "errors": [],
+      "warnings": [],
+      "checks": {
+        "layers": 11,
+        "textLayers": 8,
+        "minTextUnits": 3.52,
+        "minContrast": 7.383,
+        "scenes": 5
+      }
+    },
+    "manifest": {
+      "engine": "remotion-storyboard",
+      "version": 1,
+      "treatment": "technical",
+      "scenes": [
+        {
+          "id": "definicao",
+          "name": "Definição",
+          "start": 0,
+          "end": 3.433,
+          "camera": {
+            "layout": "split-top",
+            "from": "full",
+            "zoomKeyframes": 2
+          },
+          "transition": "wipe 0.4s",
+          "background": "grid",
+          "layers": [
+            {
+              "id": "eq",
+              "type": "text",
+              "start": 0.3,
+              "end": 3.367,
+              "placement": "panel-top",
+              "source": "speech",
+              "effects": [
+                "enter:typewriter",
+                "exit:fade",
+                "kinetic:typewriter"
+              ]
+            },
+            {
+              "id": "sub",
+              "type": "text",
+              "start": 0.5,
+              "end": 3.367,
+              "placement": "panel-bottom",
+              "source": "speech",
+              "effects": [
+                "enter:wipe",
+                "exit:fade",
+                "mask:wipeLeft",
+                "kinetic:static"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ciclo",
+          "name": "Ciclo",
+          "start": 3.433,
+          "end": 10.1,
+          "camera": {
+            "layout": "hidden",
+            "from": "split-top",
+            "zoomKeyframes": 0
+          },
+          "transition": "iris 0.5s",
+          "background": "grid",
+          "layers": [
+            {
+              "id": "titulo",
+              "type": "chapter",
+              "start": 3.5,
+              "end": 10.033,
+              "placement": "top-left",
+              "source": "design",
+              "effects": [
+                "enter:wipe",
+                "exit:fade"
+              ]
+            },
+            {
+              "id": "fluxo",
+              "type": "process",
+              "start": 3.633,
+              "end": 10.033,
+              "placement": "box",
+              "source": "speech",
+              "effects": [
+                "enter:none",
+                "exit:fade",
+                "reveal:3"
+              ]
+            },
+            {
+              "id": "laco",
+              "type": "arrow",
+              "start": 8.833,
+              "end": 10.033,
+              "placement": "box",
+              "source": "design",
+              "effects": [
+                "enter:draw",
+                "exit:fade"
+              ]
+            },
+            {
+              "id": "nota",
+              "type": "callout",
+              "start": 8.6,
+              "end": 10.033,
+              "placement": "box",
+              "source": "design",
+              "effects": [
+                "enter:fade",
+                "exit:fade"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "dados",
+          "name": "Dados",
+          "start": 10.1,
+          "end": 16.167,
+          "camera": {
+            "layout": "hidden",
+            "from": "hidden",
+            "zoomKeyframes": 0
+          },
+          "transition": "push 0.4s",
+          "background": "grid",
+          "layers": [
+            {
+              "id": "print",
+              "type": "image",
+              "start": 10.2,
+              "end": 16.1,
+              "placement": "panel-top",
+              "source": "design",
+              "effects": [
+                "enter:fade",
+                "exit:fade"
+              ],
+              "assetId": "planilha"
+            },
+            {
+              "id": "foco",
+              "type": "spotlight",
+              "start": 11.3,
+              "end": 13,
+              "placement": "full",
+              "source": "design",
+              "effects": [
+                "enter:fade",
+                "exit:fade"
+              ]
+            },
+            {
+              "id": "barras",
+              "type": "bars",
+              "start": 12.4,
+              "end": 16.1,
+              "placement": "panel-bottom",
+              "source": "brief",
+              "effects": [
+                "enter:none",
+                "exit:fade",
+                "reveal:2"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "versus",
+          "name": "Simples x compostos",
+          "start": 16.167,
+          "end": 19.767,
+          "camera": {
+            "layout": "split-top",
+            "from": "hidden",
+            "zoomKeyframes": 2
+          },
+          "transition": "wipe 0.35s",
+          "background": "grid",
+          "layers": [
+            {
+              "id": "compare",
+              "type": "compare",
+              "start": 16.367,
+              "end": 19.667,
+              "placement": "panel",
+              "source": "brief",
+              "effects": [
+                "enter:none",
+                "exit:fade",
+                "reveal:2"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "regra",
+          "name": "Regra",
+          "start": 19.767,
+          "end": 23.767,
+          "camera": {
+            "layout": "full",
+            "from": "split-top",
+            "zoomKeyframes": 2
+          },
+          "transition": "fade 0.3s",
+          "background": "none",
+          "layers": [
+            {
+              "id": "cedo",
+              "type": "text",
+              "start": 19.967,
+              "end": 23.733,
+              "placement": "top",
+              "source": "speech",
+              "effects": [
+                "enter:typewriter",
+                "exit:fade",
+                "kinetic:typewriter"
+              ]
+            }
+          ]
+        }
+      ],
+      "assets": [
+        {
+          "id": "planilha",
+          "kind": "image",
+          "role": "screenshot",
+          "sha256": "6520e457e987c9357678266ed67f2bf697ab5a4ceb48f5da4e53d0735f35e245",
+          "verified": true
+        }
+      ],
+      "sfx": [
+        {
+          "kind": "tick",
+          "at": 3.45,
+          "gainDb": -24
+        },
+        {
+          "kind": "tick",
+          "at": 10.13,
+          "gainDb": -24
+        },
+        {
+          "kind": "whoosh",
+          "at": 16.2,
+          "gainDb": -24
+        }
+      ],
+      "dropped": [],
+      "qa": {
+        "ok": true,
+        "errors": [],
+        "warnings": [],
+        "checks": {
+          "layers": 11,
+          "textLayers": 8,
+          "minTextUnits": 3.52,
+          "minContrast": 7.383,
+          "scenes": 5
+        }
+      },
+      "counts": {
+        "scenes": 5,
+        "layers": 11,
+        "transitions": 5,
+        "sfx": 3
+      },
+      "source": {
+        "sha256": "3209893baa8e29442115932476d679afb6be61b165516fbe9c0a2e7ee3593896",
+        "fps": 30,
+        "width": 1080,
+        "height": 1920,
+        "rotation": 0,
+        "colorTransfer": null
+      },
+      "compositionSha256": "89f4d9caa4897b1d6e310339fa389bd2c621cbc006e49787cab99ba4902cb51d"
+    }
+  }
+}

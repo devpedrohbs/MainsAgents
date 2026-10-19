@@ -62,3 +62,20 @@ test('media row distinguishes unchecked, failed check and missing tools',()=>{
  assert.equal(mediaRow({ffmpeg:true,ffprobe:false},true,true).level,'attention');
  assert.equal(mediaRow(null,true,true).facts[0].state,'unknown');
 });
+
+test('executor row separates a real sandboxed command from sign-in and explains the recorded failure',async()=>{
+ const {executorRow}=await import('../src/features/chat/runtimeDiagnosticsView.ts');
+ assert.equal(executorRow(null,'',false,true).level,'unchecked');
+ const unreachable=executorRow(null,'Codex is unavailable.',true,false);
+ assert.equal(unreachable.level,'attention');assert.equal(unreachable.facts[0].state,'unknown');assert.match(unreachable.next.text,/Test executor again/);
+ const ready=executorRow({ready:true,desktopIsolation:{localAppDataIsolated:true,disabledDesktopMcpServers:['node_repl']}},'',true,true);
+ assert.equal(ready.level,'ready');assert.deepEqual(ready.facts.map(f=>f.state),['yes','yes']);assert.match(ready.facts[1].value,/node_repl desativado\(s\) só neste app/);
+ const generic=executorRow({ready:false,error:'Sandboxed probe exited with code 1: denied'},'',true,true);
+ assert.equal(generic.facts[0].value,'Sandboxed probe exited with code 1: denied');assert.match(generic.next.text,/não consegue rodar comandos locais/);
+});
+
+test('a sandbox still being prepared is not proven, not failed',async()=>{
+ const {executorRow}=await import('../src/features/chat/runtimeDiagnosticsView.ts');
+ const slow=executorRow({ready:false,state:'slow',error:'The sandboxed probe did not answer within 180 s.'},'',true,true);
+ assert.equal(slow.level,'unverified');assert.equal(slow.facts[0].state,'unknown');assert.match(slow.facts[0].value,/preparando o sandbox/);assert.match(slow.next.text,/Aguarde/);
+});

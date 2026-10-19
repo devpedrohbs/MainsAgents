@@ -1,0 +1,69 @@
+{
+  "subject": "juros",
+  "format": "portrait",
+  "author": "Claude (mesmo assunto do editorial, mas estrutura diferente: diagrama com laço de realimentação, gráfico e spotlight no print)",
+  "storyboard": {
+    "version": 1,
+    "title": "Juros compostos (blueprint)",
+    "timeline": {"basis": "output", "segmentsHash": "c6fcb845"},
+    "style": {"treatment": "technical", "accent2": "#a3e635"},
+    "assets": [{"id": "planilha", "kind": "image", "sha256": "6520e457e987c9357678266ed67f2bf697ab5a4ceb48f5da4e53d0735f35e245", "role": "screenshot"}],
+    "scenes": [
+      {
+        "id": "definicao", "name": "Definição", "start": 0, "end": 3.426,
+        "camera": {"layout": "split-top", "zoom": [{"t": 0, "v": 1.15}, {"t": 3.4, "v": 1.08}]},
+        "background": {"kind": "grid", "tone": "bg"},
+        "transitionIn": {"kind": "wipe", "seconds": 0.4, "direction": "down"},
+        "layers": [
+          {"id": "eq", "type": "text", "text": "juros = juros sobre juros", "role": "title", "mode": "typewriter", "slot": "panel-top", "start": 0.3, "end": 3.35, "align": "left", "style": {"color": "accent"}, "enter": "typewriter", "source": "speech", "quote": "juros sobre juros"},
+          {"id": "sub", "type": "text", "text": "Juros compostos", "role": "label", "mode": "static", "slot": "panel-bottom", "start": 0.5, "end": 3.35, "align": "left", "style": {"color": "muted"}, "mask": {"kind": "wipeLeft", "seconds": 0.4}, "source": "speech", "quote": "Juros compostos"}
+        ]
+      },
+      {
+        "id": "ciclo", "name": "Ciclo", "start": 3.426, "end": 10.109,
+        "camera": {"layout": "hidden"},
+        "background": {"kind": "grid", "tone": "bg"},
+        "transitionIn": {"kind": "iris", "seconds": 0.5},
+        "layers": [
+          {"id": "titulo", "type": "chapter", "index": 1, "text": "O ciclo", "slot": "top-left", "start": 0.05, "end": 6.6, "source": "design"},
+          {"id": "fluxo", "type": "process", "nodes": ["Você investe", "Rendimento entra no saldo", "Rende sobre o total"], "box": {"x": 0.1, "y": 0.29, "w": 0.66, "h": 0.34}, "start": 0.2, "end": 6.6, "reveal": [0.17, 1.87, 5.13], "enter": "none", "source": "speech", "quote": "rende sobre o total"},
+          {"id": "laco", "type": "arrow", "from": {"x": 0.5, "y": 0.95}, "to": {"x": 0.5, "y": 0.05}, "box": {"x": 0.78, "y": 0.3, "w": 0.14, "h": 0.32}, "start": 5.4, "end": 6.6, "enter": {"preset": "draw", "seconds": 0.8, "ease": "out"}, "color": "accent2", "source": "design"},
+          {"id": "nota", "type": "callout", "text": "o total volta a render", "target": {"x": 0.85, "y": 0.31}, "box": {"x": 0.52, "y": 0.17, "w": 0.42, "h": 0.08}, "start": 5.15, "end": 6.6, "enter": "fade", "source": "design"}
+        ]
+      },
+      {
+        "id": "dados", "name": "Dados", "start": 10.109, "end": 16.182,
+        "camera": {"layout": "hidden"},
+        "background": {"kind": "grid", "tone": "bg"},
+        "transitionIn": {"kind": "push", "seconds": 0.4, "direction": "left"},
+        "layers": [
+          {"id": "print", "type": "image", "assetId": "planilha", "frame": "browser", "fit": "contain", "slot": "panel-top", "start": 0.1, "end": 6.0, "enter": "fade", "source": "design"},
+          {"id": "foco", "type": "spotlight", "target": {"x": 0.6, "y": 0.22, "w": 0.22, "h": 0.12}, "dim": 0.55, "start": 1.2, "end": 2.9, "enter": {"preset": "fade", "seconds": 0.4}, "exit": "fade", "source": "design"},
+          {"id": "barras", "type": "bars", "values": [{"label": "Hoje", "value": 1000, "unit": "R$"}, {"label": "Em um ano", "value": 1127, "unit": "R$"}], "slot": "panel-bottom", "start": 2.3, "end": 6.0, "reveal": [0.2, 0.9], "enter": "none", "source": "brief", "quote": "mil reais viram mil cento e vinte e sete em um ano"}
+        ]
+      },
+      {
+        "id": "versus", "name": "Simples x compostos", "start": 16.182, "end": 19.758,
+        "camera": {"layout": "split-top", "zoom": [{"t": 0, "v": 1.05}, {"t": 3.5, "v": 1.12}]},
+        "background": {"kind": "grid", "tone": "bg"},
+        "transitionIn": {"kind": "wipe", "seconds": 0.35, "direction": "up"},
+        "layers": [
+          {"id": "compare", "type": "compare", "before": {"label": "Simples", "text": "R$ 1.120"}, "after": {"label": "Compostos", "text": "R$ 1.127"}, "slot": "panel", "start": 0.2, "end": 3.5, "reveal": [0.2, 1.2], "enter": "none", "source": "brief", "quote": "Nos juros simples seriam mil cento e vinte"}
+        ]
+      },
+      {
+        "id": "regra", "name": "Regra", "start": 19.758, "end": 23.781,
+        "camera": {"layout": "full", "zoom": [{"t": 0, "v": 1}, {"t": 0.9, "v": 1.1, "ease": "out"}]},
+        "transitionIn": {"kind": "fade", "seconds": 0.3},
+        "layers": [
+          {"id": "cedo", "type": "text", "text": "Comece cedo", "role": "headline", "mode": "typewriter", "slot": "top", "start": 0.2, "end": 3.95, "style": {"background": "scrim", "color": "accent"}, "enter": "typewriter", "source": "speech", "quote": "Comece cedo"}
+        ]
+      }
+    ],
+    "sfx": [
+      {"kind": "tick", "at": 3.45, "gainDb": -24},
+      {"kind": "tick", "at": 10.13, "gainDb": -24},
+      {"kind": "whoosh", "at": 16.2, "gainDb": -24}
+    ]
+  }
+}

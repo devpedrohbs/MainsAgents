@@ -1,0 +1,67 @@
+/* Edit requested in the chat: status card, explicit choices, window preview and composer attachments. Tokens only (light/dark). */
+.chat-edit-card{display:grid;gap:8px;margin-top:8px;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface);color:var(--fg);font-size:13px;min-width:0;max-width:100%}
+.chat-edit-card.tone-done{border-color:color-mix(in oklab,var(--success),var(--border) 55%)}
+.chat-edit-card.tone-attention{border-color:color-mix(in oklab,var(--warn),var(--border) 40%)}
+.chat-edit-card.tone-error{border-color:color-mix(in oklab,var(--danger),var(--border) 45%)}
+.chat-edit-head{display:flex;align-items:center;flex-wrap:wrap;gap:6px 8px;min-width:0;line-height:1.35}
+.chat-edit-head b{font-weight:600;overflow-wrap:anywhere}
+.chat-edit-dot{flex:0 0 8px;width:8px;height:8px;border-radius:50%;background:var(--accent)}
+.tone-progress .chat-edit-dot{animation:chat-edit-pulse 1.2s var(--ease-standard) infinite}
+.tone-done .chat-edit-dot{background:var(--success)}
+.tone-attention .chat-edit-dot{background:var(--warn)}
+.tone-error .chat-edit-dot{background:var(--danger)}
+@keyframes chat-edit-pulse{50%{opacity:.35}}
+@media (prefers-reduced-motion:reduce){.tone-progress .chat-edit-dot{animation:none}}
+.chat-edit-window{padding:0 7px;border:1px solid var(--border);border-radius:var(--radius-pill);color:var(--muted);font-size:11.5px;line-height:20px;white-space:nowrap}
+.chat-edit-detail{margin:0;color:var(--muted);line-height:1.45;overflow-wrap:anywhere}
+.chat-edit-progress{height:6px;border-radius:var(--radius-pill);background:color-mix(in oklab,var(--fg),transparent 90%);overflow:hidden}
+.chat-edit-progress span{display:block;height:100%;background:var(--accent);transition:width var(--motion-base) var(--ease-standard)}
+.chat-edit-choices,.chat-edit-actions{display:flex;flex-wrap:wrap;gap:6px;min-width:0}
+.chat-edit-choices button{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chat-edit-card button:focus-visible{outline:none;box-shadow:var(--focus-ring)}
+.chat-edit-cta{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-top:6px;font-size:12px;color:var(--muted)}
+.chat-adjust-preview{display:grid;gap:4px;margin:8px 0 0;max-width:min(100%,420px)}
+.chat-adjust-preview video{width:100%;max-height:320px;border-radius:var(--radius-sm);background:#000}
+.chat-adjust-preview figcaption{font-size:12px;color:var(--muted)}
+.chat-message-attachments{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.chat-message-attachments span{max-width:100%;padding:1px 8px;border:1px solid var(--border);border-radius:var(--radius-pill);font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.composer-attachments{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:0 0 6px;font-size:12px;min-width:0}
+.composer-attachments>span{color:var(--muted)}
+.composer-attachments button{display:inline-flex;align-items:center;gap:6px;max-width:100%;height:24px;padding:0 8px;border:1px solid var(--border);border-radius:var(--radius-pill);background:transparent;color:var(--fg);font:inherit;font-size:12px;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.composer-attachments button:hover,.composer-attachments button:focus-visible{border-color:var(--accent);outline:none;box-shadow:var(--focus-ring)}
+.composer.is-dropping{outline:2px dashed var(--accent);outline-offset:2px}
+.composer-attach{height:28px;padding:0 10px;border:1px solid var(--border);border-radius:var(--radius-pill);background:transparent;color:var(--fg);font:inherit;font-size:12px;cursor:pointer;white-space:nowrap}
+.composer-attach:hover,.composer-attach:focus-visible{border-color:var(--accent);color:var(--accent);outline:none;box-shadow:var(--focus-ring)}
+@media (max-width:480px){.chat-edit-card{padding:9px 10px}.chat-edit-choices button{flex:1 1 100%}}
+/* The edit journey stays usable when the desktop sidebar is collapsed on a narrow window. */
+@media (max-width:760px){
+ .studio-shell .chat-layer:not(.floating):has(.composer-attach){left:0;right:0;width:100%;max-width:100vw}
+}
+/* Camera + screen pair (composer roles, card facts, manual offset) and provider usage-limit wait. Tokens only. */
+.composer-pair{display:grid;gap:6px;margin:0 0 6px;padding:8px 10px;border:1px solid var(--border);border-radius:var(--radius-md);min-width:0;font-size:12px}
+.composer-pair legend{padding:0 4px;color:var(--muted)}
+.composer-pair-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px;min-width:0}
+.composer-pair-row>span{flex:1 1 140px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.composer-role{display:inline-flex;align-items:center;gap:4px;height:24px;padding:0 9px;border:1px solid var(--border);border-radius:var(--radius-pill);cursor:pointer;color:var(--fg)}
+.composer-role input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+.composer-role.is-on{border-color:var(--accent);background:color-mix(in oklab,var(--accent),transparent 86%);color:var(--fg);font-weight:600}
+.composer-role:has(input:focus-visible){box-shadow:var(--focus-ring)}
+.composer-pair-options{display:flex;flex-wrap:wrap;gap:8px;min-width:0}
+.composer-pair-options label{display:grid;gap:2px;flex:1 1 160px;min-width:0;color:var(--muted)}
+.composer-pair-options select{min-width:0;max-width:100%;height:28px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--fg);font:inherit}
+.composer-pair-options select:focus-visible{outline:none;box-shadow:var(--focus-ring)}
+.composer-pair-hint{margin:0;color:var(--warn)}
+.composer-provider-wait{margin:0 0 6px;padding:6px 10px;border:1px solid color-mix(in oklab,var(--warn),var(--border) 40%);border-radius:var(--radius-sm);color:var(--fg);font-size:12px;line-height:1.4;overflow-wrap:anywhere}
+.chat-attachment-role{font-style:normal;color:var(--fg)}
+.chat-edit-pair{margin:0;font-size:12px;color:var(--fg);line-height:1.45;overflow-wrap:anywhere}
+.chat-edit-wait{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));gap:8px;font-size:12px;min-width:0}
+.chat-edit-wait ul{margin:4px 0 0;padding-left:18px;color:var(--muted)}
+.chat-edit-wait li{overflow-wrap:anywhere}
+.chat-edit-sync{display:grid;gap:6px;min-width:0;font-size:12px}
+.chat-edit-sync label{color:var(--fg);line-height:1.4}
+.chat-edit-sync-row{display:flex;flex-wrap:wrap;gap:6px;min-width:0}
+.chat-edit-sync-row input{flex:0 1 110px;min-width:80px;height:28px;padding:0 8px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--fg);font:inherit}
+.chat-edit-sync-row input:focus-visible{outline:none;box-shadow:var(--focus-ring);border-color:var(--accent)}
+.chat-edit-facts{margin:0;color:var(--muted);overflow-wrap:anywhere}
+.chat-edit-warn{margin:0;color:var(--warn);overflow-wrap:anywhere}
+@media (max-width:480px){.chat-edit-sync-row>*{flex:1 1 100%}}

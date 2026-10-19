@@ -16,7 +16,9 @@ const executionFields=['id','name','role','instructions','workspaceId','provider
 const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().filter(key=>value[key]!==undefined).map(key=>[key,canonical(value[key])])):value;
 const ref=agent=>agent?canonical({...Object.fromEntries(executionFields.map(key=>[key,agent[key]])),providerId:agent.providerId??'codex'}):null;
 
-export function productionPreflight({workspaceId,flow,agents=[],topic,topicCurrent=true,notion,notionDestination,scriptMode='notion',runtime,providers={},media,budget,entry}={},{locale='pt-BR'}={}){
+// Same ranges as editor-authoring.mjs normalizeEditorLimits (kept here so the preflight stays free of Node imports).
+const editorLimitRanges={maxRevisions:[0,5],maxPreviews:[0,8]};
+export function productionPreflight({workspaceId,flow,agents=[],topic,topicCurrent=true,notion,notionDestination,scriptMode='notion',runtime,providers={},media,budget,entry,editorLimits}={},{locale='pt-BR'}={}){
  // Content sessions: a video already recorded enters at editing with a chosen card (read-only) or pasted context.
  const recorded=entry?.kind==='recorded',local=scriptMode==='local'||recorded;
  const pt=locale!=='en-US',checks=[],add=(id,stage,level,ptText,enText)=>checks.push({id,stage,level,message:pt?ptText:enText});
@@ -65,6 +67,15 @@ export function productionPreflight({workspaceId,flow,agents=[],topic,topicCurre
  if(recorded)add('recording','recording',entry.video?'ok':'blocker',entry.video?'Vídeo já gravado associado: a edição começa direto, sem nova gravação.':'Associe o vídeo já gravado deste conteúdo.',entry.video?'Recorded video attached: editing starts directly, no new recording.':'Attach this content’s recorded video.');
  else add('recording','recording','ok',local?'A gravação não é necessária agora: adicione o vídeo depois de aprovar o roteiro.':'A gravação não é necessária agora: adicione o vídeo depois do card.',local?'No recording is needed now: add the video after approving the script.':'No recording is needed now: add the video after the card.');
  role('editor-agent','edit',editor,{pt:'Editor de vídeo',en:'Video editor'},'Configure os agentes de conteúdo e vídeo neste fluxo.','Configure content and video agents in this flow.');
+ // Claude as editor: bound local editor tools (frames, plan, preview, final receipt) instead of a blind text plan; never shell or file writes.
+ if(editor&&providerOf(editor)==='claude'){
+  const value=status('claude'),limits={maxRevisions:2,maxPreviews:3,...(editorLimits??{})};
+  const bad=Object.entries(editorLimitRanges).find(([key,[min,max]])=>!Number.isInteger(limits[key])||limits[key]<min||limits[key]>max);
+  if(bad)add('editor-limits','edit','blocker',`Limite do editor inválido: ${bad[0]} deve ficar entre ${bad[1][0]} e ${bad[1][1]}.`,`Invalid editor limit: ${bad[0]} must be between ${bad[1][0]} and ${bad[1][1]}.`);
+  if(value===undefined)add('editor-tools','edit','unverified','As ferramentas locais do editor Claude são verificadas ao iniciar a edição.','Claude editor local tools are checked when editing starts.');
+  else if(value.available&&value.editorTools)add('editor-tools','edit','ok',`Claude dirige a edição com ferramentas locais desta produção: frames reais da fonte, plano de motion, prévia curta e recibo do arquivo final verificado pelo app. Até ${limits.maxRevisions} correção(ões) e ${limits.maxPreviews} prévia(s); sem terminal, escrita de arquivos ou publicação.`,`Claude directs the edit with this production's local tools: real source frames, motion plan, short preview and a final file receipt verified by the app. Up to ${limits.maxRevisions} correction(s) and ${limits.maxPreviews} preview(s); no terminal, file writing or publishing.`);
+  else if(value.available)add('editor-tools','edit','warning','Este app não oferece as ferramentas locais de edição ao Claude: ele não verá frames nem prévias desta edição.','This app does not offer the local editing tools to Claude: it will not see frames or previews of this edit.');
+ }
  if(media===undefined)add('ffmpeg','edit','unverified','FFmpeg/ffprobe não verificados; são necessários na edição e nas capas.','FFmpeg/ffprobe not checked; they are needed for editing and covers.');
  else if(!media.ffmpeg||!media.ffprobe)add('ffmpeg','edit','warning','FFmpeg/ffprobe indisponível neste PC: roteiro e card funcionam, mas a edição vai parar até a instalação.','FFmpeg/ffprobe unavailable on this PC: script and card work, but editing will stop until installed.');
  else add('ffmpeg','edit','ok','FFmpeg e ffprobe disponíveis.','FFmpeg and ffprobe available.');
@@ -76,6 +87,6 @@ export function productionPreflight({workspaceId,flow,agents=[],topic,topicCurre
  else add('cover-generation','package','ok','Capas locais: três alternativas por formato com FFmpeg, sem IA nem quota.','Local covers: three alternatives per format with FFmpeg, no AI or quota.');
  add('publishing-accounts','schedule','unverified','Contas Zernio/Publora são consultadas somente quando você pedir, na etapa de agendamento.','Zernio/Publora accounts are only checked when you ask, at the scheduling stage.');
  const by=level=>checks.filter(c=>c.level===level);
- const fingerprint=fnv(JSON.stringify(canonical({flow:flow?.id??null,workspace:space??null,source:ref(source),editor:ref(editor),publisher:ref(publisher),topic:topic?{id:topic.id,status:topic.status,updatedAt:topic.updatedAt??null}:null,providers:Object.fromEntries(used.map(id=>[id,status(id)?{available:!!status(id).available,auth:status(id).auth??'unverified'}:'unread'])),...(recorded?{entry:canonical(entry)}:{}),...(local?{mode:'local'}:{}),notion:local?'local':{destination:notionDestination??null,config:notion===undefined?'unread':canonical({autoSync:!!notion?.autoSync,dataSourceId:notion?.dataSourceId??null})}})));
+ const fingerprint=fnv(JSON.stringify(canonical({flow:flow?.id??null,workspace:space??null,source:ref(source),editor:ref(editor),publisher:ref(publisher),topic:topic?{id:topic.id,status:topic.status,updatedAt:topic.updatedAt??null}:null,providers:Object.fromEntries(used.map(id=>[id,status(id)?{available:!!status(id).available,auth:status(id).auth??'unverified'}:'unread'])),...(recorded?{entry:canonical(entry)}:{}),...(local?{mode:'local'}:{}),...(editorLimits?{editorLimits:canonical(editorLimits)}:{}),notion:local?'local':{destination:notionDestination??null,config:notion===undefined?'unread':canonical({autoSync:!!notion?.autoSync,dataSourceId:notion?.dataSourceId??null})}})));
  return {ready:!by('blocker').length,fingerprint,checks,blockers:by('blocker'),warnings:by('warning'),unverified:by('unverified')};
 }

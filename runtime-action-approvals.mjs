@@ -1,6 +1,12 @@
 import {createHash,randomUUID} from 'node:crypto';
 import {classifyMcpAction,permittedMcpAction} from './runtime-tool-policy.mjs';
 import {notionAutomaticDecision} from './notion-automation-policy.mjs';
+import {paperAutomaticDecision} from './paper-design.mjs';
+import {publishingAutomaticDecision} from './publishing-automation.mjs';
+
+/** Saved per-agent user preferences (never model arguments) that may answer a live call without a prompt. */
+const preferenceDecision=(agent,server,tool,args)=>notionAutomaticDecision(agent,server,tool,args)||paperAutomaticDecision(agent,server,tool,args)||publishingAutomaticDecision(agent,server,tool,args);
+const preferenceSource=server=>server==='paper'?'paper-preference':server==='notion'?'notion-preference':'publishing-preference';
 
 const canonical=value=>value&&typeof value==='object'?Array.isArray(value)?value.map(canonical):Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])])):value;
 export const actionHash=value=>createHash('sha256').update(JSON.stringify(canonical(value))).digest('hex');
@@ -32,11 +38,11 @@ export function createRuntimeActionApprovals(db,{getCurrentProfile,getBinding,ti
   const id=randomUUID(),hash=actionHash(payload),now=new Date().toISOString();
   db.prepare('INSERT INTO runtime_actions VALUES (?,?,?,?,?,?,?,?)').run(id,binding.profileId,hash,'pending',JSON.stringify(payload),null,now,now);
   if(!permittedMcpAction(binding.agent,category)){update(id,'denied',`This agent does not permit ${category} MCP actions. Review its permissions before preparing a new call.`);reply({action:'decline',content:null});return id;}
-  const automaticReason=notionAutomaticDecision(binding.agent,p.serverName,tool,meta.tool_params);
+  const automaticReason=preferenceDecision(binding.agent,p.serverName,tool,meta.tool_params);
   if(automaticReason){
    const current=resolveBinding?resolveBinding():getBinding?.(p.threadId);
-   if((resolveBinding||getBinding)&&(!current||current.profileId!==binding.profileId||current.hash!==binding.hash||!permittedMcpAction(current.agent,category)||!notionAutomaticDecision(current.agent,p.serverName,tool,meta.tool_params))){update(id,'interrupted','The Notion preference or agent changed. Prepare a new call.');reply({action:'decline',content:null});return id;}
-   db.prepare('UPDATE runtime_actions SET payload_json=? WHERE id=?').run(JSON.stringify({...payload,approvalSource:'notion-preference',automaticReason}),id);
+   if((resolveBinding||getBinding)&&(!current||current.profileId!==binding.profileId||current.hash!==binding.hash||!permittedMcpAction(current.agent,category)||!preferenceDecision(current.agent,p.serverName,tool,meta.tool_params))){update(id,'interrupted','The saved tool preference or agent changed. Prepare a new call.');reply({action:'decline',content:null});return id;}
+   db.prepare('UPDATE runtime_actions SET payload_json=? WHERE id=?').run(JSON.stringify({...payload,approvalSource:preferenceSource(server),automaticReason}),id);
    update(id,'approved');reply({action:'accept',content:{}});return id;
   }
   const timer=setTimeout(()=>cancel(id,'Approval expired. Ask the agent to prepare the action again.'),timeoutMs);timer.unref?.();

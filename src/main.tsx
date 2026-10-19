@@ -19,6 +19,7 @@ import '@xyflow/react/dist/style.css';
 import './styles/refined-workspace.css';
 import './styles/precision.css';
 import './styles/chat-precision.css';
+import './styles/content-scopes.css';
 
 const root=document.getElementById('root');
 if(!root)throw new Error('Missing #root element');

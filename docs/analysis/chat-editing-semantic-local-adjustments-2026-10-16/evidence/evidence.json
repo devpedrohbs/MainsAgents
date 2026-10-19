@@ -1,0 +1,95 @@
+{
+ "kind": "real-render",
+ "renderer": {
+  "remotion": true,
+  "ffmpeg": true
+ },
+ "fixture": "synthetic testsrc2 + sine 440 Hz, 6 s, 320x180@24",
+ "simulated": [
+  "editor decisions (script calling the real tools)",
+  "no transcription"
+ ],
+ "editSeconds": 45,
+ "adjustSeconds": 31,
+ "request": {
+  "status": "started",
+  "window": {
+   "start": 2,
+   "end": 4
+  }
+ },
+ "structural": {
+  "kind": "resolved-props",
+  "fps": 24,
+  "windowFrames": {
+   "from": 48,
+   "to": 96
+  },
+  "outsideScenesCompared": 2,
+  "changedScenes": [
+   "metodo"
+  ]
+ },
+ "changedScenes": [
+  "metodo"
+ ],
+ "proof": {
+  "segmentsHash": "e5966c60",
+  "sameSegments": true,
+  "sourceOutputMap": [
+   {
+    "sourceStart": 0,
+    "sourceEnd": 6,
+    "outputStart": 0,
+    "outputEnd": 6
+   }
+  ],
+  "sameSourceOutputMap": true,
+  "srtDocumentsHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+  "sameSrtDocuments": true,
+  "audioCopied": true,
+  "audioMd5": "d3bcd8f5fed90ab16de32c8942bc08c9",
+  "sameAudio": true,
+  "durationDelta": 0,
+  "sameFps": true,
+  "sameTimebase": true,
+  "sameAudioTiming": true,
+  "sameSize": true,
+  "timelineCompatible": true
+ },
+ "audio": {
+  "base": "d3bcd8f5fed90ab16de32c8942bc08c9",
+  "adjusted": "d3bcd8f5fed90ab16de32c8942bc08c9"
+ },
+ "files": {
+  "base": {
+   "sha256": "2ab32fdf9e69ee771220b6ea1bfd231d746b82547ab4f169e72cdf418bf7b73d",
+   "path": "base-editado.mp4"
+  },
+  "adjusted": {
+   "sha256": "b8f8b9f89073c6eaa1439c06e0e746b426b006b7475d8383269e47faea87e417",
+   "path": "ajuste-versao-2.mp4"
+  },
+  "bothExist": true
+ },
+ "preview": {
+  "sha256": "57a4126213ee1eafaa6bffb6693c9d9668dfbfa6d83a72882e6b90e9359d08d8",
+  "start": 2,
+  "duration": 2,
+  "bytes": 169225
+ },
+ "frames": {
+  "1s": {
+   "psnrDb": "inf",
+   "outsideWindow": true
+  },
+  "3s": {
+   "psnrDb": 15.97,
+   "outsideWindow": false
+  },
+  "5s": {
+   "psnrDb": 38.06,
+   "outsideWindow": true
+  }
+ }
+}

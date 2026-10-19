@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, renameSync, statSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { prepareCodexRuntimeHome, importLegacyCodexThread, standaloneCodexEnvironment } from '../codex-runtime-home.mjs';
+import { prepareCodexRuntimeHome, importLegacyCodexThread, standaloneCodexEnvironment, desktopRuntimeIsolation } from '../codex-runtime-home.mjs';
 import { codexSecretCredentialTarget } from '../codex-shared-key.mjs';
 
 function fixture(t) {
@@ -112,4 +112,58 @@ test('unsafe shared history paths and independent connection files are refused w
   assert.throws(() => f.runtime(), /preserved/);
   assert.equal(readFileSync(join(f.home, 'auth.json'), 'utf8'), 'independent');
   assert.equal(readFileSync(join(f.sharedHome, 'auth.json'), 'utf8'), 'shared');
+});
+
+const desktopConfig = String.raw`model = "gpt"
+notify = [ "C:\\Users\\me\\AppData\\Local\\OpenAI\\Codex\\runtimes\\cua_node\\abc\\bin\\codex-computer-use.exe", "turn-ended" ]
+
+[mcp_servers.node_repl]
+command = 'C:\Users\me\AppData\Local\OpenAI\Codex\runtimes\cua_node\abc\bin\node_repl.exe'
+
+[mcp_servers.node_repl.env]
+NODE_REPL_NODE_PATH = 'C:\Users\me\AppData\Local\OpenAI\Codex\runtimes\cua_node\abc\bin\node.exe'
+
+[mcp_servers.publora]
+url = "https://mcp.publora.com"
+
+[mcp_servers.local_tool]
+command = "C:\\Tools\\my-mcp.exe"
+`;
+const localAppData = 'C:\\Users\\me\\AppData\\Local';
+
+test('standalone runtime isolates Codex Desktop internals without touching user MCP servers or the sandbox policy', t => {
+  const root = mkdtempSync(join(tmpdir(), 'mains-codex-iso-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const result = desktopRuntimeIsolation({ home: root, configText: desktopConfig, source: { LOCALAPPDATA: localAppData }, platform: 'win32' });
+  assert.deepEqual(result.desktopServers, ['node_repl']);
+  // Commands and user stdio MCP servers keep the user's real LOCALAPPDATA.
+  assert.deepEqual(result.args, ['-c', 'mcp_servers.node_repl.enabled=false', '-c', 'notify=[]', '-c', `shell_environment_policy.set.LOCALAPPDATA=${JSON.stringify(localAppData)}`, '-c', `mcp_servers.local_tool.env.LOCALAPPDATA=${JSON.stringify(localAppData)}`]);
+  const ownEnv = desktopRuntimeIsolation({ home: root, configText: '[mcp_servers.local_tool]\ncommand = "tool"\n[mcp_servers.local_tool.env]\nLOCALAPPDATA = "D:\\\\custom"', source: { LOCALAPPDATA: localAppData }, platform: 'win32' });
+  assert(!ownEnv.args.some(arg => arg.startsWith('mcp_servers.local_tool.env')));
+  // Only the CLI process sees the private directory, so sandbox setup cannot ACL-validate a locked Desktop node_repl.exe.
+  assert.equal(result.env.LOCALAPPDATA, join(root, 'desktop-isolation'));
+  assert(existsSync(result.env.LOCALAPPDATA));
+  assert(!result.args.some(arg => /sandbox_mode|danger|writable_roots|network_access|publora|local_tool\.enabled/.test(arg)));
+});
+
+test('isolation is inert for user-only configuration and outside Windows', t => {
+  const root = mkdtempSync(join(tmpdir(), 'mains-codex-iso-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const userOnly = desktopRuntimeIsolation({ home: root, configText: '[mcp_servers.local_tool]\ncommand = "C:\\Tools\\my-mcp.exe"\nnotify = ["my-notifier.exe"]', source: { LOCALAPPDATA: localAppData }, platform: 'win32' });
+  assert.deepEqual(userOnly.desktopServers, []);
+  assert(!userOnly.args.includes('notify=[]'));
+  const mac = desktopRuntimeIsolation({ home: root, configText: '[mcp_servers.node_repl]\ncommand = "/Applications/Codex.app/Contents/Resources/node_repl"', source: {}, platform: 'darwin' });
+  assert.deepEqual(mac, { env: {}, args: ['-c', 'mcp_servers.node_repl.enabled=false'], desktopServers: ['node_repl'] });
+});
+
+test('prepared runtime launches the CLI with Desktop isolation from the shared configuration', t => {
+  const f = fixture(t);
+  writeFileSync(join(f.sharedHome, 'config.toml'), desktopConfig);
+  const r = f.runtime();
+  try {
+    assert.match(r.args[1], /^sqlite_home=/);
+    assert(r.args.includes('mcp_servers.node_repl.enabled=false'));
+    if (process.platform === 'win32' && process.env.LOCALAPPDATA) assert.equal(r.env.LOCALAPPDATA, join(f.home, 'desktop-isolation'));
+    assert.equal(readFileSync(join(f.sharedHome, 'config.toml'), 'utf8'), desktopConfig);
+  } finally { r.close(); }
 });

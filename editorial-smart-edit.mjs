@@ -1,5 +1,6 @@
 import {artifactHash} from './editorial-jobs.mjs';
 import {normalizeMotion} from './editorial-motion-plan.mjs';
+import {validateStoryboard} from './editorial-storyboard.mjs';
 import {reframeCropFilter} from './editorial-reframe.mjs';
 
 /** Pure helpers for semi-automatic editing. Analyses and plans are suggestions; nothing here renders. */
@@ -101,7 +102,7 @@ const safeText=(value,max)=>typeof value==='string'&&value.trim().length>0&&[...
 /** Animations match the local Remotion template: at most one title, lower third and CTA; the CTA is anchored to the end. */
 export function validatePlan(plan,sourceDuration){
   if(!plan||typeof plan!=='object'||Array.isArray(plan))throw new Error('Invalid edit plan.');
-  const allowed=new Set(['segments','animations','format','normalizeAudio','theme','motion','audio']);if(Object.keys(plan).some(key=>!allowed.has(key)))throw new Error('Unsupported edit plan field.');
+  const allowed=new Set(['segments','animations','format','normalizeAudio','theme','motion','audio','storyboard']);if(Object.keys(plan).some(key=>!allowed.has(key)))throw new Error('Unsupported edit plan field.');
   const segments=plan.segments;
   if(!Array.isArray(segments)||!segments.length||segments.length>smartEditLimits.maxSegments)throw new Error(`Keep between 1 and ${smartEditLimits.maxSegments} segments.`);
   let previous=0;
@@ -130,7 +131,15 @@ export function validatePlan(plan,sourceDuration){
   const motion=normalizeMotion(plan.motion,kept);
   if(motion?.cues.length&&outputDuration>smartEditLimits.maxAnimatedSeconds)throw new Error('Animated exports accept up to 30 minutes of edited video.');
   const audio=plan.audio===undefined?undefined:validateAudioTreatment(plan.audio);
-  return {plan:{segments:kept,animations:overlays,format,normalizeAudio,theme,...(motion?{motion}:{}),...(audio?{audio}:{})},outputDuration};
+  // Storyboard autorado (cenas/camadas/keyframes) substitui os 3 overlays fixos e as cues automáticas; o reframe continua.
+  // Tempos na linha do tempo editada, amarrados aos cortes por segmentsHash (cortes mudaram => erro, nunca desalinhado).
+  let storyboard;
+  if(plan.storyboard!==undefined){
+    if(overlays.length||motion?.cues.length)throw new Error('A storyboard replaces the fixed overlays and automatic motion cues; send only one of them.');
+    if(outputDuration>smartEditLimits.maxAnimatedSeconds)throw new Error('Animated exports accept up to 30 minutes of edited video.');
+    storyboard=validateStoryboard(plan.storyboard,{outputDuration,segments:kept});
+  }
+  return {plan:{segments:kept,animations:overlays,format,normalizeAudio,theme,...(motion?{motion}:{}),...(audio?{audio}:{}),...(storyboard?{storyboard}:{})},outputDuration};
 }
 
 /** Shape/range only. Whether noiseFloorDb was really measured on this source is checked server-side (assertMeasuredNoiseFloor). */
@@ -151,7 +160,7 @@ export function validateAudioTreatment(input){
 /** True when the export needs the Remotion pass (fixed overlays or motion cues). */
 /** Motion counts when it has cues or a framing focus (manual reframe without cues still needs the Remotion pass). */
 const hasMotion=motion=>Boolean(motion?.cues?.length||motion?.reframe);
-export const needsAnimation=plan=>Boolean(plan?.animations?.length||hasMotion(plan?.motion));
+export const needsAnimation=plan=>Boolean(plan?.animations?.length||hasMotion(plan?.motion)||plan?.storyboard?.scenes?.length);
 
 /**
  * Vertical (9:16) crop that follows a user/detected framing focus, keyframed on the EDITED timeline (it runs after the
@@ -188,7 +197,8 @@ export function remotionAnimations(plan,{source}={}){
   }
   if(hasMotion(plan.motion)){const crop=portraitCrop(plan,source);spec.motion=crop?{...plan.motion,reframe:croppedReframe(plan.motion.reframe,crop)}:plan.motion;}
   // Motion text stays out of the band where burned captions (later, libass presets classic/boxed/highlight) can appear.
-  if(plan.motion?.cues?.length)spec.protect={captionBand:captionBand(plan,source)};
+  if(plan.motion?.cues?.length||plan.storyboard)spec.protect={captionBand:captionBand(plan,source)};
+  if(plan.storyboard)spec.storyboard=plan.storyboard;
   return spec;
 }
 
@@ -199,19 +209,21 @@ export function removedSegments(segments,duration){
   return removed;
 }
 
-export const planHash=({contentId,assetId,versionId,sha256},plan)=>artifactHash({kind:'smart-edit-plan',contentId,assetId,versionId,sha256,plan});
+// A camera+screen pair binds the plan to BOTH sources, the offset, the voice and the layout (pair.hash); single-video hashes are unchanged.
+export const planHash=({contentId,assetId,versionId,sha256,pair},plan)=>artifactHash({kind:'smart-edit-plan',contentId,assetId,versionId,sha256,plan,...(pair?.hash?{pair:pair.hash}:{})});
 
 /**
  * Same kept intervals for video and audio: trim/atrim + setpts/asetpts per segment, then one concat. Without `audio`
  * the filter is exactly the legacy one. `audio` adds short fades at cut edges (duration unchanged), conservative
  * high-pass + FFT denoise at the measured floor, and loudnorm ONCE (normalizeAudio || leveling).
  */
-export function cutFilter(segments,{hasAudio,format='original',normalizeAudio=false,audio,video=true,motion,source}){
+/** `audioInput`/`audioShift`: the voice of a camera+screen pair taken from input 1 at screen time = camera time + audioShift (exact transform before the cuts). */
+export function cutFilter(segments,{hasAudio,format='original',normalizeAudio=false,audio,video=true,motion,source,audioInput=0,audioShift=0}){
   const parts=[],labels=[],treatment=audio?validateAudioTreatment(audio):null,fade=audioTreatment.cutFadeSeconds;
   segments.forEach((item,index)=>{
     if(video)parts.push(`[0:v:0]trim=start=${fmt(item.start)}:end=${fmt(item.end)},setpts=PTS-STARTPTS[v${index}]`);
     const fades=treatment?.smoothCuts&&item.end-item.start>fade*4?[...(index>0||item.start>0.0005?[`afade=t=in:st=0:d=${fade}`]:[]),...(index<segments.length-1?[`afade=t=out:st=${fmt(item.end-item.start-fade)}:d=${fade}`]:[])]:[];
-    if(hasAudio)parts.push(`[0:a:0]atrim=start=${fmt(item.start)}:end=${fmt(item.end)},asetpts=PTS-STARTPTS${fades.map(value=>`,${value}`).join('')}[a${index}]`);
+    if(hasAudio)parts.push(`[${audioInput}:a:0]atrim=start=${fmt(item.start+audioShift)}:end=${fmt(item.end+audioShift)},asetpts=PTS-STARTPTS${fades.map(value=>`,${value}`).join('')}[a${index}]`);
     labels.push(!video?`[a${index}]`:hasAudio?`[v${index}][a${index}]`:`[v${index}]`);
   });
   const crop=video?portraitCrop({format,motion},source):null;

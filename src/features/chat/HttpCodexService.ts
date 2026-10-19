@@ -3,7 +3,7 @@ import type { CodexEvent, CodexExecutionHandle, CodexExecutionId, CodexService, 
 async function requestJson<T>(url:string, init?:RequestInit):Promise<T> {
   const response=await fetch(url,{...init,headers:{'content-type':'application/json',...(init?.headers??{})}});
   const payload=await response.json().catch(()=>({}));
-  if(!response.ok)throw new Error(payload.error??`Codex bridge returned ${response.status}`);
+  if(!response.ok)throw Object.assign(new Error(payload.error??`Codex bridge returned ${response.status}`),{status:response.status,code:typeof payload.code==='string'?payload.code:undefined});
   return payload as T;
 }
 

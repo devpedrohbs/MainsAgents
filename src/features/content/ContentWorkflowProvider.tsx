@@ -1,4 +1,5 @@
 import {parseInspirationState,type InspirationLibraryState} from './inspiration';
+import {contentDeletedEvent} from './contentDeletion';
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type PropsWithChildren } from 'react';
 import { useAgents } from '../agents/AgentsProvider';
 import { useChat } from '../chat/ChatProvider';
@@ -102,6 +103,8 @@ export function ContentWorkflowProvider({children}:PropsWithChildren){
   const retryJob=useCallback(async(id:string)=>{await request(`jobs/${encodeURIComponent(id)}/retry`,{method:'POST'});await refreshJobs()},[request,refreshJobs]);
   useEffect(()=>{let active=true;const refresh=()=>{if(active)void refreshJobs().catch(()=>{})};refresh();const timer=setInterval(refresh,2000);return()=>{active=false;clearInterval(timer)}},[refreshJobs]);
 
+  // After a local content deletion the host already rewrote the editorial state: reload it (never merge the old copy back).
+  useEffect(()=>{const resync=()=>{void storage.resync().catch(()=>{});};window.addEventListener(contentDeletedEvent,resync);return()=>window.removeEventListener(contentDeletedEvent,resync);},[storage]);
   useEffect(()=>{
     let active=true;
     const unregister=saveCoordinator.register('editorial',storage);

@@ -151,7 +151,7 @@ test('capacidades diagnosticam bundle, navegador e licença sem baixar nada', as
     assert.ok(caps.reasons.some((reason) => reason.includes('browserExecutable')));
     assert.equal(caps.license.requiresReview, true);
     assert.match(caps.license.url, /remotion-dev\/remotion/);
-    assert.deepEqual(caps.template.overlays, ['title', 'lowerThird', 'cta', 'motion']);
+    assert.deepEqual(caps.template.overlays, ['title', 'lowerThird', 'cta', 'motion', 'storyboard']);
     assert.equal(caps.versions.remotion, '4.0.534');
     assert.equal(caps.versions['@remotion/renderer'], '4.0.534');
     assert.equal(resolveBrowser({browserExecutable: path.join(dir, 'x.exe')}).status, 'missing');

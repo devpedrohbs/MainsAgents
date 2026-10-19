@@ -94,7 +94,7 @@ export {parseProviderJson,validateResearch,validateScriptOptions,researchPrompt,
 export interface SpecialistResult {summary:string;outputFiles:import('./assetModel').LocalAssetInspection[];blockers:string[]}
 export interface FileDelivery {summary:string;files:Array<{assetId:string;versionId:string;sha256:string;path:string;caption:string}>}
 export interface VideoMetadata {duration:number;width:number;height:number;hasAudio:boolean;videoCodec:string;audioCodec?:string}
-export interface MediaJob {id:string;workspaceId:string;contentId:string;assetId:string;versionId:string;inputPath:string;start:number;duration:number;status:'queued'|'running'|'succeeded'|'failed'|'interrupted'|'canceled';progress:number;error?:string;imported?:boolean;mode?:'advanced';planHash?:string;plan?:{segments:Array<{start:number;end:number}>};createdAt:string;updatedAt:string;result?:{file:import('./assetModel').LocalAssetInspection;metadata:VideoMetadata;assetId:string}}
+export interface MediaJob {id:string;workspaceId:string;contentId:string;assetId:string;versionId:string;inputPath:string;start:number;duration:number;status:'queued'|'running'|'succeeded'|'failed'|'interrupted'|'canceled';progress:number;error?:string;imported?:boolean;mode?:'advanced';planHash?:string;plan?:{segments:Array<{start:number;end:number}>};createdAt:string;updatedAt:string;result?:{file:import('./assetModel').LocalAssetInspection;metadata:VideoMetadata;assetId:string;receipt?:import('../chat/model/Chat').DeliveryReceiptView};receiptError?:string}
 export interface WorkflowJob {
   id:string;workspaceId:string;targetId:string;topicId:string;contentId?:string;kind:WorkflowStage;
   agent:{id:string;name:string};sourceAgent?:{id:string;name:string};

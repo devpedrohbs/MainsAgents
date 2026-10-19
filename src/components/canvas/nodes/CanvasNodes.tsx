@@ -104,14 +104,14 @@ export function ChatNode({id,data,selected}:NodeProps<CanvasFlowNode>) {
   const chooseAgent=(agentId:string)=>{
     const next=availableAgents.find(item=>item.id===agentId);
     if(!next){updateNodeData(workspaceId,id,{chatAgentId:undefined,chatSessionId:undefined});return}
-    const nextSession=createSession(next.id,t('Canvas chat'),next.providerId??'codex',next.modelId);
+    const nextSession=createSession(next.id,t('Canvas chat'),next.providerId??'codex',next.modelId,undefined,false);
     updateNodeData(workspaceId,id,{chatAgentId:next.id,chatSessionId:nextSession.id,agentId:next.id,agentLabel:next.name});
   };
   const submit=(event:FormEvent)=>{
     event.preventDefault();
     const content=draft.trim();
     if(!content||!agent||!session||busy)return;
-    openSession(agent.id,session.id);
+    openSession(agent.id,session.id,{select:false});
     followRef.current=true;
     sendMessage(agent,content,contextNodes,session.id,chatDraft.skill??undefined);
     writeChatDraft(agent.id,session.id,{text:'',skill:null,context:[]});

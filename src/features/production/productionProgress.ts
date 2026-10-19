@@ -21,7 +21,7 @@ const actions:Record<string,[string,string]>={
  writing:['Aguarde: o agente está estruturando o roteiro.','Wait: the agent is structuring the script.'],
  'script-review':['Escolha hook, CTA e caminho, edite o roteiro e aprove a versão para liberar o Notion e a gravação.','Choose hook, CTA and path, edit the script and approve the version to release Notion and recording.'],
  notion:['Aguarde: o roteiro aprovado está sendo registrado no Notion.','Wait: the approved script is being saved to Notion.'],
- recording:['Grave o vídeo e envie a gravação para a edição básica.','Record the video and send it for basic editing.'],
+ recording:['Grave o vídeo e envie a gravação para a edição.','Record the video and send it for editing.'],
  'planning-edit':['Aguarde: o editor está preparando o plano de edição.','Wait: the editor is preparing the editing plan.'],
  editing:['Aguarde: o vídeo está sendo editado neste PC.','Wait: the video is being edited on this PC.'],
  'video-review':['Revise o vídeo editado e aprove ou peça um ajuste.','Review the edited video, then approve it or request a revision.'],

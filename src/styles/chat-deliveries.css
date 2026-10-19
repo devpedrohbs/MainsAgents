@@ -13,3 +13,6 @@
 .flow-dialog:has(.delivery-review-fields)>header,.flow-dialog>.delivery-review-footer{flex:none}
 .flow-dialog>.delivery-review-footer .primary-button{width:100%;white-space:normal}
 .delivery-review-fields textarea{color:var(--fg)}
+.delivery-receipts{display:grid;gap:8px;margin-top:10px;min-width:0}
+.delivery-receipt>header b{overflow-wrap:anywhere}
+.delivery-receipt-path{display:block;margin:2px 0 6px;padding:7px 9px;border-radius:8px;background:var(--chat-code,var(--surface-2,rgba(127,127,127,.12)));font-size:12px;line-height:1.45;overflow-wrap:anywhere;word-break:break-all;user-select:text}

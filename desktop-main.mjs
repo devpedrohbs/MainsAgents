@@ -26,6 +26,8 @@ import {createCalendarConnector} from './publication-calendar-connector.mjs';
 import {createZernioCalendarApi} from './publication-calendar-api.mjs';
 import {inspectBackupFileLinks} from './backup-file-links.mjs';
 import {registerEditorialFilesIpc} from './editorial-files-ipc.mjs';
+import {registerDeliveryReceiptsIpc} from './delivery-receipts-ipc.mjs';
+import {registerContentDeletionIpc} from './content-deletion-ipc.mjs';
 
 const mimeTypes = {
   '.css': 'text/css; charset=utf-8',
@@ -82,7 +84,7 @@ function readProviderKeys(){try{return JSON.parse(readFileSync(providerKeysPath(
 function writeProviderKeys(keys){mkdirSync(app.getPath('userData'),{recursive:true});writeFileSync(providerKeysPath(),JSON.stringify(keys),{mode:0o600})}
 function getProviderKey(provider){const encrypted=readProviderKeys()[provider];if(!encrypted)return '';if(!safeStorage.isEncryptionAvailable())throw new Error('Secure credential storage is unavailable');return safeStorage.decryptString(Buffer.from(encrypted,'base64'))}
 const externalProviders=createExternalProviderBridge({getKey:getProviderKey});
-const claudeCodeBridge=createClaudeCodeBridge({cwdRoot:join(app.getPath('documents'),'MainsAgents Workspace','Claude'),getApprovals:()=>contentWorkflowBridge?{actions:contentWorkflowBridge.actions,claudeBinding:contentWorkflowBridge.claudeBinding}:null});
+const claudeCodeBridge=createClaudeCodeBridge({cwdRoot:join(app.getPath('documents'),'MainsAgents Workspace','Claude'),getApprovals:()=>contentWorkflowBridge?{actions:contentWorkflowBridge.actions,claudeBinding:contentWorkflowBridge.claudeBinding,paperAssets:contentWorkflowBridge.paperAssets,chatPublishing:contentWorkflowBridge.chatPublishing}:null});
 const canvasRuntimeBridge=createCanvasRuntimeBridge({cwdRoot:join(app.getPath('documents'),'MainsAgents Workspace','Canvas')});
 ipcMain.handle('provider:save-key',(event,provider,key)=>{assertTrustedSender(event);if(provider!=='gemini'||typeof key!=='string'||key.length<12||key.length>512)throw new Error('Invalid provider key');if(!safeStorage.isEncryptionAvailable())throw new Error('Secure credential storage is unavailable');writeProviderKeys({...readProviderKeys(),[provider]:safeStorage.encryptString(key).toString('base64')});return {saved:true}});
 ipcMain.handle('provider:remove-key',(event,provider)=>{assertTrustedSender(event);if(provider!=='gemini')throw new Error('Unknown provider');const keys=readProviderKeys();delete keys[provider];writeProviderKeys(keys);return {saved:false}});
@@ -186,6 +188,7 @@ ipcMain.handle('skills:select-directory', async (event) => {
   const directory = result.filePaths[0];
   return { directory, skills: findSkills(directory) };
 });
+ipcMain.handle('files:select-videos',async event=>{assertTrustedSender(event);const result=await dialog.showOpenDialog(mainWindow,{title:'Anexar vídeo à conversa',properties:['openFile','multiSelections'],filters:[{name:'Vídeos',extensions:['mp4','mov','m4v','mkv','webm','avi']}]});return result.canceled?[]:result.filePaths.slice(0,5);});
 ipcMain.handle('file-access:select-directory',async event=>{assertTrustedSender(event);const result=await dialog.showOpenDialog(mainWindow,{title:'Selecionar pasta autorizada para arquivos de saída',properties:['openDirectory','createDirectory']});return result.canceled?null:result.filePaths[0]??null;});
 
 ipcMain.handle('skills:refresh-directory', (event, directory) => {
@@ -243,7 +246,7 @@ function startWebServer(rootDirectory, port = 47831) {
     if (url.pathname === '/api/codex/reconnect' && request.method === 'POST') {
       if (codexBridge?.isAlive()) {response.writeHead(200,{'content-type':'application/json'});return response.end(JSON.stringify({ready:true}));}
       const workspaceDirectory=join(app.getPath('documents'),'MainsAgents Workspace');
-      void (async()=>{if(codexBridge){await codexBridge.close();codexBridge=null}return startCodexBridge({port:0,cwd:workspaceDirectory,runtimeHome:join(app.getPath('userData'),'codex-runtime'),actions:contentWorkflowBridge.actions,getBinding:contentWorkflowBridge.binding,getAgents:contentWorkflowBridge.agents,delegations:contentWorkflowBridge.delegations})})().then((bridge)=>{codexBridge=bridge;response.writeHead(200,{'content-type':'application/json'});response.end(JSON.stringify({ready:true}))}).catch((error)=>{response.writeHead(503,{'content-type':'application/json'});response.end(JSON.stringify({ready:false,error:error instanceof Error?error.message:String(error)}))});return;
+      void (async()=>{if(codexBridge){await codexBridge.close();codexBridge=null}return startCodexBridge({port:0,cwd:workspaceDirectory,runtimeHome:join(app.getPath('userData'),'codex-runtime'),actions:contentWorkflowBridge.actions,getBinding:contentWorkflowBridge.binding,getAgents:contentWorkflowBridge.agents,delegations:contentWorkflowBridge.delegations,paperAssets:contentWorkflowBridge.paperAssets,chatPublishing:contentWorkflowBridge.chatPublishing})})().then((bridge)=>{codexBridge=bridge;response.writeHead(200,{'content-type':'application/json'});response.end(JSON.stringify({ready:true}))}).catch((error)=>{response.writeHead(503,{'content-type':'application/json'});response.end(JSON.stringify({ready:false,error:error instanceof Error?error.message:String(error)}))});return;
     }
     if (url.pathname.startsWith('/api/codex/')) {
       if (codexBridge) return proxyToCodex(request,response,codexBridge);
@@ -290,6 +293,8 @@ function startWebServer(rootDirectory, port = 47831) {
 
 let desktopStateStore;
 registerEditorialFilesIpc({ipcMain,dialog,shell,getWindow:()=>mainWindow,getStore:()=>desktopStateStore});
+registerDeliveryReceiptsIpc({ipcMain,shell,getWindow:()=>mainWindow,getReceipts:()=>contentWorkflowBridge?.receipts,getCurrentProfile:()=>desktopStateStore?.currentProfile()});
+registerContentDeletionIpc({ipcMain,isTrustedSender:event=>event.sender===mainWindow?.webContents&&event.senderFrame===event.sender.mainFrame,getStore:()=>shuttingDown?null:desktopStateStore,getDeletion:()=>contentWorkflowBridge?.deletion});
 ipcMain.on('state:profile', event => {
   event.returnValue=event.sender===mainWindow?.webContents ? desktopStateStore?.currentProfile() : undefined;
 });
@@ -332,12 +337,16 @@ async function createWindow() {
   desktopStateStore=await openDesktopWorkspaceStore(app.getPath('home'),app.getPath('userData'),app.getVersion());
   logStartup(`Storage profile=${desktopStateStore.currentProfile()??'default'}; version=${app.getVersion()}; data=${desktopStorageDirectory(app.getPath('home'))}`);
   contentWorkflowBridge=openDesktopEditorialBridge(app.getPath('home'),app.getPath('userData'),{
+    // createWindow only runs after the single-instance lock: this process is the only host of the database.
+    hostExclusive:true,
     mediaOptions:{...createRemotionAnimator(app.isPackaged?{bundleDir:join(process.resourcesPath,'app.asar.unpacked','dist','remotion')}:{}),transcriber:createWhisperTranscriber({directories:[join(app.getPath('userData'),'tools','whispercpp'),...(app.isPackaged?[join(process.resourcesPath,'tools','whispercpp')]:[])]})},
     getRuntime:()=>codexBridge?.isAlive()?codexBridge.workflow:null,
     getChatRuntime:provider=>provider==='claude'?claudeCodeBridge.runtime:codexBridge?.isAlive()?codexBridge.chatRuntime:null,
     // Local `claude auth status` only (no inference): lets production preflight separate availability from sign-in.
     getProviderStatus:provider=>provider==='claude'?claudeCodeBridge.status():undefined,
     getAgents:profile=>desktopStateStore.read(profile,'agents')??[],
+    // Native GPT images: the host library plus the Codex tool's own output folder (verified by content hash).
+    paperAssetOptions:{generatedRoots:[join(app.getPath('userData'),'codex-runtime','generated_images')]},
     getFlows:profile=>desktopStateStore.read(profile,'production-flows'),
     getSessions:profile=>desktopStateStore.read(profile,'sessions')??[],
     getCurrentProfile:()=>desktopStateStore.currentProfile(),
@@ -364,7 +373,7 @@ async function createWindow() {
   logStartup('Local account service ready');
   const workspaceDirectory = join(app.getPath('documents'), 'MainsAgents Workspace');
   mkdirSync(workspaceDirectory, { recursive: true });
-  try {codexBridge = await startCodexBridge({ port: 0, cwd: workspaceDirectory, runtimeHome: join(app.getPath('userData'),'codex-runtime'),actions:contentWorkflowBridge.actions,getBinding:contentWorkflowBridge.binding,getAgents:contentWorkflowBridge.agents,delegations:contentWorkflowBridge.delegations });logStartup(`Codex bridge ready on ${codexBridge.port}; history isolated, connections shared`);}
+  try {codexBridge = await startCodexBridge({ port: 0, cwd: workspaceDirectory, runtimeHome: join(app.getPath('userData'),'codex-runtime'),actions:contentWorkflowBridge.actions,getBinding:contentWorkflowBridge.binding,getAgents:contentWorkflowBridge.agents,delegations:contentWorkflowBridge.delegations,paperAssets:contentWorkflowBridge.paperAssets,chatPublishing:contentWorkflowBridge.chatPublishing });logStartup(`Codex bridge ready on ${codexBridge.port}; history isolated, connections shared`);}
   catch(error){logStartup(`Codex unavailable: ${error instanceof Error?error.message:String(error)}`);}
   contentWorkflowBridge.jobs.kick();
   contentWorkflowBridge.work.kick();

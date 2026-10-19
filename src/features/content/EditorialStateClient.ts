@@ -74,6 +74,8 @@ export class EditorialStateClient {
         }
         if(!response.ok)throw new Error(payload.error??'Could not save editorial data.');
         if(!Number.isSafeInteger(payload.revision)||payload.revision<0)throw new Error('The editorial service did not confirm this save.');this.revision=payload.revision;confirmed=true;
+        // The host dropped records of a content deleted locally from this (stale) copy: adopt its saved state.
+        if(payload.stripped){const read=await this.transport(this.url,{cache:'no-store'}),current=await read.json();if(read.ok){validateSnapshot(current);state=current.state;this.revision=current.revision;}}
       }
       if(!confirmed)throw new Error('Editorial work changed repeatedly while saving. Your edits remain pending. Try saving again.');
       this.state=generation===this.generation?state:mergeEditorialState(original,this.state,state);
@@ -126,6 +128,8 @@ export class EditorialStateClient {
     this.state=payload.state;this.revision=payload.revision;this.uncertain=false;this.lastError='';this.changed();
     this.base=structuredClone(payload.state);
   }
+  /** After a local deletion: queue a full reload behind pending writes (never merges the deleted records back). */
+  resync=():Promise<void>=>{const run=this.queue.catch(()=>{}).then(()=>this.reconcile());this.queue=run;return run;};
   refresh=async():Promise<void>=>{
     if(!this.ready||this.pending())return;
     const generation=this.generation,revision=this.revision;

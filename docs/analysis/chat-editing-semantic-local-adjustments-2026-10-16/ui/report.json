@@ -1,0 +1,38 @@
+{
+ "progress": "Planejando cortes e motion\n\nDireção: Editor de Vídeo (Claude Code)\n\nCancelar edição",
+ "adjust": "Vídeo editado entregue\n\nO arquivo verificado está nesta conversa. Peça ajustes aqui (ex.: “Entre 12 e 18 segundos troque a animação por uma comparação”). Direção: Editor de Vídeo (Claude Code).\n\nAbrir produção\n---\nAjuste aplicado em 2,0–4,0 s\n2,0–4,0 s\n\nÁudio idêntico ao da versão anterior; fora do trecho nada mudou no plano.\n\nVoltar à versão anterior",
+ "cta": {
+  "editorTurns": 1,
+  "realRequest": true
+ },
+ "codexProgress": "Planejando cortes e motion\n\nDireção: Editor de Vídeo (Claude Code)\n\nCancelar edição",
+ "restart": {
+  "newEditorTurns": 0
+ },
+ "runs": [
+  {
+   "stage": "video-review",
+   "adjustments": [
+    "canceled"
+   ],
+   "director": {
+    "name": "Editor de Vídeo",
+    "provider": "claude",
+    "choice": "claude"
+   }
+  },
+  {
+   "stage": "video-review",
+   "adjustments": [
+    "reverted"
+   ],
+   "director": {
+    "name": "Editor de Vídeo",
+    "provider": "claude",
+    "choice": "claude"
+   }
+  }
+ ],
+ "chatSends": 1,
+ "out": "C:\\Users\\pacas\\Documents\\ChatGPT\\MainsAgents\\.mainsagents-workspaces\\chat-edit-ui\\1792115391215"
+}

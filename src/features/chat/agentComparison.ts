@@ -12,9 +12,11 @@ export interface AgentComparison {id:string;workspaceId:string;title:string;brie
  /** Same-agent mode only: the model sent on each side; '' means the provider's own default. */
  codexModelId?:string;claudeModelId?:string}
 /** Legacy two-agent input; `mode` may be omitted for compatibility. */
-export interface AgentPairComparisonInput {mode?:'agents';codexAgentId:string;claudeAgentId:string;briefing:string;context?:ChatContextReference[]}
+/** Content link of the chat the comparison was requested from: both new sessions keep that SAME saved identity (own fresh threads). */
+export interface ComparisonContentLink {contentId:string;topicId?:string;contentTitle?:string}
+export interface AgentPairComparisonInput {mode?:'agents';codexAgentId:string;claudeAgentId:string;briefing:string;context?:ChatContextReference[];link?:ComparisonContentLink}
 /** One source agent on both providers. Per side: 'model-id' = that model; '' = the provider default (Codex: the app's configured default Codex model, else the CLI default); omitted = the agent's saved model on its own provider, provider default on the other. */
-export interface SameAgentComparisonInput {mode:'same-agent';agentId:string;codexModelId?:string;claudeModelId?:string;briefing:string;context?:ChatContextReference[]}
+export interface SameAgentComparisonInput {mode:'same-agent';agentId:string;codexModelId?:string;claudeModelId?:string;briefing:string;context?:ChatContextReference[];link?:ComparisonContentLink}
 export type AgentComparisonInput=AgentPairComparisonInput|SameAgentComparisonInput;
 /** Pairing metadata saved on both sessions, so backups and restarts keep the comparison without replaying it. */
 export type SessionComparison=AgentComparison&{role:'codex'|'claude'};
@@ -121,19 +123,22 @@ export function createComparisonLauncher(deps:ComparisonLauncherDeps){
  return function start(input:AgentComparisonInput):Promise<AgentComparison>{
   let valid:ValidComparison;try{valid=validateComparison(input,deps.agents(),deps.registeredProviders(),deps.modelCatalog?.());}catch(error){return Promise.reject(error);}
   const fingerprint=JSON.stringify(valid.mode==='same-agent'?{mode:valid.mode,agent:valid.agent.id,codexModel:valid.codexModelId??null,claudeModel:valid.claudeModelId??null,briefing:valid.briefing,context:valid.context}:{codex:valid.codex.id,claude:valid.claude.id,briefing:valid.briefing,context:valid.context});
-  const existing=launches.get(fingerprint);if(existing)return existing;
+  const link=input.link?.contentId?{contentId:input.link.contentId,...(input.link.topicId?{topicId:input.link.topicId}:{}),...(input.link.contentTitle?{contentTitle:input.link.contentTitle}:{})}:undefined;
+  const key=JSON.stringify([fingerprint,link?.contentId??null]);
+  const existing=launches.get(key);if(existing)return existing;
   const launch=(async()=>{
-   const {comparison,sessions}=comparisonSessions(valid,{id:deps.makeId('comparison'),codexSessionId:deps.makeId('session'),claudeSessionId:deps.makeId('session'),now:deps.now(),defaultCodexModelId:deps.defaultCodexModelId()});
+   const created=comparisonSessions(valid,{id:deps.makeId('comparison'),codexSessionId:deps.makeId('session'),claudeSessionId:deps.makeId('session'),now:deps.now(),defaultCodexModelId:deps.defaultCodexModelId()});
+   const {comparison}=created,sessions=link?created.sessions.map(session=>({...session,...link})):created.sessions;
    await deps.persist(sessions);
    // Same-agent sides get detached snapshots: identical instructions/tools/skills, and nothing can write back to the saved agent.
    const agentFor=(agent:Agent)=>valid.mode==='same-agent'?structuredClone(agent):agent;
    const runs=[[agentFor(valid.codex),sessions[0]],[agentFor(valid.claude),sessions[1]]] as const;
    // Independent starts: one failure never cancels or blocks the sibling.
    const settled=Promise.allSettled(runs.map(([agent,session])=>{try{return deps.execute(agent,valid.briefing,valid.context.map(item=>({...item})),session);}catch(error){return Promise.reject(error);}}));
-   void settled.finally(()=>launches.delete(fingerprint));
+   void settled.finally(()=>launches.delete(key));
    return comparison;
   })();
-  launches.set(fingerprint,launch);launch.catch(()=>launches.delete(fingerprint));
+  launches.set(key,launch);launch.catch(()=>launches.delete(fingerprint));
   return launch;
  };
 }

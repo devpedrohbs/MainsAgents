@@ -11,7 +11,7 @@ export function unpackPublication(result){
 export function createPublicationConnector(getMcp,{fetchImpl=fetch}={}){
   const invoke=async(tool,args)=>{const mcp=getMcp();if(!mcp)throw Error('Reconnect Codex CLI to use the Publora MCP.');return unpackPublication(await mcp.call(tool,args));};
   return {
-    async accounts(){const data=await invoke('list_connections',{});if(!Array.isArray(data.connections))throw Error('Publora returned an unsupported account list.');return data.connections.filter(item=>typeof item.platformId==='string'&&item.platformId.startsWith('linkedin-')&&item.tokenStatus==='valid'&&item.connectionStatus==='active').map(item=>({id:item.platformId,name:String(item.displayName??item.username??item.platformId).slice(0,200)}));},
+    async accounts(){const data=await invoke('list_connections',{});if(!Array.isArray(data.connections))throw Error('Publora returned an unsupported account list.');return data.connections.filter(item=>typeof item.platformId==='string'&&/^(?:linkedin|instagram)-[A-Za-z0-9_-]{1,200}$/.test(item.platformId)&&item.tokenStatus==='valid'&&item.connectionStatus==='active').map(item=>({id:item.platformId,platform:item.platformId.slice(0,item.platformId.indexOf('-')),name:String(item.displayName??item.username??item.platformId).slice(0,200)}));},
     async media(op,files,checkpoint,guard){
       const data=await invoke('get_post',{postGroupId:op.externalId});
       // Only the draft created by this operation can receive files. Unknown slots stop recovery.
@@ -34,6 +34,8 @@ export function createPublicationConnector(getMcp,{fetchImpl=fetch}={}){
       }
       verifiedPublication(await invoke('get_post',{postGroupId:op.externalId}),op);
     },
+    /** Plan quota and schedule horizon for one future time (read-only account_context). */
+    async limits(scheduledTime){const data=await invoke('account_context',scheduledTime?{scheduledTime}:{}),q=data.context?.quotas;if(!q)throw Error('Publora returned no plan limits.');return {plan:String(data.context.plan?.name??''),scheduledRemaining:q.scheduledPosts?.remaining,monthlyRemaining:q.monthlyPosts?.remaining,maxScheduledDate:q.scheduleHorizon?.maxScheduledDate};},
     async create(operation){const data=await invoke('create_post',operation.arguments);if(typeof data.postGroupId!=='string'||!data.postGroupId||data.postGroupId.length>500)throw Error('Publora returned no post identifier. Do not repeat the create operation.');return data.postGroupId;},
     async read(id){return invoke('get_post',{postGroupId:id});},
     async update(operation){return invoke('update_post',{postGroupId:operation.externalId,...operation.arguments,status:operation.mode==='schedule'?'scheduled':'draft'});},
@@ -41,11 +43,14 @@ export function createPublicationConnector(getMcp,{fetchImpl=fetch}={}){
   };
 }
 
-/** A group status alone is insufficient: account, text, media and target must match. */
+const publoraPlatform=id=>String(id).slice(0,String(id).indexOf('-'));
+// Carousel order is part of the approval: slides are compared in the provider's explicit order when it reports one.
+const orderedMedia=media=>media.some(m=>Number.isInteger(m.order??m.position))?[...media].sort((a,b)=>(a.order??a.position)-(b.order??b.position)):media;
+/** A group status alone is insufficient: account, text, media (in order) and target must match. */
 export function verifiedPublication(data,operation){
   const args=operation.arguments,id=operation.externalId;
-  if((operation.uploads??[]).length!==(operation.files??[]).length||data.postGroupId!==id||!Array.isArray(data.platforms)||data.platforms.length!==1||data.platforms[0]!==args.platforms[0]||!Array.isArray(data.posts)||data.posts.length!==1||data.posts[0].platform!=='linkedin'||data.posts[0].content!==args.content||!Array.isArray(data.media)||data.media.length!==(operation.uploads??[]).length||!(operation.uploads??[]).every(u=>u.status==='uploaded'&&data.media.some(m=>(m.mediaId??m._id)===u.mediaId&&m.status==='ready'&&m.sourceFileName===u.name)))throw Error('The external post differs from the approved text, account or media. Review it in Publora.');
-  const post=data.posts[0],account=args.platforms[0].slice('linkedin-'.length);
+  if((operation.uploads??[]).length!==(operation.files??[]).length||data.postGroupId!==id||!Array.isArray(data.platforms)||data.platforms.length!==1||data.platforms[0]!==args.platforms[0]||!Array.isArray(data.posts)||data.posts.length!==1||data.posts[0].platform!==publoraPlatform(args.platforms[0])||data.posts[0].content!==args.content||!Array.isArray(data.media)||data.media.length!==(operation.uploads??[]).length||!(operation.uploads??[]).every((u,i)=>u.status==='uploaded'&&(m=>m&&(m.mediaId??m._id)===u.mediaId&&m.status==='ready'&&m.sourceFileName===u.name)(orderedMedia(data.media)[i])))throw Error('The external post differs from the approved text, account or media. Review it in Publora.');
+  const post=data.posts[0],account=args.platforms[0].slice(args.platforms[0].indexOf('-')+1);
   if(post.platformId!==account&&post.platformId!==args.platforms[0])throw Error('The external account could not be verified.');
   if(data.status==='published'&&post.status==='published'&&post.postedId)return {status:'published',scheduledAt:data.scheduledTime,platformPostId:String(post.postedId)};
   if(data.status==='scheduled'&&post.status==='scheduled'&&args.scheduledTime&&Date.parse(data.scheduledTime)===Date.parse(args.scheduledTime))return {status:'scheduled',scheduledAt:data.scheduledTime};
