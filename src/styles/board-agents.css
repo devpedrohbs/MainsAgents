@@ -1,0 +1,86 @@
+/* Board ("Quadro") and Agents, round 6: mascots carry identity and live state, same quiet cards as the rest of the app. */
+
+/* ---------- Board ---------- */
+.studio-shell .qb{display:flex;flex-direction:column;gap:16px;min-height:100%}
+.qb-head,.ag-head{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.qb-head>div:first-child,.ag-head>div:first-child{flex:1;min-width:240px}
+.qb-head h1,.ag-head h1{margin:0}
+.qb-head p,.ag-head p{margin:6px 0 0;color:var(--muted);font-size:14px}
+.studio-shell .qb-head .search-field,.studio-shell .ag-head .search-field{flex:0 1 260px;width:260px;max-width:100%}
+
+.qb-faces{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.qb-faces>button:not(.text-link){display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border:1px solid var(--border);border-radius:999px;background:transparent;color:var(--fg);font:inherit;font-size:12px;cursor:pointer}
+.qb-faces>button:has(.agent-avatar){padding-left:4px}
+.qb-faces>button[aria-pressed=true]{border-color:var(--accent);background:color-mix(in oklab,var(--accent) 12%,transparent)}
+.qb-faces>button span{color:var(--meta,var(--muted))}
+.qb-faces .agent-avatar{width:24px;height:24px;min-width:24px;border-radius:999px}
+.qb-faces .result-count{margin-left:auto;font-size:12px;color:var(--muted)}
+
+.studio-shell .qb .board{display:grid;grid-template-columns:repeat(4,minmax(200px,1fr));gap:12px;flex:1;min-height:0;padding:0;overflow-x:auto;align-items:stretch}
+.studio-shell .qb .board-column{display:flex;flex-direction:column;gap:8px;padding:10px;border:1px solid var(--border);border-radius:12px;background:var(--surface);min-width:0}
+.studio-shell .qb .board-column.drop-target{border-color:var(--accent);background:color-mix(in oklab,var(--accent) 6%,var(--surface))}
+.studio-shell .qb .column-head{display:flex;align-items:center;gap:8px;padding:2px 4px 4px;font-size:13px;color:var(--fg)}
+.studio-shell .qb .column-head b{font-weight:600}
+.studio-shell .qb .column-head .count{margin:0;padding:0;background:none;font-size:12px;color:var(--meta,var(--muted))}
+.studio-shell .qb .column-status{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.studio-shell .qb .column-status.running{background:var(--accent)}
+.studio-shell .qb .column-status.review{background:#f5b544}
+.studio-shell .qb .column-status.done{background:#3ecf8e}
+.qb .column-add{margin-left:auto;width:24px;height:24px;border:0;border-radius:6px;background:transparent;color:var(--muted);font-size:16px;line-height:1;cursor:pointer}
+.qb .column-add:hover{background:var(--surface-2);color:var(--fg)}
+.studio-shell .qb .task-stack{display:flex;flex-direction:column;gap:8px;min-height:40px}
+.qb .column-empty{padding:18px 10px;border:1px dashed var(--border);border-radius:10px;color:var(--meta,var(--muted));font-size:12px;text-align:center}
+
+.studio-shell .qb .task-card{display:flex;flex-direction:column;gap:10px;padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--surface-2);box-shadow:none;cursor:grab;transition:border-color .15s,transform .15s}
+.studio-shell .qb .task-card:hover{border-color:var(--line-strong,var(--border));transform:translateY(-1px)}
+.studio-shell .qb .task-card.needs-review{border-color:color-mix(in oklab,#f5b544 45%,var(--border))}
+.studio-shell .qb .task-card.dragging{opacity:.5}
+.studio-shell .qb .task-card h3{margin:0;font-size:13px;font-weight:500;line-height:1.4}
+.qb .task-scope{align-self:flex-start;max-width:100%;padding:1px 8px;border:1px solid var(--border);border-radius:999px;font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.studio-shell .qb .task-agent{display:flex;align-items:center;gap:8px;min-width:0;font-size:12px;color:var(--muted)}
+.studio-shell .qb .task-agent>span:last-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.studio-shell .qb .task-agent .agent-avatar{width:26px;height:26px;min-width:26px;border-radius:8px}
+.qb .task-review-action{height:28px;display:flex;align-items:center;justify-content:center;border-radius:7px;background:var(--fg);color:var(--bg);font-size:12px;font-weight:600}
+
+/* ---------- Agents ---------- */
+.studio-shell .ag{display:flex;flex-direction:column;gap:20px}
+.ag-segment{display:inline-flex;gap:2px;padding:2px;border:1px solid var(--border);border-radius:8px}
+.ag-segment button{height:28px;padding:0 12px;border:0;border-radius:6px;background:transparent;color:var(--muted);font:inherit;font-size:12px;cursor:pointer}
+.ag-segment button[aria-pressed=true]{background:var(--surface-2);color:var(--fg)}
+.ag-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:14px}
+.studio-shell .ag .agents-list{display:contents}
+
+.studio-shell .ag .specialist-tile{display:flex;flex-direction:column;gap:14px;padding:18px;border:1px solid var(--border);border-radius:14px;background:linear-gradient(180deg,color-mix(in oklab,var(--agent-color,var(--accent)) 12%,var(--surface)) 0%,var(--surface) 55%);box-shadow:none;overflow:visible}
+.studio-shell .ag .specialist-tile:hover{border-color:var(--line-strong,var(--border));box-shadow:none}
+.studio-shell .ag .specialist-tile.selected{border-color:var(--accent)}
+.studio-shell .ag .specialist-open{display:flex;flex-direction:column;align-items:stretch;gap:14px;padding:0;border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer;width:100%}
+.studio-shell .ag .specialist-identity{display:flex;align-items:flex-start;gap:14px}
+.studio-shell .ag .specialist-identity>.agent-avatar{width:64px;height:64px;min-width:64px;border-radius:18px}
+.studio-shell .ag .specialist-identity h2{display:flex;align-items:center;gap:8px;margin:0 0 3px;font-size:15px;font-weight:600}
+.studio-shell .ag .specialist-identity h2 small{font-size:11px;font-weight:400;color:var(--muted);border:1px solid var(--border);border-radius:999px;padding:1px 7px}
+.studio-shell .ag .specialist-role{display:block;font-size:12px;color:var(--muted)}
+.ag .specialist-state{display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12px;color:var(--muted);min-width:0}
+.ag .specialist-state>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ag .specialist-state i{width:7px;height:7px;min-width:7px;border-radius:50%;background:var(--border)}
+.ag .specialist-tile.busy .specialist-state i{background:var(--agent-color,var(--accent));animation:mascot-dot 1.2s infinite}
+.ag .specialist-tile.review .specialist-state i{background:#f5b544}
+.ag .specialist-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.ag .specialist-stats>span{display:grid;padding:8px 10px;border-radius:8px;background:color-mix(in oklab,var(--fg) 4%,transparent);font-size:11px;color:var(--muted)}
+.ag .specialist-stats b{font-size:15px;font-weight:600;color:var(--fg)}
+.studio-shell .ag .specialist-chips{display:flex;flex-wrap:wrap;gap:4px;min-height:20px}
+.studio-shell .ag .specialist-chips span{font-size:11px;color:var(--muted);background:var(--surface-2);border:0;border-radius:6px;padding:2px 7px}
+.studio-shell .ag .precision-agent-actions{display:flex;gap:6px;margin-top:auto;padding:0;border:0}
+.studio-shell .ag .precision-agent-actions .specialist-chat{flex:1;margin:0;padding:0 12px;min-height:0;display:inline-flex;align-items:center;justify-content:center;gap:6px;height:32px;border:0;border-radius:8px;background:var(--fg);color:var(--bg);font:inherit;font-size:12px;font-weight:600;cursor:pointer}
+.studio-shell .ag .precision-agent-actions .specialist-chat svg{width:14px;height:14px;fill:none;stroke:currentColor}
+.studio-shell .ag .specialist-configure{height:32px;margin:0}
+.ag-new{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;min-height:260px;padding:18px;border:1px dashed var(--border);border-radius:14px;background:transparent;color:var(--muted);font:inherit;cursor:pointer}
+.ag-new:hover{border-color:var(--line-strong,var(--border));color:var(--fg)}
+.ag-new>span{display:grid;place-items:center;width:56px;height:56px;border-radius:16px;border:1px dashed var(--border)}
+.ag-new>span svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8}
+.ag-new b{color:var(--fg);font-weight:500;font-size:13px}
+.ag-new small{max-width:230px;font-size:12px;text-align:center;line-height:1.5}
+
+@media (prefers-reduced-motion:reduce){.ag .specialist-tile.busy .specialist-state i{animation:none}.studio-shell .qb .task-card:hover{transform:none}}
+@media (max-width:900px){.studio-shell .qb .board{grid-template-columns:repeat(4,minmax(220px,1fr))}}
+.studio-shell .ag .precision-agent-actions .specialist-chat{justify-content:center!important}
+.studio-shell .ag .precision-agent-actions .specialist-chat span{flex:none!important;margin:0!important}

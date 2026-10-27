@@ -88,7 +88,8 @@ async function fixture({transcriber,videoAgent={}}={}){
   events:async function*(id){const text=outputs.get(id);yield {type:'message.completed',content:text};yield {type:'execution.completed'}}};
  const authoring=createEditorAuthoring(),log=[],scripts=[],claude=scriptedClaude(authoring,scripts);
  const flow=createProductionFlow('space','Fluxo',agents);
- const mediaOptions={...(transcriber?{transcriber}:{}),inspect,animate:async({inputPath,outputPath})=>copyFile(inputPath,outputPath),animationCapabilities:async()=>({available:true}),stills:stillsStub};
+ // Regression of legacy combined productions (the staged workflow has a separate real-engine suite).
+ const mediaOptions={newEditWorkflow:()=>undefined,...(transcriber?{transcriber}:{}),inspect,animate:async({inputPath,outputPath})=>copyFile(inputPath,outputPath),animationCapabilities:async()=>({available:true}),stills:stillsStub};
  const bridge=createContentWorkflowBridge({dbPath,getCurrentProfile:()=>'owner',getAgents:()=>agents,getFlows:()=>({flows:[flow]}),getSessions:()=>sessions,getRuntime:()=>codex,getChatRuntime:provider=>provider==='claude'?claude:codex,inspect,mediaOptions,timeoutMs:120000});
  const db=new DatabaseSync(dbPath);
  const delegate=(callId,instructions)=>bridge.delegations.dispatch({profileId:'owner',agentId:'conteudo',sessionId:'chat-1'},{threadId:'source-thread',turnId:`turn-${callId}`,callId,arguments:{targetAgentId:'editor-de-video-1',title:'Dicas de edição',instructions,files:[input]}},{targets:[{id:'editor-de-video-1'}]});

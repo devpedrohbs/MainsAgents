@@ -25,6 +25,6 @@ interface TileProps {id:string;title:string;platform:string;status:string;status
 export function PublicationTile({id,title,platform,status,statusLabel,time,cover,pt=true,onClick,compact=false,className=''}:TileProps) {
   return <button type="button" className={`publication-tile ${compact?'compact':''} ${className}`} data-status={status} data-od-id={`post-${id}`} onClick={onClick} aria-label={`${title} · ${platform} · ${time??(pt?'Sem data':'No date')} · ${statusLabel}`}>
     <span className="post-cover"><PostCover src={cover} title={title} pt={pt}/><NetworkLogo platform={platform}/></span>
-    <span className="post-tile-copy"><b>{title}</b><span className="post-tile-meta"><time>{time??(pt?'Sem data':'No date')}</time><span className="post-status"><i/>{statusLabel}</span></span></span>
+    <span className="post-tile-copy"><b>{title}</b><span className="post-tile-meta"><time>{time??(pt?'Sem data':'No date')}</time><span className="post-tile-network" aria-hidden="true">{platform}</span><span className="post-status"><i/>{statusLabel}</span></span></span>
   </button>;
 }

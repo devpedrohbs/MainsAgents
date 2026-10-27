@@ -29,7 +29,7 @@ export function srtDocumentView(doc) {
   return {...doc, source: {...source, ...(doc.source.words ? {wordCount: doc.source.words.length} : {})}, ...(alignment ? {alignment} : {})};
 }
 /** Vídeo cujos tempos o documento usa: a fonte (gerado) ou o da sincronização (importado alinhado). */
-export const linkedVideo = (doc) => doc.source.kind === 'video' ? refOf(doc.source) : doc.alignment ? refOf(doc.alignment) : null;
+export const linkedVideo = (doc) => doc.source.kind === 'video' ? refOf(doc.source) : doc.alignment ? refOf(doc.alignment) : doc.targetVideo ? refOf(doc.targetVideo) : null;
 
 export function createContentSrt(db, {directory, inspect = inspectLocalAsset, readBytes = readFile, media, getCurrentProfile} = {}) {
   db.exec('CREATE TABLE IF NOT EXISTS content_srt_documents(profile_id TEXT NOT NULL,id TEXT NOT NULL,content_id TEXT NOT NULL,data_json TEXT NOT NULL,updated_at TEXT NOT NULL,PRIMARY KEY(profile_id,id))');
@@ -229,10 +229,12 @@ export function createContentSrt(db, {directory, inspect = inspectLocalAsset, re
         try { parsed = parseSrtDocument(input.srt); } catch (error) { asSrtError(error); }
         return transact(() => {
           profileCheck(profile);
-          const {content} = contentOf(profile, input.contentId);
+          const {content,value} = contentOf(profile, input.contentId);
+          const target=input.targetVideo;
+          if(target!==undefined&&(!id(target?.assetId)||!id(target?.versionId)||!sha(target?.sha256)||!videoOf(value,content.id,target)))throw statusError(409,'Escolha a versão atual do vídeo deste conteúdo para associar o SRT.');
           if (countFor(profile, content.id) >= MAX_DOCS_PER_CONTENT) throw statusError(409, `Este conteúdo já tem ${MAX_DOCS_PER_CONTENT} SRTs. Use um dos existentes.`);
           const title = typeof input.name === 'string' && input.name.trim() ? input.name.trim().slice(0, 120) : 'legendas.srt';
-          const doc = {id: `srt-${randomUUID()}`, schema: SRT_SCHEMA, contentId: content.id, workspaceId: content.workspaceId, title, source: {kind: 'srt', name: title, sha256: srtBlocksHash(parsed.cues), cues: parsed.cues, warnings: parsed.warnings}, versions: [], exports: [], createdAt: stamp()};
+          const doc = {id: `srt-${randomUUID()}`, schema: SRT_SCHEMA, contentId: content.id, workspaceId: content.workspaceId, title, ...(target?{targetVideo:refOf(target)}:{}), source: {kind: 'srt', name: title, sha256: srtBlocksHash(parsed.cues), cues: parsed.cues, warnings: parsed.warnings}, versions: [], exports: [], createdAt: stamp()};
           const original = {version: 0, blocks: parsed.cues.map((cue, unit) => ({...cue, timing: 'imported', unit})), warnings: parsed.warnings};
           const next = resplit(doc, original, maxWords);
           pushVersion(doc, next.blocks, {origin: 'split', maxWords, warnings: next.warnings});

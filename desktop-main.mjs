@@ -1,6 +1,6 @@
 import {createZernioPublicationConnector} from './zernio-publication-connector.mjs';
 import { setDesktopDiagnosticWriter } from './desktop-diagnostics.mjs';
-import { app, BrowserWindow, dialog, ipcMain, safeStorage, session, shell, Notification } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, nativeImage, safeStorage, session, shell, Notification } from 'electron';
 import { attachCanvasBrowserPolicy } from './canvas-browser-security.mjs';
 import { desktopStorageDirectory, openDesktopWorkspaceStore } from './desktop-storage-location.mjs';
 import { findSkills } from './skill-discovery.mjs';
@@ -28,6 +28,7 @@ import {inspectBackupFileLinks} from './backup-file-links.mjs';
 import {registerEditorialFilesIpc} from './editorial-files-ipc.mjs';
 import {registerDeliveryReceiptsIpc} from './delivery-receipts-ipc.mjs';
 import {registerContentDeletionIpc} from './content-deletion-ipc.mjs';
+import {registerChatAttachmentsIpc} from './chat-attachments-ipc.mjs';
 
 const mimeTypes = {
   '.css': 'text/css; charset=utf-8',
@@ -293,6 +294,7 @@ function startWebServer(rootDirectory, port = 47831) {
 
 let desktopStateStore;
 registerEditorialFilesIpc({ipcMain,dialog,shell,getWindow:()=>mainWindow,getStore:()=>desktopStateStore});
+registerChatAttachmentsIpc({ipcMain,dialog,nativeImage,getWindow:()=>mainWindow,directory:()=>join(app.getPath('userData'),'chat-attachments')});
 registerDeliveryReceiptsIpc({ipcMain,shell,getWindow:()=>mainWindow,getReceipts:()=>contentWorkflowBridge?.receipts,getCurrentProfile:()=>desktopStateStore?.currentProfile()});
 registerContentDeletionIpc({ipcMain,isTrustedSender:event=>event.sender===mainWindow?.webContents&&event.senderFrame===event.sender.mainFrame,getStore:()=>shuttingDown?null:desktopStateStore,getDeletion:()=>contentWorkflowBridge?.deletion});
 ipcMain.on('state:profile', event => {
@@ -386,7 +388,7 @@ async function createWindow() {
     height: 940,
     minWidth: 1080,
     minHeight: 700,
-    backgroundColor: '#0c0d10',
+    backgroundColor: '#0f0f10',
     icon: join(app.getAppPath(), 'dist', 'images', 'brand', 'mainsagents-icon-black.ico'),
     show: false,
     title: 'MainsAgents',

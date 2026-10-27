@@ -121,3 +121,96 @@
 @container (max-width:800px){.calendar-period{flex-basis:100%}.calendar-topline{gap:12px}.calendar-view-tabs{margin-left:auto}.calendar-filters>.select-menu{width:155px}.calendar-search{flex:1;max-width:none}.calendar-network-filters{flex-basis:100%}.post-cover{height:70px}.publishing-day{padding:5px}.calendar-footer{flex-wrap:wrap}.calendar-day-panel{display:block;position:static}.calendar-day-panel>div:not(.calendar-day-note){display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}}
 @container (max-width:600px){.publishing-grid{display:none}.publishing-agenda{display:block;padding:4px 14px}.calendar-period h2{font-size:18px}.calendar-period>span{font-size:11px}.calendar-topline{gap:8px}.calendar-view-tabs button{padding:6px 9px}.calendar-navigation{gap:0}.network-filter{padding:7px;min-height:36px}.network-filter>span:not(.network-logo){display:none}.network-filter .network-logo{width:20px;height:20px}.calendar-day-panel{display:none}.calendar-filters>.select-menu{width:135px}.agenda-day{grid-template-columns:55px minmax(0,1fr);gap:10px}.calendar-search{min-width:100px}.calendar-backlog>div{grid-template-columns:1fr}.calendar-confirmation-note{font-size:10px}.calendar-connections>summary{padding:14px 12px}.calendar-connections>summary small{font-size:10px}.publication-preview-meta{flex-wrap:wrap}}
 @media(pointer:coarse){.publishing-day-number,.network-filter,.calendar-view-tabs button,.calendar-navigation button{min-height:44px}}
+/* Round 6: month label in sentence case, and the agents of each post under the day panel's tile. */
+.calendar-period h2{text-transform:none}
+.calendar-period h2::first-letter{text-transform:uppercase}
+.day-post{display:grid;gap:6px}
+.day-post-crew{display:grid;gap:4px;margin:0;padding:0 2px;list-style:none}
+.day-post-crew li{display:flex;align-items:center;gap:8px;min-width:0;font-size:12px;color:var(--muted)}
+.day-post-crew .agent-avatar{width:22px;height:22px;min-width:22px;border-radius:7px}
+.day-post-crew span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.day-post-crew small{margin-left:auto;font-size:11px}
+/* Dark Studio calendar: one panel holds the month grid and the day detail; posts read as small chips
+   (status dot, time · network, title) and the artwork lives in the day panel. No shadows. */
+.post-tile-network{display:none}
+.calendar-topline{margin:4px 0 16px;gap:10px}
+.calendar-period{align-items:center;gap:10px}
+.calendar-period h2{font-size:18px;font-weight:700;letter-spacing:-.01em}
+.calendar-navigation{gap:6px}
+.calendar-navigation .icon-button{width:28px;min-height:28px;height:28px;padding:0;border:1px solid var(--border);border-radius:7px;color:var(--muted)}
+.calendar-navigation .icon-button:hover{background:var(--surface-2);color:var(--fg)}
+.calendar-navigation .soft-button{min-height:28px;height:28px;padding:0 10px;margin-right:0;border-radius:7px;font-size:12px}
+.calendar-view-tabs{padding:2px;background:transparent;border-color:var(--border);border-radius:8px}
+.calendar-view-tabs button{min-height:26px;padding:0 10px}
+.calendar-view-tabs button[aria-pressed=true]{background:var(--surface-2);color:var(--fg);font-weight:600;box-shadow:none}
+.calendar-filters{gap:8px;margin-bottom:12px}
+.network-filter{min-height:30px;padding:0 10px;font-size:12px;border-radius:8px}
+.network-filter[aria-pressed=true]{border-color:transparent;background:var(--surface-2)}
+.network-filter:hover{background:var(--surface-2);color:var(--fg)}
+.calendar-search{padding:0 10px;min-height:30px;background:transparent;border-radius:8px}
+.calendar-layout{grid-template-columns:minmax(0,1fr) 300px;gap:0;border:1px solid var(--border);border-radius:12px;background:var(--bg);overflow:hidden}
+.calendar-layout{align-items:stretch}
+.publishing-grid,.publishing-agenda{border:0;border-radius:0;background:transparent}
+.publishing-weekday{padding:8px 10px;background:transparent;border-bottom-color:var(--border);color:var(--meta);font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+.publishing-day{min-height:112px;padding:6px 8px;display:flex;flex-direction:column;gap:4px}
+.publishing-day.outside{background:color-mix(in srgb,var(--frame) 55%,var(--bg))}
+.publishing-day.outside .publishing-day-number{color:var(--faint)}
+.publishing-day.selected{background:var(--accent-soft);box-shadow:inset 0 0 0 1px var(--accent)}
+.publishing-day-number{min-height:24px;margin-bottom:0}
+.publishing-day-number time{width:22px;height:22px;border-radius:6px;font-weight:500;color:var(--fg-2)}
+.publishing-day.today .publishing-day-number time{background:var(--primary-bg);color:var(--primary-fg);font-weight:700}
+.publishing-day.selected:not(.today) .publishing-day-number time{background:transparent;color:var(--fg);font-weight:700}
+.publishing-grid .publication-tile{margin:0;border-color:var(--border);border-radius:6px;background:var(--surface)}
+.publishing-grid .publication-tile:hover{border-color:var(--line-strong);box-shadow:none}
+.publishing-grid:not(.week-grid) .post-cover{display:none}
+.publishing-grid:not(.week-grid) .post-tile-copy{flex-direction:column-reverse;gap:1px;padding:5px 7px}
+.publishing-grid:not(.week-grid) .post-tile-copy>b{font-size:12px;font-weight:500;line-height:1.35;-webkit-line-clamp:1}
+.publishing-grid:not(.week-grid) .post-tile-meta{flex-wrap:nowrap;gap:0;font-size:11px;overflow:hidden;white-space:nowrap}
+.publishing-grid:not(.week-grid) .post-tile-meta time{font-family:inherit;font-size:11px}
+.publishing-grid:not(.week-grid) .post-tile-network{display:inline;overflow:hidden;text-overflow:ellipsis}
+.publishing-grid:not(.week-grid) .post-tile-network::before{content:"·";margin:0 4px}
+.publishing-grid:not(.week-grid) .post-status{order:-1;font-size:0;gap:0;margin-right:6px}
+.post-status i,.calendar-legend i{width:6px;height:6px}
+.calendar-more{padding:2px 0;font-size:11px}
+/* Status colors follow the tokens: draft gray, review amber, approved accent, scheduled and published green. */
+.post-status i,.calendar-legend i.draft{background:var(--meta)}
+[data-status=in-review] .post-status i{background:var(--warn)}
+[data-status=approved] .post-status i,.calendar-legend i.approved{background:var(--accent)}
+[data-status=scheduled] .post-status i,.calendar-legend i.scheduled{background:var(--success)}
+[data-status=published] .post-status i{background:var(--success)}
+[data-status=failed] .post-status i{background:var(--danger)}
+.calendar-day-panel{position:static;border:0;border-left:1px solid var(--border);border-radius:0;background:transparent;display:flex;flex-direction:column}
+.calendar-day-panel>header{padding:16px 16px 4px;border-bottom:0}
+.calendar-day-panel>header>span{font-size:12px}
+.calendar-day-panel h3{margin-top:2px;font-size:18px;font-weight:700;letter-spacing:-.01em}
+.calendar-day-panel>header>small{font-size:12px;color:var(--meta)}
+.calendar-day-panel>div:not(.calendar-day-note){display:grid;gap:14px;padding:12px 16px 16px}
+.calendar-day-panel .publication-tile{margin:0;border-radius:12px;background:var(--surface)}
+.calendar-day-panel .publication-tile:hover{border-color:var(--line-strong);box-shadow:none}
+.calendar-day-panel .post-cover{height:150px;background:var(--surface-2)}
+.calendar-day-panel .post-cover-empty{background:var(--surface-2);font-size:12px}
+.calendar-day-panel .post-tile-copy{flex-direction:column-reverse;gap:8px;padding:12px}
+.calendar-day-panel .post-tile-copy>b{font-size:14px;font-weight:600}
+.calendar-day-panel .post-tile-meta{font-size:12px}
+.calendar-day-panel .post-tile-meta time{font-family:inherit;font-size:12px}
+.calendar-day-panel .post-status{margin-left:auto;padding:1px 8px;border:1px solid var(--border);border-radius:999px;font-size:12px}
+.calendar-day-panel [data-status=in-review] .post-status{color:var(--warn);background:var(--warn-soft);border-color:color-mix(in srgb,var(--warn) 25%,transparent)}
+.calendar-day-panel [data-status=approved] .post-status{color:var(--accent);background:var(--accent-soft);border-color:color-mix(in srgb,var(--accent) 25%,transparent)}
+.calendar-day-panel [data-status=scheduled] .post-status,.calendar-day-panel [data-status=published] .post-status{color:var(--success);background:var(--success-soft);border-color:color-mix(in srgb,var(--success) 25%,transparent)}
+.calendar-day-panel [data-status=failed] .post-status{color:var(--danger);background:var(--danger-soft);border-color:color-mix(in srgb,var(--danger) 25%,transparent)}
+.calendar-day-note{margin-top:auto;padding:14px 16px;font-size:12px;color:var(--meta);border-top-color:var(--border)}
+.calendar-day-note i{display:none}
+.day-panel-empty p{font-size:13px}
+.day-panel-empty span{font-size:12px}
+.post-cover .network-logo,.publication-preview-cover .network-logo{border-color:var(--surface);box-shadow:none}
+.calendar-legend>span,.calendar-confirmation-note{font-size:12px;color:var(--meta)}
+.calendar-backlog summary>span{font-size:11px;background:var(--surface-2)}
+.calendar-connections{background:transparent}
+/* Empty month: the message sits over the faded grid, as on the board. */
+.calendar-board{position:relative}
+.calendar-board:has(.publishing-grid) .calendar-empty{position:absolute;inset:36px 0 0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:24px;background:radial-gradient(ellipse 46% 44% at 50% 50%,var(--bg),color-mix(in srgb,var(--bg) 85%,transparent) 55%,transparent 100%)}
+.calendar-empty>svg{display:block;box-sizing:content-box;width:20px;height:20px;padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--surface);color:var(--muted);fill:none;stroke:currentColor;stroke-width:1.7}
+.calendar-empty strong{font-size:22px;line-height:1.25;font-weight:700;letter-spacing:-.01em}
+.calendar-empty p{max-width:400px;margin:0;font-size:14px;line-height:1.55;color:var(--muted)}
+@container (max-width:1120px){.calendar-layout{grid-template-columns:minmax(0,1fr)}.calendar-day-panel{border-left:0;border-top:1px solid var(--border)}.calendar-day-panel>div:not(.calendar-day-note){grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}}
+@container (max-width:600px){.calendar-layout{border:0;background:transparent}.publishing-agenda{border:1px solid var(--border);border-radius:12px}}

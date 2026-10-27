@@ -1,0 +1,70 @@
+/* Overview, direction A ("Mesa do dia"): what needs the user, what is in production, who is working now. */
+.studio-shell .ov{display:grid;gap:22px;container-type:inline-size}
+.ov-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px 20px;flex-wrap:wrap}
+.ov-date{margin:0 0 4px;font-size:12px;color:var(--meta,var(--muted))}
+.ov-date::first-letter{text-transform:uppercase}
+.ov-head h1{margin:0}
+.ov-lede{margin:6px 0 0;color:var(--muted);font-size:14px}
+.ov-head-side{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ov-team-pill{display:inline-flex;align-items:center;gap:10px;height:40px;padding:0 14px 0 12px;border:1px solid var(--border);border-radius:999px;background:transparent;color:var(--muted);font:inherit;font-size:12px;cursor:pointer}
+.ov-team-pill:hover{background:var(--surface-2)}
+
+.ov-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,340px);gap:20px;align-items:start}
+.ov-main,.ov-side{display:grid;gap:20px;min-width:0;align-content:start}
+/* Older panels (production executions) bring their own outer margins; the grid gap is the only spacing here. */
+.studio-shell .ov .ov-main>*,.studio-shell .ov .ov-side>*{margin:0}
+.ov-card{border:1px solid var(--border);border-radius:12px;background:var(--surface);padding:8px;min-width:0}
+.ov-card-head{display:flex;align-items:center;gap:10px;padding:8px 10px 6px;min-width:0}
+.ov-card-head h2{margin:0;font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px;flex:1;min-width:0}
+.ov-card-head .text-link{display:inline-flex;align-items:center;gap:2px;font-size:12px;white-space:nowrap}
+.ov-card-head .text-link svg{width:13px;height:13px}
+.ov-sub{font-size:12px;font-weight:400;color:var(--muted)}
+.ov-needs-count{font-size:11px;font-weight:600;color:#111113;background:#f5b544;border-radius:999px;padding:1px 7px}
+.ov-alert{display:grid;gap:2px;margin:4px 10px 8px;padding:10px 12px;border-radius:9px;background:color-mix(in oklab,#f87171 12%,transparent);font-size:12px;color:var(--muted)}
+.ov-alert b{color:var(--fg);font-weight:500}
+
+.ov-list{display:grid;gap:2px}
+.ov-row{display:flex;align-items:center;gap:12px;width:100%;padding:10px;border:0;border-radius:9px;background:transparent;color:var(--fg);font:inherit;text-align:left;cursor:pointer;min-width:0}
+.ov-row:hover{background:var(--surface-2)}
+.ov-row>.agent-avatar,.ov-need-icon{width:36px;height:36px;min-width:36px;border-radius:11px}
+.ov-need-icon{display:grid;place-items:center;background:var(--surface-2);color:var(--muted)}
+.ov-need-icon svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7}
+.ov-row-copy{display:grid;gap:2px;flex:1;min-width:0}
+.ov-row-copy b{font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ov-row-copy small{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ov-tone{flex-shrink:0;font-size:11px;padding:2px 8px;border:1px solid var(--border);border-radius:999px;white-space:nowrap;color:var(--muted)}
+.ov-tone.review{color:#d99a1e}.ov-tone.reply{color:var(--accent)}.ov-tone.approval{color:#8b6cf0}.ov-tone.blocked{color:#e05252}
+.ov-action{flex-shrink:0;height:30px;display:inline-flex;align-items:center;padding:0 12px;border-radius:8px;background:var(--fg);color:var(--bg);font-size:12px;font-weight:600;white-space:nowrap}
+.ov-need.next .ov-action{background:var(--surface-2);color:var(--fg)}
+.ov-more{display:flex;align-items:center;justify-content:center;gap:4px;width:calc(100% - 16px);margin:6px 8px 4px;padding:8px;border:0;border-radius:8px;background:var(--surface-2);color:var(--muted);font:inherit;font-size:12px;cursor:pointer}
+.ov-empty{display:grid;justify-items:start;gap:6px;padding:8px 10px 12px;margin:0;color:var(--muted);font-size:13px}
+.ov-empty b{color:var(--fg);font-weight:500}
+
+/* Production rows: title, a bar of the 8 stages, the agents on it. */
+.ov-prod-labels,.ov-prod-row{display:grid;grid-template-columns:minmax(0,1fr) 224px 72px;gap:0 16px;align-items:center}
+.ov-prod-labels{padding:4px 10px 2px;font-size:11px;color:var(--meta,var(--muted))}
+.ov-bars{display:grid;grid-template-columns:repeat(8,1fr);gap:3px}
+.ov-bars i{height:6px;border-radius:3px;background:var(--border)}
+.ov-bars i.done{background:var(--accent)}
+.ov-bars i.current{background:color-mix(in oklab,var(--accent) 45%,#fff)}
+.ov-faces{display:flex;justify-content:flex-end;flex-shrink:0}
+.ov-faces .agent-avatar{width:26px;height:26px;min-width:26px;border-radius:8px;margin-left:-6px;box-shadow:0 0 0 2px var(--surface)}
+.ov-faces .agent-avatar:first-child{margin-left:0}
+.ov-team-pill .ov-faces .agent-avatar{width:28px;height:28px;min-width:28px;box-shadow:0 0 0 2px var(--bg)}
+
+/* Now: every agent with what it is doing. */
+.ov-now .ov-row>.agent-avatar{width:40px;height:40px;min-width:40px;border-radius:12px}
+.ov-provider{flex-shrink:0;font-size:11px;color:var(--meta,var(--muted))}
+.ov-live{width:7px;height:7px;border-radius:50%;background:var(--accent);animation:mascot-dot 1.2s infinite}
+.ov-shimmer{background:linear-gradient(90deg,var(--muted) 0%,var(--muted) 40%,var(--fg) 50%,var(--muted) 60%,var(--muted) 100%);background-size:240% 100%;-webkit-background-clip:text;background-clip:text;color:transparent !important;animation:ov-shimmer 2.2s linear infinite}
+@keyframes ov-shimmer{0%{background-position:120% 0}100%{background-position:-120% 0}}
+
+.ov-task-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;padding:4px 8px 8px}
+.ov-task-stats button{display:grid;gap:2px;padding:10px;border:0;border-radius:9px;background:var(--surface-2);color:var(--fg);font:inherit;text-align:left;cursor:pointer;min-width:0}
+.ov-task-stats b{font-size:20px;font-weight:600;font-variant-numeric:tabular-nums}
+.ov-task-stats span{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ov-task-stats .review b{color:#d99a1e}
+
+@media (prefers-reduced-motion:reduce){.ov-shimmer,.ov-live{animation:none}.ov-shimmer{color:var(--muted) !important;background:none}}
+@container (max-width:900px){.ov-grid{grid-template-columns:minmax(0,1fr)}}
+@container (max-width:620px){.ov-prod-labels{display:none}.ov-prod-row{grid-template-columns:minmax(0,1fr) auto}.ov-prod-row .ov-bars{grid-column:1/-1;grid-row:2;margin-top:8px}.ov-tone{display:none}}

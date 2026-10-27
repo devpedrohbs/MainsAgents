@@ -53,7 +53,7 @@ const sessions=()=>store.read(profile,'sessions'),byTitle=title=>sessions().find
 async function openSessions(){await js(`document.querySelector('button[title="Sessões deste agente"]').click()`);await until(()=>js('Boolean(document.querySelector(".panel-sessions"))'),'sessions tab');}
 // Content spaces: the agent's Sessions tab lists only the selected content, so switch to the chat's space first (title = content).
 const spaceOption=title=>`Array.from(document.querySelectorAll('[role=listbox] .select-menu-option')).find(el=>el.querySelector('.select-menu-option-copy b')?.textContent===${JSON.stringify(title)})`;
-async function showSpace(title){if(await js(`document.querySelector('.content-scope-picker .select-menu-value')?.textContent`)===title)return;await js(`document.querySelector('.content-scope-picker .select-menu-trigger').click()`);await until(()=>js(`Boolean(${spaceOption(title)})`),`space ${title}`);await js(`${spaceOption(title)}.click()`);await until(()=>js(`document.querySelector('.content-scope-picker .select-menu-value')?.textContent===${JSON.stringify(title)}`),`space ${title} selected`);}
+async function showSpace(title){if(await js(`document.querySelector('.content-scope-picker .select-menu-value')?.textContent`)===title)return;await click('.content-scope-picker .select-menu-trigger');await until(()=>js(`Boolean(${spaceOption(title)})`),`space ${title}`);await js(`${spaceOption(title)}.click()`);await until(()=>js(`document.querySelector('.content-scope-picker .select-menu-value')?.textContent===${JSON.stringify(title)}`),`space ${title} selected`);}
 async function openSessionNamed(title){await showSpace(title);await openSessions();await js(`Array.from(document.querySelectorAll('.panel-session-main')).find(el=>el.querySelector('b')?.textContent===${JSON.stringify(title)}).click()`);await until(()=>js(`document.querySelector('.active-session-bar')?.textContent.includes(${JSON.stringify(title)})`),`open ${title}`);}
 async function newContent(title){await openSessions();await button('Novo conteúdo');await inputText('[aria-label="Nome do novo conteúdo"]',title);await button('Criar conteúdo');await until(()=>js(`document.querySelector('.content-session-card')?.textContent.includes(${JSON.stringify(title)})`),`card ${title}`);}
 const composer=()=>js('document.querySelector(".composer textarea").value');
@@ -68,8 +68,8 @@ async function startRecorded({file,context,card}){
   cardFails=false;await button('Ler este card');await until(()=>js(`document.querySelector('.recorded-entry-card')?.textContent.includes('CARD_B_CONTEXT')`),'card preview');}
  else await inputText('[aria-label="Contexto do vídeo"]',context);
  await until(()=>js(`document.querySelector('.recorded-entry .production-preflight [role=status]')?.textContent.includes('Nenhum bloqueio')`),'preflight ok');
- // Synthetic tone without speech: motion has nothing to animate, so the fixture explicitly chooses the existing "Sem motion" option.
- await js(`document.querySelector('.recorded-entry button[aria-label="Movimento na edição do vídeo gravado"]').click()`);await until(()=>js(`Boolean(Array.from(document.querySelectorAll('[role=listbox] .select-menu-option')).find(el=>el.textContent.includes('Sem motion')))`),'motion menu');await js(`Array.from(document.querySelectorAll('[role=listbox] .select-menu-option')).find(el=>el.textContent.includes('Sem motion')).click()`);
+ // New edits start with cuts/audio; visual editing must not be offered before the cut review.
+ assert(await js(`document.querySelector('.recorded-entry').textContent.includes('1. Cortes e ' )`),'cuts-first stages explained');assert.equal(await js(`Boolean(document.querySelector('.recorded-entry [aria-label^="Movimento"]'))`),false,'no premature visual/motion selector');
  await click('.recorded-entry-review .production-check input');await until(()=>js('document.querySelector(".recorded-entry-review .production-check input").checked'),'authorized');
  await shot(card?'entry-review-B':'entry-review-A');await button('Iniciar edição do vídeo gravado');await until(()=>js('!document.querySelector(".recorded-entry")'),'entry closed');
 }
@@ -97,9 +97,9 @@ app.whenReady().then(async()=>{try{
  // A: recorded video + pasted context. B: inaccessible card (honest error), then the chosen card.
  await openSessionNamed('Vídeo A');await shot('content-a-start');
  await startRecorded({file:videoA,context:'TEXT_A_CONTEXT: tutorial já gravado sobre automação de planilhas.'});
- await until(()=>['video-review','blocked'].includes(runFor(sa.contentId)?.stage),'A edited');assert.equal(runFor(sa.contentId).stage,'video-review',runFor(sa.contentId).error);
+ await until(()=>['video-review','blocked'].includes(runFor(sa.contentId)?.stage),'A edited');assert.equal(runFor(sa.contentId).stage,'video-review',runFor(sa.contentId).error);assert.equal(runFor(sa.contentId).editWorkflow.phase,'cuts','A waits for cut approval');
  await openSessionNamed('Vídeo B');await startRecorded({file:videoB,card:`https://www.notion.so/Roteiro-B-${CARD}`});
- await until(()=>['video-review','blocked'].includes(runFor(sb.contentId)?.stage),'B edited');assert.equal(runFor(sb.contentId).stage,'video-review',runFor(sb.contentId).error);
+ await until(()=>['video-review','blocked'].includes(runFor(sb.contentId)?.stage),'B edited');assert.equal(runFor(sb.contentId).stage,'video-review',runFor(sb.contentId).error);assert.equal(runFor(sb.contentId).editWorkflow.phase,'cuts','B waits for cut approval');
  const ra=runFor(sa.contentId),rb=runFor(sb.contentId);assert.equal(ra.sourceSession.id,sa.id);assert.equal(rb.sourceSession.id,sb.id);assert.equal(ra.entry.origin,'text');assert.equal(rb.entry.origin,'notion');assert.equal(rb.notion.pageId,CARD);
  assert.equal(notionWrites,0,'no Notion card created or updated');assert.equal(cardReads,2,'only the chosen card was read (one failed attempt + one read)');assert.equal(bridge.jobs.list(profile).length,0);
  assert(prompts.every(p=>p.agent==='editor'),'no script/idea generation: only the configured editor ran');
@@ -117,19 +117,19 @@ app.whenReady().then(async()=>{try{
  assert(JSON.parse(payloadB.content.split('tools):\n')[1].split('\nThe app owns')[0]).entry.cardUrl.includes(CARD));
  // Mirroring: the editor's result is in each main chat and no empty visible clone of the same content exists in the entry agent.
  for(const s of [byTitle('Vídeo A'),byTitle('Vídeo B')]){assert(s.messages.some(m=>m.sourceAgentName==='Editor de Vídeo'&&/Vídeo exportado e verificado/.test(m.content)),'editor result mirrored into the main chat');assert.equal(sessions().filter(x=>x.agentId==='source'&&x.contentId===s.contentId).length,1,'one visible main chat per content');}
- // Approving A's video changes only A.
+ // Approving A's cuts advances only A to captions; no visual or publication work starts.
  await openSessionNamed('Vídeo A');await button('Abrir etapa atual');await until(()=>js('Boolean(document.querySelector(".production-panel-body"))'),'A production');
  assert(await js(`document.querySelector('.production-panel-body').textContent.includes('Entrada com vídeo já gravado')`));assert.equal(await js(`Array.from(document.querySelectorAll('[aria-label="Produção atual"]')).length`),1);
- const bBefore=runFor(sb.contentId).revision;await button('Aprovar este vídeo');await until(()=>runFor(sa.contentId).stage==='platforms','A approved');assert.equal(runFor(sb.contentId).stage,'video-review');assert.equal(runFor(sb.contentId).revision,bBefore);
- await click('.flow-dialog header button');await until(()=>js(`document.querySelector('.content-session-card')?.textContent.includes('Escolher plataformas')`),'A card updated');await shot('content-a-platforms');
+ const bBefore=runFor(sb.contentId).revision;await button('Usar só os cortes e ir para legendas');await until(()=>runFor(sa.contentId).editWorkflow?.phase==='captions','A cut approval');assert.equal(runFor(sa.contentId).stage,'video-review');assert.equal(runFor(sb.contentId).editWorkflow.phase,'cuts');assert.equal(runFor(sb.contentId).revision,bBefore);
+ await until(()=>js(`document.querySelector('[data-od-id="edit-stages"]')?.textContent.includes('3. Legendas SRT para o CapCut')`),'caption stage shown');await shot('content-a-captions');await click('.flow-dialog header button');
  // Restart: both contents resume from saved state, no AI call, card read or job is repeated.
  const counts=JSON.stringify({prompts:prompts.length,cardReads,notionWrites,chat:chatInputs.length});await js('window.mainsAgentsSaveNow?.()');win.destroy();await bridge.close();bridge=createContentWorkflowBridge(bridgeOptions);await open();
  await openSessionNamed('Vídeo B');await until(()=>js(`document.querySelector('.content-session-card')?.textContent.includes('Aguardando aprovação do vídeo')`),'B resumed');
- await openSessionNamed('Vídeo A');await until(()=>js(`document.querySelector('.content-session-card')?.textContent.includes('Escolher plataformas')`),'A resumed');assert.equal(await composer(),'','A draft was sent and cleared');
+ await openSessionNamed('Vídeo A');await until(()=>runFor(sa.contentId)?.editWorkflow?.phase==='captions','A caption phase persisted');assert.equal(runFor(sb.contentId).editWorkflow.phase,'cuts','B cut review persisted');assert.equal(await composer(),'','A draft was sent and cleared');
  await showSpace('Vídeo B');await openSessions();assert(await js(`Array.from(document.querySelectorAll('.panel-session')).some(el=>el.textContent.includes('Vídeo B')&&el.textContent.includes('Conteúdo · Aguardando aprovação do vídeo'))`));await shot('sessions-list');
  await new Promise(resolve=>setTimeout(resolve,1500));assert.equal(JSON.stringify({prompts:prompts.length,cardReads,notionWrites,chat:chatInputs.length}),counts,'reopen never repeats a job');
  const old=sessions().find(s=>s.id===legacy.id);assert.equal(old.contentId,undefined);assert.equal(old.messages[0].content,'LEGACY_HISTORY');assert.equal(old.remoteSessionId,'thread-legacy');
- assert.deepEqual(errors,[]);console.log(`CONTENT_SESSIONS_UI_OK: two contents in agent "source" (sessions ${sa.id} / ${sb.id}, threads ${sa.remoteSessionId} / ${sb.remoteSessionId}); drafts and late reply isolated; recorded video + pasted context and + chosen card reached video review without script, idea or Notion write; inaccessible card reported honestly; approval of A left B unchanged; restart resumed both without repeating work; legacy chat preserved. Screenshots: ${out}`);
+ assert.deepEqual(errors,[]);console.log(`CONTENT_SESSIONS_UI_OK: two contents in agent "source" (sessions ${sa.id} / ${sb.id}, threads ${sa.remoteSessionId} / ${sb.remoteSessionId}); drafts and late reply isolated; recorded video + pasted context and + chosen card reached video review without script, idea or Notion write; inaccessible card reported honestly; cuts-only approval advances only A to captions, B unchanged; restart resumed both without repeating work; legacy chat preserved. Screenshots: ${out}`);
  win.destroy();await bridge.close();store.close();server.close();app.exit(0);
  }catch(error){console.error(error);console.error(errors);if(win&&!win.isDestroyed()){console.log((await js('document.body.innerText')).slice(0,4000));await shot('failure');win.destroy()}await bridge.close();store.close();server.close();app.exit(1)}
 });

@@ -4,7 +4,7 @@ import { useWorkspaces } from '../app/WorkspaceProvider';
 import { TaskColumn } from '../components/tasks/TaskColumn';
 import { useLanguage } from '../app/LanguageProvider';
 import { useAgents } from '../features/agents/AgentsProvider';
-import { SelectMenu } from '../components/common/SelectMenu';
+import { AgentAvatar } from '../components/agents/AgentAvatar';
 import { Icon } from '../components/common/Icon';
 
 const columns: { status: TaskStatus; label: string }[] = [
@@ -26,7 +26,7 @@ export function Board({
   onToast: (message: string) => void;
   onAddTask: (status: TaskStatus) => void;
 }) {
-  const { currentWorkspace, currentWorkspaceId } = useWorkspaces();
+  const { currentWorkspaceId } = useWorkspaces();
   const { agents } = useAgents();
   const [agentFilter, setAgentFilter] = useState('all');
   const { t, locale } = useLanguage();
@@ -40,6 +40,12 @@ export function Board({
           .includes(query.trim().toLocaleLowerCase(locale)),
     )
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const pt = locale === 'pt-BR';
+  const workspaceAgents = agents.filter((agent) => agent.workspaceId === currentWorkspaceId);
+  const review = tasks.filter((task) => task.status === 'review').length;
+  const summary = pt
+    ? `${tasks.length} tarefa${tasks.length === 1 ? '' : 's'}${review ? ` · ${review} esperando sua revisão` : ''}. Arraste os cartões para mudar o status.`
+    : `${tasks.length} task${tasks.length === 1 ? '' : 's'}${review ? ` · ${review} awaiting your review` : ''}. Drag cards to change status.`;
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<TaskStatus | null>(null);
   const finishDrag = () => {
@@ -52,17 +58,22 @@ export function Board({
     finishDrag();
   };
   return (
-    <div className="page board-page" data-od-id="task-board">
-      <div className="page-head">
+    <div className="page board-page qb" data-od-id="task-board">
+      <div className="qb-head">
         <div>
-          <p className="eyebrow">{currentWorkspace.name}</p>
-          <h1>{locale === 'pt-BR' ? 'Trabalho em andamento' : 'Work in progress'}</h1>
-          <p>
-            {locale === 'pt-BR'
-              ? 'Organize as entregas. Arraste para mudar o status ou abra o card para editar e conversar.'
-              : 'Organize deliverables. Drag to change status or open a card to edit and chat.'}
-          </p>
+          <h1>{pt ? 'Quadro' : 'Board'}</h1>
+          <p>{summary}</p>
         </div>
+        <label className="search-field">
+          <Icon name="search" />
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={pt ? 'Buscar tarefas…' : 'Search tasks…'}
+            aria-label={pt ? 'Buscar tarefas' : 'Search tasks'}
+          />
+        </label>
         <button className="primary-button" onClick={() => onAddTask('research')}>
           <Icon name="plus" />
           {t('New Task')}
@@ -83,42 +94,17 @@ export function Board({
           </button>
         </div>
       )}
-      <div className="collection-toolbar" data-od-id="board-filters">
-        <label className="search-field">
-          <Icon name="search" />
-          <input
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder={locale === 'pt-BR' ? 'Buscar tarefas…' : 'Search tasks…'}
-            aria-label={locale === 'pt-BR' ? 'Buscar tarefas' : 'Search tasks'}
-          />
-        </label>
-        <SelectMenu
-          ariaLabel={locale === 'pt-BR' ? 'Filtrar tarefas por agente' : 'Filter tasks by agent'}
-          value={agentFilter}
-          onChange={setAgentFilter}
-          options={[
-            { value: 'all', label: locale === 'pt-BR' ? 'Todos os agentes' : 'All agents' },
-            ...agents
-              .filter((agent) => agent.workspaceId === currentWorkspaceId)
-              .map((agent) => ({ value: agent.id, label: agent.name })),
-          ]}
-        />
-        <span className="result-count" role="status">
-          {filtered.length} {locale === 'pt-BR' ? 'tarefas' : 'tasks'}
-        </span>
-        {(query || agentFilter !== 'all') && (
-          <button
-            className="text-link"
-            onClick={() => {
-              setQuery('');
-              setAgentFilter('all');
-            }}
-          >
-            {locale === 'pt-BR' ? 'Limpar' : 'Clear'}
+      {/* The agents' faces are the filter. */}
+      <div className="qb-faces" role="group" aria-label={pt ? 'Filtrar tarefas por agente' : 'Filter tasks by agent'} data-od-id="board-filters">
+        <button aria-pressed={agentFilter === 'all'} onClick={() => setAgentFilter('all')}>{pt ? 'Todos os agentes' : 'All agents'}</button>
+        {workspaceAgents.map((agent) => (
+          <button key={agent.id} aria-pressed={agentFilter === agent.id} onClick={() => setAgentFilter(agentFilter === agent.id ? 'all' : agent.id)}>
+            <AgentAvatar name={agent.name} image={agent.avatarImage} mascot={agent.avatarMascot} role={agent.role} />
+            {agent.name}<span>{tasks.filter((task) => task.agentId === agent.id).length}</span>
           </button>
-        )}
+        ))}
+        <span className="result-count" role="status">{filtered.length} {pt ? 'tarefas' : 'tasks'}</span>
+        {(query || agentFilter !== 'all') && <button className="text-link" onClick={() => { setQuery(''); setAgentFilter('all'); }}>{pt ? 'Limpar' : 'Clear'}</button>}
       </div>
       {(query || agentFilter !== 'all') && filtered.length === 0 && (
         <p className="filter-feedback">

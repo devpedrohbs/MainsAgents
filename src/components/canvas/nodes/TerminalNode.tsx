@@ -1,5 +1,6 @@
+import { CanvasNodeResizer } from './CanvasNodeResizer';
 import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
-import { Handle, NodeResizer, Position, type NodeProps } from '@xyflow/react';
+import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { useWorkspaces } from '../../../app/WorkspaceProvider';
 import { useLanguage } from '../../../app/LanguageProvider';
 import { Icon } from '../../common/Icon';
@@ -19,7 +20,7 @@ export function TerminalNode({ id, data, selected }: NodeProps<CanvasFlowNode>) 
   const { currentWorkspaceId } = useWorkspaces();
   const { updateNodeData } = useCanvas();
   const { t } = useLanguage();
-  const workspaceId = String(data.workspaceId ?? currentWorkspaceId);
+  const workspaceId = currentWorkspaceId;
   const running = data.terminalStatus === 'running';
   const outputRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -174,10 +175,8 @@ export function TerminalNode({ id, data, selected }: NodeProps<CanvasFlowNode>) 
     : data.terminalStatus === 'error' ? t('Error') : data.terminalStatus === 'finished'
       ? t('Exit {{code}}', { code: data.terminalExitCode ?? '—' }) : t('Ready');
 
-  return <article className={`flow-node terminal ${selected ? 'selected' : ''}`} aria-label={t('Terminal')}>
-    <NodeResizer isVisible={selected} minWidth={340} minHeight={250} color="#767676" />
-    <Handle className="flow-handle" type="target" position={Position.Left} />
-    <header className="terminal-window-header">
+  return <><CanvasNodeResizer kind="terminal" selected={selected}/><Handle className="flow-handle" type="target" position={Position.Left}/><Handle className="flow-handle" type="source" position={Position.Right}/><article className={`flow-node terminal ${selected ? 'selected' : ''}`} aria-label={t('Terminal')}>
+    <header className="terminal-window-header canvas-node-drag-handle">
       <div className="terminal-window-tab"><Icon name="terminal" /><span>{shellName}</span></div>
       <div className="terminal-window-tools nodrag">
         <button type="button" onClick={() => void copyOutput()} title={t(copyState === 'copied' ? 'Copied' : copyState === 'error' ? 'Could not copy output.' : 'Copy output')} aria-label={t('Copy output')} disabled={!output}><Icon name="copy" /></button>
@@ -204,6 +203,5 @@ export function TerminalNode({ id, data, selected }: NodeProps<CanvasFlowNode>) 
       <span className={`terminal-status ${data.terminalStatus ?? 'idle'}`} role="status">{actionError || state}</span>
       <span title={t('Each command starts a new shell in the workspace folder.')}>{running ? 'Ctrl+C' : 'Enter ↵ · Shift+Enter'}</span>
     </footer>
-    <Handle className="flow-handle" type="source" position={Position.Right} />
-  </article>;
+  </article></>;
 }

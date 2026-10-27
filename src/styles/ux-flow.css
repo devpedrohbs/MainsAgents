@@ -1,0 +1,34 @@
+/* Orientation round: where to start, continue the last work, clear header actions.
+   Built on the Dark Studio tokens; imported by the sidebar so it loads with the shell. */
+
+/* Overview: three real steps for a new workspace; the current one carries the page's only primary action. */
+.studio-shell .ov-start-steps{display:grid;gap:2px;margin:0;padding:0 0 2px;list-style:none}
+.studio-shell .ov-start-steps li{display:flex;align-items:center;gap:12px;min-height:56px;padding:8px 10px;border-radius:9px;min-width:0}
+.studio-shell .ov-start-steps li.current{background:var(--surface-2)}
+.studio-shell .ov-start-mark{display:grid;place-items:center;flex:0 0 28px;width:28px;height:28px;border:1px solid var(--border);border-radius:50%;color:var(--muted);font-size:12px;font-weight:600;font-variant-numeric:tabular-nums}
+.studio-shell .ov-start-steps li.current .ov-start-mark{border-color:var(--accent);color:var(--accent)}
+.studio-shell .ov-start-steps li.done .ov-start-mark{border-color:transparent;background:var(--success-soft);color:var(--success)}
+.studio-shell .ov-start-mark svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.studio-shell .ov-start-steps li.done b{color:var(--muted)}
+/* The step copy explains what happens, so it may wrap instead of being cut off. */
+.studio-shell .ov-start-steps small{white-space:normal;line-height:1.45}
+.studio-shell .ov-start-steps .primary-button{flex:0 0 auto;min-height:32px;white-space:nowrap}
+.studio-shell .ov-head-side .text-link{font-size:13px}
+
+/* Overview: when nothing waits, the most recent work is one click away. */
+.studio-shell .ov-empty .ov-resume{justify-self:stretch;margin-top:6px;background:var(--surface-2)}
+.studio-shell .ov-empty .ov-resume:hover{background:color-mix(in oklab,var(--surface-2),var(--fg) 5%)}
+.studio-shell .ov-resume .ov-action{background:var(--primary-bg);color:var(--primary-fg)}
+
+/* Scopes: history is a secondary action beside the primary one, not a floating underlined link. */
+.studio-shell .scopes-head-actions{display:flex;align-items:center;gap:8px;margin-left:auto;flex-wrap:wrap}
+.studio-shell .scopes-head-actions .scope-history-link{margin:0;display:inline-flex;align-items:center;gap:6px;text-decoration:none;color:var(--fg)}
+.studio-shell .scopes-head-actions .scope-history-link svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+
+.studio-shell :is(.ov-start-steps .primary-button,.ov-resume,.scope-history-link):focus-visible{outline:none;box-shadow:var(--focus-ring)}
+
+@container (max-width:620px){
+ .studio-shell .ov-start-steps li{flex-wrap:wrap}
+ .studio-shell .ov-start-steps .ov-row-copy{flex-basis:calc(100% - 40px)}
+ .studio-shell .ov-start-steps .primary-button{margin-left:40px}
+}

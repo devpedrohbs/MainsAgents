@@ -6,7 +6,7 @@ import {providerWaitText} from '../production/providerWait.ts';
 
 /** Host view of an edit request made in a chat (chat-edit-requests.mjs). */
 export interface ChatEditRequestView {
- key?:string;sessionId:string;messageId:string;kind?:'edit'|'adjust';adjustId?:string;
+ key?:string;sessionId:string;messageId:string;kind?:'edit'|'adjust'|'visual';adjustId?:string;
  status:'pending'|'admitted'|'started'|'needs-choice'|'needs-video'|'needs-editor'|'needs-window'|'refused'|'failed'|'measuring'|'needs-sync'|'canceled';
  /** Camera + screen request: names, voice and layout as admitted; sync = how the offset stands (measured/manual or why not). */
  pair?:{camera:{name:string};screen:{name:string};voice?:'camera'|'screen';layout:'camera-corner'|'screen-full'|'alternate'};
@@ -16,7 +16,7 @@ export interface ChatEditRequestView {
  choices?:Array<{id:string;name:string}>;editors?:Array<{id:string;name:string}>;options?:Array<{kind:string;start:number;end:number;label:string}>;
  error?:string;reason?:string;updatedAt?:string;
 }
-export type ChatEditAction='cancel-edit'|'cancel-adjust'|'revert'|'open-production'|'retry'|'resume'|'cancel-measure';
+export type ChatEditAction='cancel-edit'|'cancel-adjust'|'revert'|'open-production'|'retry'|'resume'|'cancel-measure'|'cancel-visual';
 export interface ChatEditStatus {tone:'progress'|'done'|'attention'|'error';title:string;detail?:string;progress?:number;actions:ChatEditAction[]}
 
 const fileName=(path:string)=>path.split(/[\\/]/).pop()??path;
@@ -78,6 +78,12 @@ export function chatEditStatus(request:ChatEditRequestView|undefined,run:Product
   if(entry?.status==='canceled'||live?.status==='canceled')return {tone:'error',title:t('Ajuste cancelado','Adjustment canceled'),detail:t('A versão anterior continua em revisão.','The previous version stays under review.'),actions:[]};
   if(['blocked','paused'].includes(run.stage))return {tone:'attention',title:t('Ajuste parado','Adjustment stopped'),detail:run.error,actions:['open-production','cancel-adjust']};
   return {tone:'progress',title:t(`Ajustando ${label}`,`Adjusting ${label}`),actions:[]};
+ }
+ if(run.editWorkflow){
+  const phase=run.editWorkflow.phase;
+  if(['planning-edit','editing','blocked','paused'].includes(run.stage)&&phase==='visual')return {tone:['blocked','paused'].includes(run.stage)?'attention':'progress',title:t('Acabamento visual sobre os cortes aprovados','Visual editing on the approved cuts'),detail:run.error??t('Corte base preservado. A voz e a montagem ficam iguais.','Cut base preserved. Voice and montage stay the same.'),progress,actions:['open-production','cancel-visual']};
+  if(run.stage==='planning-edit')return {tone:'progress',title:t('Preparando o corte base, sem motion','Preparing the cut base, without motion'),detail:director,actions:['cancel-edit']};
+  if(run.stage==='video-review')return {tone:'done',title:phase==='cuts'?t('Corte base entregue para revisão','Cut base delivered for review'):phase==='visual'?t('Acabamento visual entregue','Visual edit delivered'):t('Vídeo escolhido · legendas no CapCut','Video chosen · captions in CapCut'),detail:phase==='cuts'?t('Confira os cortes. Depois peça aqui “Agora adicione motion…” com suas instruções, ou abra a produção.','Review the cuts. Then request “Now add motion…” with your instructions here, or open the production.'):phase==='visual'?t('Confira o visual e avance para as legendas SRT do CapCut na produção.','Review the visuals and continue to CapCut SRT captions in the production.'):t('Importe e ajuste o SRT na produção; o vídeo fica sem legendas gravadas.','Import and adjust the SRT in the production; captions stay separate.'),actions:['open-production']};
  }
  if(run.stage==='planning-edit')return {tone:'progress',title:t('Planejando cortes e motion','Planning cuts and motion'),detail:t(`Direção: ${director}`,`Directed by ${director}`),actions:['cancel-edit']};
  if(run.stage==='editing')return {tone:'progress',title:t('Exportando o vídeo editado','Exporting the edited video'),detail:t(`Direção: ${director}`,`Directed by ${director}`),progress,actions:['cancel-edit']};

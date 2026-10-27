@@ -12,6 +12,10 @@ export interface ChatContextReference {
   label: string;
   kind: string;
   content?: string;
+  /** Attached image: small JPEG preview for the message (never sent to the provider). */
+  thumbnail?: string;
+  /** Attached file size in bytes, for display. */
+  size?: number;
 }
 
 export interface ChatMessageItem {
@@ -33,7 +37,7 @@ export interface ChatMessageItem {
   /** Local videos attached to this user message (absolute paths; the host inspects them, never reads them as text). */
   attachments?: ChatAttachment[];
   /** This user message was sent as an edit request to the local engine (host-decided; see chat-edit-requests.mjs). */
-  chatEdit?: {kind: 'edit' | 'adjust'};
+  chatEdit?: {kind: 'edit' | 'adjust' | 'visual'};
   /** Camera + screen options of an edit request with two videos (roles are on each attachment; never inferred). */
   sourcePair?: {voice?: 'camera' | 'screen'; layout: 'camera-corner' | 'screen-full' | 'alternate'};
   /** Production message: preview of ONLY the adjusted window (served by the host when its sha256 still matches). */

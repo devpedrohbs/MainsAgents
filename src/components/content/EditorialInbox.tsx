@@ -10,6 +10,7 @@ const labels: Record<EditorialInboxItem['kind'], [string, string]> = {
   'notion-error': ['Verificar envio ao Notion', 'Check Notion delivery'], 'video-review': ['Revisar produção', 'Review production'],
   'publication-review':['Revisar entrega por rede','Review network delivery'],
 };
+export const editorialInboxLabel = (kind: EditorialInboxItem['kind'], pt: boolean) => labels[kind][pt ? 0 : 1];
 export function EditorialInbox({ items, ready, error, onOpen, onOpenStudio }: { items: EditorialInboxItem[]; ready: boolean; error: string; onOpen: (item: EditorialInboxItem) => void; onOpenStudio: () => void }) {
   const { locale } = useLanguage(), pt = locale === 'pt-BR';
   const [expanded, setExpanded] = useState(false);

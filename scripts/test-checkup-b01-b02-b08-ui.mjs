@@ -85,7 +85,8 @@ async function clickText(scope,text) {await until(()=>js(`Array.from(document.qu
 const key = async (keyCode,char) => {win.webContents.sendInputEvent({type:'keyDown',keyCode});if(char)win.webContents.sendInputEvent({type:'char',keyCode:char});win.webContents.sendInputEvent({type:'keyUp',keyCode});};
 const noEffects = () => {assert.deepEqual(writes,[],'No API mutation, AI call, publication or recording may happen');assert.deepEqual(external,[],'No external network access');};
 const shot = async name => {writeFileSync(join(out,`${name}.png`),await captureReadyPng(win.webContents));captures.push(name);};
-const column = id => js(`(()=>{const el=document.querySelector('.precision-pipeline-stage[data-column=${id}]');return el?{count:Number(el.querySelector('strong').textContent),titles:Array.from(el.querySelectorAll(':scope>button:not(.precision-pipeline-more)')).map(b=>b.textContent)}:null})()`);
+// Home "Em produção": one row per item, tagged with the pipeline column the projection placed it in.
+const column = id => js(`(()=>{const rows=[...document.querySelectorAll('.ov-prod-row[data-column=${id}]')];return {count:rows.length,titles:rows.map(row=>row.querySelector('.ov-prod-title').textContent)}})()`);
 async function open(hash) {
   win = new BrowserWindow({show:false,width:1440,height:1100,webPreferences:{preload:resolve(root,'tests/fixtures/assets-ui-preload.cjs'),contextIsolation:true,sandbox:true,offscreen:true,backgroundThrottling:false}});
   win.webContents.session.webRequest.onBeforeRequest((details,callback)=>{const url = new URL(details.url);if (['http:','https:'].includes(url.protocol) && url.hostname !== '127.0.0.1') {external.push(details.url);callback({cancel:true});} else callback({});});
@@ -101,14 +102,14 @@ app.whenReady().then(async()=>{
   try {
     await new Promise(r=>server.listen(0,'127.0.0.1',r));
     // ---- B01: Home follows the active run, not the stale stored stage ----
-    await open('home');await until(()=>js(`Boolean(document.querySelector('.precision-pipeline-stage[data-column=package]'))`),'pipeline');
+    await open('home');await until(()=>js(`Boolean(document.querySelector('.ov-prod-row[data-column=package]'))`),'pipeline');
     await until(async()=>(await column('package'))?.count===1,'package column filled');
     assert.deepEqual((await column('package')).titles,['CONTENT covers']);
     assert.equal((await column('editing')).count,0,'covers-review must not sit in Editing');
     assert.deepEqual((await column('schedule')).titles,['CONTENT sched'],'active schedule run beats the stale completed run');
     assert.equal((await column('published')).count,0);
     assert.deepEqual((await column('recording')).titles.sort(),['CONTENT manual','CONTENT rec'],'manual content keeps its stored stage; foreign-workspace run is ignored');
-    assert.equal(await js(`document.querySelectorAll('.precision-pipeline-stage').length`),8);
+    assert(await js(`[...document.querySelectorAll('.ov-prod-row .ov-bars')].every(bar=>bar.children.length===8)`),'every row shows the 8 stages');
     await shot('home-pipeline-light');noEffects();
     // ---- B02: welcome step + central readiness checklist ----
     assert(await js(`document.querySelector('.welcome-guide')!==null`));
@@ -225,8 +226,8 @@ app.whenReady().then(async()=>{
     noEffects();assert.deepEqual(errors,[]);
     // English labels
     await js('window.mainsAgentsSaveNow()');win.destroy();state.write(profile,'language','en-US');await open('home');
-    await until(()=>js(`Boolean(document.querySelector('.precision-pipeline-stage[data-column=package]'))`));
-    assert((await js(`document.querySelector('.precision-pipeline-stage[data-column=package] span').textContent`))==='Covers and package');
+    await until(()=>js(`Boolean(document.querySelector('.ov-prod-row[data-column=package]'))`));
+    assert((await js(`document.querySelector('.ov-prod-row[data-column=package] .ov-prod-stage').textContent`)).startsWith('Covers and package'));
     await click('[data-od-id="execution-rec"] .soft-button');
     await clickText('.recording-package button','Open reading mode');
     await until(()=>js(`document.querySelector('.teleprompter-status').textContent.startsWith('Paused')`),'English status');
@@ -236,7 +237,7 @@ app.whenReady().then(async()=>{
     console.log(JSON.stringify(evidence,null,2));win.destroy();state.close();server.close();app.exit(0);
   } catch(error) {
     console.error(error);
-    if(win&&!win.isDestroyed()){try{console.log((await js('document.querySelector(".precision-pipeline")?.innerText??document.body.innerText')).slice(0,3000));writeFileSync(join(out,'failure.png'),await captureReadyPng(win.webContents));}catch{}win.destroy();}
+    if(win&&!win.isDestroyed()){try{console.log((await js('document.querySelector(".ov-production")?.innerText??document.body.innerText')).slice(0,3000));writeFileSync(join(out,'failure.png'),await captureReadyPng(win.webContents));}catch{}win.destroy();}
     writeFileSync(join(out,'failure.json'),JSON.stringify({error:String(error),requests,writes,external,errors},null,2));
     state.close();server.close();app.exit(1);
   }

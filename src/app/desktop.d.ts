@@ -12,6 +12,12 @@ interface Window {
       pathForFile(file:File):string;
       /** Native picker for videos to attach to a chat message (absolute paths; nothing is copied). */
       selectVideos?():Promise<string[]>;
+      /** Native picker for chat attachments (absolute paths; nothing is copied). */
+      selectAttachments?(kind:'images'|'files'|'folder'):Promise<string[]>;
+      /** Name, size, kind and a small preview (images) of each path that still exists. */
+      attachmentInfo?(paths:string[]):Promise<Array<{path:string;name:string;kind:'image'|'video'|'file'|'folder';size?:number;thumbnail?:string}>>;
+      /** Saves a pasted image in the app folder and returns its path. */
+      savePasted?(bytes:Uint8Array,type:string):Promise<string>;
       select(profile:string,contentId:string,multiple?:boolean):Promise<import('../features/content/assetModel').LocalAssetInspection[]>;
       inspect(profile:string,contentId:string,paths:string[]):Promise<import('../features/content/assetModel').LocalAssetInspection[]>;
       verify(profile:string,contentId:string):Promise<Array<{id:string;versionId:string;inspection:import('../features/content/assetModel').LocalAssetInspection}>>;

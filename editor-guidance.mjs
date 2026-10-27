@@ -15,6 +15,9 @@ export const APP_GUIDE_NAME='mainsagents-guia-creator-tech';
 export const APP_GUIDE=`# Guia visual e sonoro padrão — creator de tecnologia (MainsAgents)
 Guia original do app. Referência, cores ou pedidos do conteúdo atual (briefing/ajustes) prevalecem SOMENTE nesta peça; skills do agente prevalecem sobre este guia.
 
+## Fluxo em etapas
+Quando get_context.editStage estiver presente, respeite a etapa acima de qualquer orientação de estilo: cuts = apenas cortes e áudio; visual = acabamento sobre a montagem congelada; captions = SRT separado no CapCut. Não avance sozinho nem recorte a fala durante o acabamento. Hard/jump cuts servem à seleção da fala; cutaway/match cut dependem de material real. Não simule J/L-cuts com a voz fora de sincronia.
+
 ## Intenção
 A fala do criador manda; o visual explica o que é dito com animações e telas reais (números, passos, comparações, prova). Nada decorativo sem função.
 Cada caixa de conteúdo pode pedir um estilo novo: não repita automaticamente o visual de outra peça.

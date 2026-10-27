@@ -41,7 +41,7 @@ export function AgentChooser({
       <div className="flow-options">
         {filtered.map((agent) => (
           <button key={agent.id} className="flow-option" onClick={() => onChoose(agent.id)}>
-            <AgentAvatar name={agent.name} image={agent.avatarImage} />
+            <AgentAvatar name={agent.name} image={agent.avatarImage} mascot={agent.avatarMascot} role={agent.role} />
             <span>
               <b>{agent.name}</b>
               <small>{agent.role}</small>

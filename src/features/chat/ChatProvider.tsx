@@ -5,7 +5,8 @@ import type {ChatEditRequestView} from './chatEdits';
 import type { CodexEvent } from './CodexService';
 import type { AiProvider } from './AiProvider';
 import { sessionProviderId, sessionRemoteId } from './AiProvider';
-import { saveNow, usePersistentState } from '../../data/localPersistence';
+import { saveNow, updatePersistentValue, usePersistentState } from '../../data/localPersistence';
+import { usageEntry, usageLedgerKey, usageReportedEvent, withUsageEntry, type UsageEntry } from '../usage/usageLedger';
 import { writeChatDraft } from './chatDrafts';
 import { providerSkillPrompt } from './skillCommands';
 import { attachChatImage } from './chatImages';
@@ -18,7 +19,7 @@ import {mergeNativeDelegations,type NativeDelegationSnapshot} from './nativeDele
 import {finishResponseTiming,recoverResponseTiming,startRunItem} from './responseTiming';
 import {createComparisonLauncher,deriveComparisons,type AgentComparison,type AgentComparisonInput} from './agentComparison';
 import {activeAfterCreate,chatSessionSnapshot,childContentLink} from './contentSessions';
-import {activeScopeKey,contentScopesKey,continueTargetProblem,delegationBusy,emptyContentScopes,normalizeContentScopes,organizeSessions,rawScope,withOpened,withSelected,withVisible,withoutSession,type ContentScopeState,type OrganizeContext,type OrganizeRequest,type ScopeKey} from './contentScopes';
+import {activeScopeKey,contentScopesKey,scopedTargets,continueTargetProblem,delegationBusy,emptyContentScopes,normalizeContentScopes,organizeSessions,rawScope,withOpened,withSelected,withVisible,withoutSession,type ContentScopeState,type OrganizeContext,type OrganizeRequest,type ScopeKey} from './contentScopes';
 import type {EditorialContent} from '../content/model';
 import {providerSwitchPlan} from './providerChoice';
 import {isMissingThreadError,isThreadNotLoadedError,recoveredSession,recoveryBriefing,recoveryNotice} from './sessionRecovery';
@@ -61,7 +62,7 @@ interface ChatContextValue {
    * An unequivocal edit request: the user message (with its attached videos) is saved, then the HOST decides on that saved
    * message and starts the local edit engine. No provider turn is sent for it (no "I can't edit" reply).
    */
-  sendEditRequest: (agent: Agent, content: string, attachments: readonly ChatAttachment[], sessionId?: string, kind?: 'edit' | 'adjust', sourcePair?: ChatMessageItem['sourcePair']) => Promise<void>;
+  sendEditRequest: (agent: Agent, content: string, attachments: readonly ChatAttachment[], sessionId?: string, kind?: 'edit' | 'adjust' | 'visual', sourcePair?: ChatMessageItem['sourcePair']) => Promise<void>;
   /** Cancels the camera/screen offset measurement (or the pending manual choice) of one saved request; nothing was started. */
   cancelChatEditMeasure: (sessionId: string, messageId: string) => Promise<void>;
   /** Host state of the edit requests of the loaded chats, by user message id. */
@@ -235,6 +236,14 @@ export function ChatProvider({ children, providers }: PropsWithChildren<{provide
     if(event.type==='image.failed'){
       updateSession(sessionId,session=>{const id=`image-error-${event.executionId}-${event.callId}`;if(session.messages.some(item=>item.id===id))return session;return {...session,messages:[...session.messages,{id,type:'activity',label:event.message,status:'error'}]}});return;
     }
+    if(event.type==='usage.reported'){
+      const session=sessionsRef.current.find(item=>item.id===sessionId)??pendingSessions.current.get(sessionId);if(!session)return;
+      const entry=usageEntry({executionId:event.executionId,provider:sessionProviderId(session)==='claude'?'claude':'codex',agentId:session.agentId,workspaceId:workspaceOf(session.agentId),sessionId,contentId:session.contentId,usage:event.usage});
+      if(entry)updatePersistentValue<UsageEntry[]>(usageLedgerKey,[],current=>withUsageEntry(current,entry));
+      // Live limits: meters and the Usage page re-read this provider's plan limits as soon as a reply reports usage.
+      window.dispatchEvent(new CustomEvent(usageReportedEvent,{detail:entry?.provider??(sessionProviderId(session)==='claude'?'claude':'codex')}));
+      return;
+    }
     if(event.type==='execution.started'){setRunStates((current)=>({...current,[sessionId]:'thinking'}));return}
     if(event.type==='message.delta'||event.type==='message.completed'){
       const messageId=`codex-${event.executionId}`;
@@ -246,9 +255,12 @@ export function ChatProvider({ children, providers }: PropsWithChildren<{provide
       const label=event.type==='tool.started'?(event.label??`Using ${event.tool}...`):event.type==='tool.finished'?`Used ${event.tool}`:event.label;
       const activityId=`codex-activity-${event.executionId}-${'callId' in event?event.callId:label}`;
       setRunStates((current)=>({...current,[sessionId]:event.type==='search'?'searching':event.type==='activity'?'thinking':'using-tool'}));
-      updateSession(sessionId,(session)=>{const exists=session.messages.some((item)=>item.id===activityId);const activity:ChatActivityItem={id:activityId,type:'activity',label,status:isFinished?'done':'running'};return {...session,updatedAt:new Date().toISOString(),messages:exists?session.messages.map((item):ChatItem=>item.id===activityId?activity:item):[...session.messages,activity]}});
+      // A finished step keeps the label it started with ("Searching: …"), so the chat can say what was actually done.
+      updateSession(sessionId,(session)=>{const previous=session.messages.find((item)=>item.id===activityId);const exists=!!previous;const activity:ChatActivityItem={id:activityId,type:'activity',label:isFinished&&previous?.type==='activity'&&previous.label?previous.label:label,status:isFinished?'done':'running'};return {...session,updatedAt:new Date().toISOString(),messages:exists?session.messages.map((item):ChatItem=>item.id===activityId?activity:item):[...session.messages,activity]}});
       return;
     }
+    // Every finished reply also refreshes that provider's live limits (some turns report no token usage).
+    if(event.type==='execution.completed'){const session=sessionsRef.current.find(item=>item.id===sessionId);if(session)window.dispatchEvent(new CustomEvent(usageReportedEvent,{detail:sessionProviderId(session)==='claude'?'claude':'codex'}));}
     if(event.type==='execution.completed'){setRunStates((current)=>({...current,[sessionId]:'finished'}));updateSession(sessionId,(session)=>({...session,updatedAt:new Date().toISOString(),messages:session.messages.map((item):ChatItem=>item.type==='activity'&&item.kind!=='run'&&item.status==='running'?{...item,status:'done'}:item.type==='message'&&item.id===`codex-${event.executionId}`?{...item,deliveryState:'completed'}:item)}));return}
     if(event.type==='execution.cancelled'){updateSession(sessionId,session=>({...session,messages:session.messages.map((item):ChatItem=>item.type==='activity'&&item.status==='running'&&item.id.startsWith(`codex-activity-${event.executionId}-`)?{...item,status:'error',label:`${item.label} · interrupted`}:item.type==='message'&&item.id===`codex-${event.executionId}`?{...item,deliveryState:'interrupted'}:item)}));setRunStates((current)=>({...current,[sessionId]:'idle'}));return}
     if(event.type==='execution.failed'){setRunStates((current)=>({...current,[sessionId]:'error'}));updateSession(sessionId,(session)=>({...session,updatedAt:new Date().toISOString(),messages:[...session.messages.map((item):ChatItem=>item.type==='activity'&&item.status==='running'&&item.id.startsWith(`codex-activity-${event.executionId}-`)?{...item,status:'error'}:item.type==='message'&&item.id===`codex-${event.executionId}`?{...item,deliveryState:'interrupted'}:item),{id:makeId('activity'),type:'activity',label:event.message,status:'error'}]}))}
@@ -283,8 +295,9 @@ export function ChatProvider({ children, providers }: PropsWithChildren<{provide
         // Read when sending (not at click time): an approval made just before must reach the prompt.
         const connection=session.agentConnection?.enabled?session.agentConnection:undefined;
         const available=handoffTargets(agent,agentsRef.current,ancestors);
-        // Comparison sessions never fan out unless the user later enables a connection explicitly.
-        const targets=session.agentConnection?(connection?available.filter(target=>target.id===connection.targetAgentId):[]):session.comparison?[]:available;
+        // Comparison sessions never fan out unless the user later enables a connection explicitly. A connection is the user's own
+        // choice of agent; otherwise, inside a scope, an agent only consults the scope's members (see scopedTargets).
+        const targets=session.agentConnection?(connection?available.filter(target=>target.id===connection.targetAgentId):[]):session.comparison?[]:scopedTargets(available,session,sessionsRef.current);
         if(connection&&!targets.length)throw new Error('The connected agent is unavailable. Select another agent or turn off the connection.');
         const oldRemoteId=sessionRemoteId(session);
         const migrate=provider.id==='codex'&&oldRemoteId&&session.delegationRuntimeVersion!==2&&targets.length>0;
@@ -425,7 +438,7 @@ export function ChatProvider({ children, providers }: PropsWithChildren<{provide
     const body=await response.json().catch(()=>({})) as {request?:ChatEditRequestView;error?:string};
     if(!response.ok)throw new Error(body.error??'O app não confirmou o cancelamento.');if(body.request)setChatEditRequests(current=>({...current,[messageId]:body.request!}));
   },[]);
-  const sendEditRequest=useCallback(async(agent:Agent,content:string,attachments:readonly ChatAttachment[],targetSessionId?:string,kind:'edit'|'adjust'='edit',sourcePair?:ChatMessageItem['sourcePair'])=>{
+  const sendEditRequest=useCallback(async(agent:Agent,content:string,attachments:readonly ChatAttachment[],targetSessionId?:string,kind:'edit'|'adjust'|'visual'='edit',sourcePair?:ChatMessageItem['sourcePair'])=>{
     const clean=content.trim();if(!clean)return;
     let session=targetSessionId?(sessionsRef.current.find((item)=>item.id===targetSessionId)??pendingSessions.current.get(targetSessionId)):sessionsRef.current.find((item)=>item.id===activeSessionIds[agent.id]);
     if(targetSessionId&&!session)throw new Error('Conversa não encontrada.');

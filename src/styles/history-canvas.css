@@ -1,0 +1,99 @@
+/* History (list by scope + preview) and Canvas (typed blocks, agent chat, inspector), round 6. */
+
+/* ---------- History ---------- */
+.studio-shell .hs{display:flex;container-type:inline-size;gap:0;padding:0;height:100%;min-height:0;border:1px solid var(--border);border-radius:12px;background:var(--surface);overflow:hidden}
+.hs-list{flex:0 1 440px;min-width:300px;display:flex;flex-direction:column;min-height:0;border-right:1px solid var(--border)}
+.hs-head{display:grid;gap:12px;padding:22px 20px 12px}
+.hs-title{display:flex;align-items:flex-start;gap:10px}
+.hs-title>div{flex:1;min-width:0}
+.studio-shell .hs-title h1{margin:0;font-size:22px}
+.hs-title p{margin:4px 0 0;font-size:13px;color:var(--muted)}
+.hs-faces{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.hs-faces button{width:34px;height:34px;padding:0;border:1px solid transparent;border-radius:10px;background:none;cursor:pointer}
+.hs-faces button .agent-avatar{width:100%;height:100%;min-width:0;border-radius:10px}
+.hs-faces button[aria-pressed=true]{border-color:var(--accent)}
+.hs-faces button.dim{opacity:.45}
+.hs-faces .result-count{margin-left:auto;font-size:12px;color:var(--muted);max-width:50%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.studio-shell .hs .hs-groups{display:block;flex:1;min-height:0;overflow:auto;padding:0 10px 14px;margin:0;border:0;background:none}
+.studio-shell .hs .content-space-cell{display:block;margin:0;border:0;background:none}
+.hs-group-head{display:flex;align-items:center;gap:4px}
+.studio-shell .hs .content-space-box{flex:1;min-width:0;display:flex;align-items:center;gap:8px;padding:10px;border:0;border-radius:8px;background:none;color:var(--fg);font:inherit;text-align:left;cursor:pointer;box-shadow:none;min-height:0}
+.studio-shell .hs .content-space-box:hover{background:var(--surface-2)}
+.hs-dot{width:8px;height:8px;min-width:8px;border-radius:2px;background:var(--meta,var(--muted))}
+.kind-content .hs-dot{background:var(--accent)}
+.kind-recovery .hs-dot{background:#f5b544}
+.studio-shell .hs .content-space-title{display:flex;align-items:center;gap:6px;flex:1;min-width:0}
+.studio-shell .hs .content-space-title b{font-size:12px;font-weight:600;color:var(--fg-2,var(--fg));text-transform:uppercase;letter-spacing:.04em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.studio-shell .hs .content-space-title i{font-style:normal;font-size:10px;color:var(--accent)}
+.studio-shell .hs .content-space-box small{font-size:11px;color:var(--meta,var(--muted));white-space:nowrap}
+.studio-shell .hs .content-space-box[aria-pressed=true] .content-space-title b{color:var(--fg)}
+.hs .content-spaces-more{margin:8px 10px 0}
+
+.studio-shell .hs .conversation-list{display:grid;gap:2px;margin:2px 0 8px;border:0;background:none}
+.studio-shell .hs .conversation-row{position:relative;display:flex;align-items:center;gap:4px;padding:0;border:0;border-radius:9px;background:transparent;min-height:0}
+.studio-shell .hs .conversation-row:hover,.studio-shell .hs .conversation-row.selected{background:var(--surface-2)}
+.studio-shell .hs .conversation-open{flex:1;min-width:0;display:flex;align-items:flex-start;gap:12px;padding:10px;border:0;background:none;color:var(--fg);font:inherit;text-align:left;cursor:pointer}
+.studio-shell .hs .conversation-open>.agent-avatar{width:32px;height:32px;min-width:32px;border-radius:10px}
+.hs .conversation-copy{display:grid;gap:3px;min-width:0;flex:1}
+.hs .conversation-line{display:flex;align-items:baseline;gap:8px;min-width:0}
+.studio-shell .hs .conversation-line b{flex:1;min-width:0;font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hs .conversation-line small{font-size:11px;color:var(--meta,var(--muted));white-space:nowrap}
+.hs .conversation-snippet{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.studio-shell .hs .conversation-actions{display:flex;align-items:center;gap:2px;padding-right:6px;opacity:0;transition:opacity .15s;flex-wrap:wrap;justify-content:flex-end}
+.studio-shell .hs .conversation-row:hover .conversation-actions,.studio-shell .hs .conversation-row.selected .conversation-actions,.studio-shell .hs .conversation-actions:focus-within,.studio-shell .hs .conversation-actions:has(.danger-button){opacity:1}
+.studio-shell .hs .conversation-actions:has(.danger-button){position:static;flex-basis:100%;padding:0 10px 10px;font-size:12px;gap:6px}
+.studio-shell .hs .conversation-row:has(.danger-button){flex-wrap:wrap}
+.studio-shell .hs .conversation-actions .icon-button{width:28px;height:28px}
+.studio-shell .hs .conversation-rename{display:flex;gap:6px;flex:1;padding:8px}
+.studio-shell .hs .conversation-rename input{flex:1;min-width:0}
+.hs-empty{display:grid;justify-items:start;gap:8px;padding:10px 12px 14px;font-size:13px;color:var(--muted)}
+.hs-empty b{color:var(--fg);font-weight:500}
+
+.hs-preview{flex:1 1 auto;display:flex;flex-direction:column;min-width:0;min-height:0}
+.hs-preview-head{display:flex;align-items:center;gap:12px;padding:18px 24px;border-bottom:1px solid var(--border)}
+.hs-preview-head>.agent-avatar{width:40px;height:40px;min-width:40px;border-radius:12px}
+.hs-preview-head>div{flex:1;min-width:0;display:grid;gap:2px}
+.hs-preview-head b{font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hs-preview-head span{font-size:12px;color:var(--muted)}
+.hs-chips{display:flex;gap:6px;flex-wrap:wrap;padding:10px 24px;border-bottom:1px solid var(--border)}
+.hs-scope{font-size:11px;color:var(--accent);background:color-mix(in oklab,var(--accent) 12%,transparent);border-radius:999px;padding:3px 9px}
+.hs-running{font-size:11px;color:var(--fg);border:1px solid var(--border);border-radius:999px;padding:2px 9px}
+.hs-thread{flex:1;min-height:0;overflow:auto;padding:22px 24px;display:flex;flex-direction:column;gap:16px;max-width:780px}
+.hs-bubble{display:grid;gap:4px;max-width:560px}
+.hs-bubble.user{align-self:flex-end;justify-items:end}
+.hs-bubble small{font-size:11px;color:var(--meta,var(--muted))}
+.hs-bubble p{margin:0;padding:10px 14px;border-radius:14px;background:var(--surface-2);font-size:13px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere}
+.hs-bubble.user p{background:color-mix(in oklab,var(--fg) 9%,var(--surface))}
+.hs-note{align-self:center;margin:0;font-size:12px;color:var(--meta,var(--muted))}
+.hs-preview-empty{flex:1;display:grid;place-content:center;justify-items:center;gap:10px;color:var(--muted);font-size:13px}
+.hs-preview-empty svg{width:28px;height:28px;fill:none;stroke:currentColor;stroke-width:1.5}
+/* No room for a readable preview (e.g. chat panel open): the list takes the page; each row keeps its open button. */
+@container (max-width:860px){.hs-preview{display:none}.hs-list{flex:1 1 auto;border-right:0}}
+
+/* ---------- Canvas ---------- */
+.studio-shell .canvas-layout .flow-node{border:1px solid var(--border);border-radius:12px;background:var(--surface-2);box-shadow:none;overflow:hidden;--kind:var(--muted)}
+.studio-shell .canvas-layout .flow-node.selected{border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in oklab,var(--accent) 18%,transparent)}
+.studio-shell .canvas-layout .flow-node.research{--kind:#5b8cff}
+.studio-shell .canvas-layout .flow-node.note{--kind:#f5b544}
+.studio-shell .canvas-layout .flow-node.hook{--kind:#f472b6}
+.studio-shell .canvas-layout .flow-node.script{--kind:#3ecf8e}
+.studio-shell .canvas-layout .flow-node.image{--kind:#a78bfa}
+.studio-shell .canvas-layout .flow-node.contentIdea{--kind:#2dd4bf}
+.studio-shell .canvas-layout .flow-node .flow-node-type{display:flex;align-items:center;gap:8px;margin:0;padding:9px 12px;border-bottom:1px solid var(--border);font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.studio-shell .canvas-layout .flow-node .flow-node-type>svg{width:22px;height:22px;min-width:22px;padding:4px;border-radius:6px;background:color-mix(in oklab,var(--kind) 16%,transparent);color:var(--kind);fill:none;stroke:currentColor;stroke-width:1.8;box-sizing:border-box}
+.studio-shell .canvas-layout .flow-node.chat{border-color:color-mix(in oklab,#f472b6 30%,var(--border));border-radius:14px}
+.studio-shell .canvas-layout .flow-node.chat.selected{border-color:var(--accent)}
+.studio-shell .canvas-layout .chat-node-agent{text-transform:none;letter-spacing:0;font-size:13px;color:var(--fg);background:color-mix(in oklab,#f472b6 7%,transparent)}
+.studio-shell .canvas-layout .chat-node-agent>.agent-avatar{width:28px;height:28px;min-width:28px;border-radius:9px}
+.studio-shell .canvas-layout .chat-node-agent>span{font-weight:600}
+.studio-shell .canvas-layout .chat-node-agent>small{margin-left:auto;font-size:11px}
+
+.studio-shell .canvas-layout .canvas-detail{top:12px;right:12px;bottom:12px;height:auto;width:300px;padding:18px;display:flex;flex-direction:column;gap:12px;border:1px solid var(--border);border-radius:12px;background:var(--surface);box-shadow:0 12px 32px rgba(0,0,0,.28);overflow:auto}
+.studio-shell .canvas-layout .canvas-detail .eyebrow{margin:0;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.studio-shell .canvas-layout .canvas-detail h3{margin:0;font-size:16px;line-height:1.35}
+.studio-shell .canvas-layout .canvas-detail>.icon-button{position:absolute;top:12px;right:12px}
+.studio-shell .canvas-layout .canvas-detail label{display:grid;gap:6px;font-size:12px;color:var(--muted)}
+.studio-shell .canvas-layout .canvas-detail>.soft-button{justify-content:center;height:34px;margin:0}
+.studio-shell .canvas-layout .canvas-detail>.soft-button:first-of-type{background:var(--fg);color:var(--bg);border-color:transparent;font-weight:600}
+.studio-shell .canvas-layout .canvas-detail .detail-danger{color:#e05252;border-color:color-mix(in oklab,#e05252 30%,var(--border))}

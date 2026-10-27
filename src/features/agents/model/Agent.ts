@@ -1,3 +1,5 @@
+import type { AgentMascot } from '../mascot';
+
 export type AgentId = string;
 export type AgentStatusValue = 'working' | 'review' | 'idle';
 export type AgentTool = 'web-search' | 'files' | 'canvas-context' | 'subagents';
@@ -21,6 +23,8 @@ export interface Agent {
   publishingAutomation?:{enabled:boolean;provider:''|'publora'|'zernio';timeZone:string};
   modelId?: string;
   avatarImage?: string;
+  /** Mascot look; shown whenever there is no photo (avatarImage wins). */
+  avatarMascot?: AgentMascot;
   skillsDirectory?: string;
   skills?: string[];
   skillFiles?: Record<string, string>;
@@ -43,7 +47,7 @@ export const agentToolDetails: Record<AgentTool, { label: string; description: s
   subagents: { label: 'Agent collaboration', description: 'Send briefings to agents in this workspace and follow both chats.' },
 };
 
-export type AgentEditorValues = Pick<Agent, 'name' | 'role' | 'description' | 'instructions' | 'workspaceId' | 'tools' | 'skillsDirectory' | 'skills' | 'skillFiles' | 'disabledSkills' | 'skillsInstallKey' | 'providerId' | 'modelId' | 'avatarImage'|'mcpPermissions'|'notionAutomation'|'fileAccess'|'paperDesign'|'publishingAutomation'>;
+export type AgentEditorValues = Pick<Agent, 'name' | 'role' | 'description' | 'instructions' | 'workspaceId' | 'tools' | 'skillsDirectory' | 'skills' | 'skillFiles' | 'disabledSkills' | 'skillsInstallKey' | 'providerId' | 'modelId' | 'avatarImage'|'avatarMascot'|'mcpPermissions'|'notionAutomation'|'fileAccess'|'paperDesign'|'publishingAutomation'>;
 
 export function getAgentInitials(agent: Pick<Agent, 'name'>): string {
   return agent.name

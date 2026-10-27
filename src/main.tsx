@@ -20,6 +20,14 @@ import './styles/refined-workspace.css';
 import './styles/precision.css';
 import './styles/chat-precision.css';
 import './styles/content-scopes.css';
+import './styles/dark-studio.css';
+import './styles/scopes-usage.css';
+import './styles/mascot-chat.css';
+import './styles/overview.css';
+import './styles/board-agents.css';
+import './styles/history-canvas.css';
+import './styles/canvas-interactions.css';
+import './styles/chat-clean.css';
 
 const root=document.getElementById('root');
 if(!root)throw new Error('Missing #root element');

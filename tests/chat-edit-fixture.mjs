@@ -95,7 +95,7 @@ export const fullEditScript=(log,{segments,cutDecisions,storyboard,before}={})=>
 };
 
 /** media: real engine options (e.g. createRemotionAnimator()) instead of the FFmpeg stub, for evidence scripts. */
-export async function chatEditFixture({transcriber,editorProvider='claude',secondEditor=false,withFlow=true,media}={}){
+export async function chatEditFixture({transcriber,editorProvider='claude',secondEditor=false,withFlow=true,media,staged=false}={}){
  const directory=mkdtempSync(join(tmpdir(),'chat-edit-')),dbPath=join(directory,'state.sqlite'),input=join(directory,'gravacao.mp4'),other=join(directory,'outra-gravacao.mp4');
  await ffmpeg(['-f','lavfi','-i','testsrc2=size=320x180:rate=24','-f','lavfi','-i','sine=frequency=440:sample_rate=48000','-t','6','-c:v','libx264','-pix_fmt','yuv420p','-c:a','aac',input]);
  await ffmpeg(['-f','lavfi','-i','smptebars=size=320x180:rate=24','-f','lavfi','-i','sine=frequency=660:sample_rate=48000','-t','6','-c:v','libx264','-pix_fmt','yuv420p','-c:a','aac',other]);
@@ -107,7 +107,8 @@ export async function chatEditFixture({transcriber,editorProvider='claude',secon
   async send(){const id=`execution-${++serial}`;this.sends.push(id);return {executionId:id}},events:async function*(){yield {type:'message.completed',content:'{}'};yield {type:'execution.completed'}}};
  const log=[],scripts=[];let authoring=createEditorAuthoring(),claude=scriptedClaude(authoring,scripts);
  const flows=withFlow?[createProductionFlow('space','Fluxo',agents.filter(agent=>agent.id!=='editor-de-video-2'))]:[];
- const mediaOptions={...(transcriber?{transcriber}:{}),inspect,...(media??{animate:paintScenes,animationCapabilities:async()=>({available:true}),stills:stillsStub})};
+ // Older tests exercise persisted combined editing; staged=true exercises the current default.
+ const mediaOptions={...(staged?{}:{newEditWorkflow:()=>undefined}),...(transcriber?{transcriber}:{}),inspect,...(media??{animate:paintScenes,animationCapabilities:async()=>({available:true}),stills:stillsStub})};
  const makeBridge=()=>createContentWorkflowBridge({dbPath,getCurrentProfile:()=>'owner',getAgents:()=>agents,getFlows:()=>({flows}),getSessions:()=>sessions,getRuntime:()=>codex,getChatRuntime:provider=>provider==='claude'?claude:codex,inspect,mediaOptions,timeoutMs:120000});
  let bridge=makeBridge();
  const db=new DatabaseSync(dbPath);

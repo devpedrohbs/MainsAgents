@@ -303,3 +303,14 @@ test('migration: the first shown chat initializes the workspace selection only w
  // General initializes the same way, and only for that workspace.
  const general=withVisible(emptyContentScopes(),'space','writer','general','g');assert.equal(general.selected.space,'general');assert.equal(general.selected.other,undefined);
 });
+
+test('inside a content scope an agent only consults the scope members; General keeps every candidate', async () => {
+ const {scopedTargets,scopeMemberIds}=await import('../src/features/chat/contentScopes.ts');
+ const targets=[{id:'writer'},{id:'cover'},{id:'publisher'}];
+ const sessions=[{agentId:'writer',contentId:'c1'},{agentId:'cover',contentId:'c1'},{agentId:'publisher',contentId:'c2'},{agentId:'publisher'}];
+ assert.deepEqual([...scopeMemberIds(sessions,'c1')].sort(),['cover','writer']);
+ assert.deepEqual(scopedTargets(targets,{contentId:'c1'},sessions).map(t=>t.id),['writer','cover']);
+ assert.deepEqual(scopedTargets(targets,{contentId:'c2'},sessions).map(t=>t.id),['publisher']);
+ assert.deepEqual(scopedTargets(targets,{},sessions).map(t=>t.id),['writer','cover','publisher']);
+ assert.deepEqual(scopedTargets(targets,{contentId:'c3'},sessions),[]);
+});

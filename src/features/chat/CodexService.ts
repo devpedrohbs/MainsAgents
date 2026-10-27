@@ -116,6 +116,8 @@ export type CodexEvent =
   | { type:'search'; executionId:CodexExecutionId; label:string; status:'started'|'finished' }
   | { type:'tool.started'; executionId:CodexExecutionId; tool:string; callId:string; label?:string }
   | { type:'tool.finished'; executionId:CodexExecutionId; tool:string; callId:string; summary?:string }
+  /** Provider-reported usage of this execution (sanitized by the host; see provider-usage.mjs / claude-usage.mjs). */
+  | { type:'usage.reported'; executionId:CodexExecutionId; usage:unknown }
   | { type:'execution.completed'; executionId:CodexExecutionId }
   | { type:'execution.cancelled'; executionId:CodexExecutionId }
   | { type:'execution.failed'; executionId:CodexExecutionId; code:string; message:string; retryable:boolean };

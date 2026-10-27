@@ -20,7 +20,7 @@ interface Props {
 /** Status of an edit request made in THIS chat: real host/run state, the explicit choices it needs and its actions. */
 export function ChatEditCard({request,run,mediaJobs,pt,working=false,onAdmit,onOption,onAction}:Props){
  const status=chatEditStatus(request,run,mediaJobs,pt);
- const label:Record<ChatEditAction,string>={'cancel-edit':pt?'Cancelar edição':'Cancel edit','cancel-adjust':pt?'Cancelar ajuste':'Cancel adjustment','revert':pt?'Voltar à versão anterior':'Back to the previous version','open-production':pt?'Abrir produção':'Open production','retry':pt?'Tentar de novo':'Try again','resume':pt?'Retomar':'Resume','cancel-measure':pt?'Cancelar pedido':'Cancel request'};
+ const label:Record<ChatEditAction,string>={'cancel-visual':pt?'Cancelar visual e manter corte base':'Cancel visuals and keep cut base','cancel-edit':pt?'Cancelar edição':'Cancel edit','cancel-adjust':pt?'Cancelar ajuste':'Cancel adjustment','revert':pt?'Voltar à versão anterior':'Back to the previous version','open-production':pt?'Abrir produção':'Open production','retry':pt?'Tentar de novo':'Try again','resume':pt?'Retomar':'Resume','cancel-measure':pt?'Cancelar pedido':'Cancel request'};
  const pair=pairLine(request,run,pt),wait=run?.stage==='blocked'&&run.blockReason==='provider-limit'?run.providerWait:undefined;
  return <section className={`chat-edit-card tone-${status.tone}`} aria-label={pt?'Edição pedida nesta conversa':'Edit requested in this chat'}>
   <div className="chat-edit-head" role="status" aria-live="polite">

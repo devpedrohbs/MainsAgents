@@ -1,0 +1,99 @@
+/* Agent avatars: the MainsAgents conductor on a tile tinted with the agent's colour; photos fill the same tile. */
+.agent-avatar.agent-mascot{display:inline-grid;place-items:center;overflow:hidden;border:0!important;background:color-mix(in oklab,var(--mascot) 16%,transparent)!important;color:inherit;flex-shrink:0;container-type:size}
+.agent-avatar.agent-mascot>.mascot-figure{width:86%;height:86%}
+.agent-avatar.agent-photo{display:inline-grid;overflow:hidden;flex-shrink:0;padding:0}
+.agent-avatar.agent-photo>img{width:100%;height:100%;object-fit:cover;display:block}
+/* Too small for the object in hand: keep the face readable. */
+@container (max-width:23px){.mascot-prop{display:none}}
+.mascot-figure{overflow:visible}
+
+@keyframes mascot-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-2.5px)}}
+@keyframes mascot-conduct{0%,100%{transform:rotate(0)}50%{transform:rotate(-30deg)}}
+@keyframes mascot-blink{0%,88%,100%{transform:scaleY(1)}92%{transform:scaleY(.12)}}
+.mascot-figure.thinking .mascot-body{animation:mascot-bob 1.4s ease-in-out infinite}
+.mascot-figure.thinking .mascot-prop{transform-box:view-box;transform-origin:54px 40px;animation:mascot-conduct .7s ease-in-out infinite}
+.mascot-figure.thinking .mascot-eyes{transform-box:view-box;transform-origin:32px 29px;animation:mascot-blink 2.6s infinite}
+@media (prefers-reduced-motion:reduce){.mascot-figure.thinking *{animation:none!important}}
+
+/* Avatar picker (agent editor › Identity). */
+.avatar-picker{display:grid;gap:16px;padding:16px;border:1px solid var(--border-soft,var(--border));border-radius:12px;background:var(--surface-2)}
+.avatar-picker-tabs{display:inline-flex;justify-self:start;gap:2px;padding:3px;border-radius:9px;border:1px solid var(--border);background:var(--bg)}
+.avatar-picker-tabs button{height:28px;padding:0 14px;border:0;border-radius:7px;background:transparent;color:var(--muted);font:inherit;font-size:13px;cursor:pointer}
+.avatar-picker-tabs button[aria-pressed=true]{background:var(--surface-2);color:var(--fg)}
+.avatar-picker-preview{display:flex;align-items:center;gap:16px}
+.avatar-picker-tile,.avatar-picker-preview .avatar-picker-photo{flex:0 0 88px;width:88px;height:88px;border-radius:22px}
+.avatar-picker-tile{display:grid;place-items:center;background:color-mix(in oklab,var(--mascot) 16%,transparent)}
+.avatar-picker-tile>.mascot-figure{width:74px;height:74px}
+.avatar-picker-preview .avatar-picker-photo{border-radius:50%}
+.avatar-picker-preview>div{display:grid;gap:3px;min-width:0}
+.avatar-picker-preview b{font-size:15px;font-weight:600}
+.avatar-picker-preview span{font-size:12px;color:var(--muted);line-height:1.5}
+.avatar-picker-options{display:grid;gap:14px}
+.avatar-picker fieldset{border:0;margin:0;padding:0;min-width:0}
+.avatar-picker legend{padding:0;margin-bottom:8px;font-size:12px;color:var(--muted)}
+.avatar-shapes,.avatar-colors,.avatar-chips{display:flex;flex-wrap:wrap;gap:6px}
+.avatar-shapes button{display:grid;justify-items:center;gap:3px;width:66px;padding:7px 2px;border:1px solid var(--border);border-radius:10px;background:transparent;color:var(--fg-2,var(--fg));font:inherit;font-size:11px;cursor:pointer}
+.avatar-shapes button svg{width:30px;height:30px}
+.avatar-shapes button[aria-pressed=true],.avatar-chips button[aria-pressed=true]{border-color:var(--accent);background:var(--accent-soft);color:var(--fg)}
+.avatar-colors button{width:28px;height:28px;padding:0;border-radius:50%;border:2px solid transparent;box-shadow:inset 0 0 0 2px var(--surface-2);cursor:pointer}
+.avatar-colors button[aria-pressed=true]{border-color:var(--fg)}
+.avatar-chips button{height:28px;padding:0 11px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--muted);font:inherit;font-size:12px;cursor:pointer}
+.avatar-shuffle{justify-self:start}
+.avatar-photo-drop{display:grid;justify-items:center;gap:6px;padding:22px;border:1.5px dashed var(--border);border-radius:12px;text-align:center}
+.avatar-photo-drop span{font-size:12px;color:var(--muted)}
+.avatar-photo-drop>div{display:flex;gap:8px;margin-top:6px}
+
+/* Chat · the agent thinking: its mascot keeps time next to a shimmering label (no per-tool text, nothing reflows). */
+.chat-run-status.is-live{flex-wrap:nowrap;gap:12px;padding:6px 0;font-size:13px}
+.chat-run-status .run-status-mascot{width:40px;height:40px;min-width:40px;border-radius:12px}
+.run-status-text{display:grid;gap:2px;min-width:0}
+.chat-run-status.is-live .run-status-label{font-size:14px;font-weight:500;background:linear-gradient(90deg,var(--muted) 0%,var(--muted) 40%,var(--fg) 50%,var(--muted) 60%,var(--muted) 100%);background-size:240% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:mascot-shimmer 2.2s linear infinite}
+.run-status-meta{display:flex;align-items:center;gap:4px;white-space:pre;font-size:12px;color:var(--meta,var(--muted))}
+.run-status-meta time{color:inherit}
+.run-status-dots{display:inline-flex;gap:3px;margin-left:2px}
+.run-status-dots i{width:4px;height:4px;border-radius:50%;background:currentColor;animation:mascot-dot 1.2s infinite}
+.run-status-dots i:nth-child(2){animation-delay:.2s}.run-status-dots i:nth-child(3){animation-delay:.4s}
+.agent-avatar.agent-photo.thinking,.chat-run-status .agent-photo{box-shadow:0 0 0 2px var(--accent);animation:mascot-ring 1.6s ease-in-out infinite}
+@keyframes mascot-shimmer{0%{background-position:120% 0}100%{background-position:-120% 0}}
+@keyframes mascot-dot{0%,100%{opacity:.25}50%{opacity:1}}
+@keyframes mascot-ring{0%,100%{box-shadow:0 0 0 2px color-mix(in oklab,var(--accent),transparent 60%)}50%{box-shadow:0 0 0 3px var(--accent)}}
+
+/* Agent replies carry the agent's face; every new message slides in softly. */
+.studio-shell .chat-message.agent-turn,.studio-shell .editorial-chat article.chat-message.agent-turn{position:relative;padding-left:40px}
+.studio-shell .chat-message.agent-turn>.agent-avatar.message-avatar{position:absolute;left:0;top:2px;width:28px;height:28px;min-width:28px;border-radius:9px}
+.studio-shell .chat-message,.chat-run-status{animation:chat-message-in .28s ease-out both}
+@keyframes chat-message-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* Attachments in the message. */
+.message-files{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px;margin:4px 0 6px}
+.message-file{display:flex;align-items:center;gap:8px;border-radius:10px;overflow:hidden;background:var(--surface-2);border:1px solid var(--border)}
+.message-file>img{display:block;width:120px;height:90px;object-fit:cover}
+.message-file:not(:has(img)){height:52px;padding:0 12px 0 8px}
+
+/* Composer: + menu and the attachment tray. */
+.composer-attach-root{position:relative;display:flex}
+.composer-plus{display:grid;place-items:center;width:32px;height:32px;padding:0;border-radius:50%;border:1px solid var(--border);background:transparent;color:var(--fg);cursor:pointer}
+.composer-plus svg{width:15px;height:15px;transition:transform .15s}
+.composer-plus[aria-expanded=true]{background:var(--surface-2)}
+.composer-plus[aria-expanded=true] svg{transform:rotate(45deg)}
+.composer-attach-menu{position:absolute;left:0;bottom:calc(100% + 8px);z-index:30;width:270px;padding:6px;border:1px solid var(--border);border-radius:12px;background:var(--surface);box-shadow:var(--elev-raised,0 12px 32px rgba(0,0,0,.4))}
+.composer-attach-menu[hidden]{display:none}
+.composer-attach-menu button{display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px;border:0;border-radius:8px;background:transparent;color:var(--fg);font:inherit;text-align:left;cursor:pointer}
+.composer-attach-menu button:hover,.composer-attach-menu button:focus-visible{background:var(--surface-2)}
+.composer-attach-menu button>span:first-child{flex:0 0 28px;height:28px;display:grid;place-items:center;border-radius:7px;background:var(--surface-2);font-size:13px}
+.composer-attach-menu button>span:last-child{display:grid;gap:1px}
+.composer-attach-menu b{font-size:13px;font-weight:500}
+.composer-attach-menu small{font-size:11px;color:var(--muted)}
+.composer-files{display:flex;flex-wrap:wrap;gap:8px;padding:2px 0 6px}
+.composer-file{position:relative;display:flex;align-items:center;gap:8px;height:48px;max-width:240px;padding:0 28px 0 4px;border-radius:10px;background:var(--surface-2)}
+.composer-file>img{width:40px;height:40px;border-radius:7px;object-fit:cover}
+.composer-file-badge{flex:0 0 40px;height:40px;display:grid;place-items:center;border-radius:7px;background:var(--bg);color:var(--accent);font-size:10px;font-weight:700}
+.composer-file.kind-folder .composer-file-badge,.message-file.kind-folder .composer-file-badge{color:#f5b544}
+.composer-file-text{display:grid;min-width:0;font-size:12px}
+.composer-file-text b{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.composer-file-text small{color:var(--muted)}
+.composer-file>button{position:absolute;top:4px;right:4px;width:20px;height:20px;padding:0;border:0;border-radius:50%;background:var(--border);color:var(--fg);font-size:12px;line-height:1;cursor:pointer}
+@media (prefers-reduced-motion:reduce){.chat-run-status.is-live .run-status-label{animation:none;color:var(--muted);background:none}.run-status-dots i,.studio-shell .chat-message,.chat-run-status,.agent-avatar.agent-photo.thinking{animation:none}}
+.composer-plus svg{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}
+.composer-bar>.composer-attach-root{order:-1}
+.agent-drawer .drawer-section[data-editor-section=identity]>.avatar-picker{grid-column:1/-1}

@@ -5,7 +5,7 @@ import '../../styles/runtime-actions.css';
 
 interface Action {id:string;hash:string;sessionId:string;agentName:string;server:string;tool:string;category?:string;arguments:unknown;status:string;error?:string}
 const labels:Record<string,[string,string]>={pending:['Aguardando aprovação','Awaiting approval'],approved:['Aprovada · aguardando execução','Approved · waiting to run'],running:['Executando','Running'],succeeded:['Execução confirmada','Execution confirmed'],failed:['Falhou','Failed'],denied:['Recusada','Denied'],interrupted:['Interrompida · resultado não confirmado','Interrupted · outcome unconfirmed']};
-export function RuntimeActionApprovals({sessionId,history=false}:{sessionId?:string;history?:boolean}){
+export function RuntimeActionApprovals({sessionId,history=false,onPendingChange}:{sessionId?:string;history?:boolean;onPendingChange?:(pending:boolean)=>void}){
  const {locale}=useLanguage(),pt=locale==='pt-BR';
  const [actions,setActions]=useState<Action[]>([]),[error,setError]=useState(''),[working,setWorking]=useState('');
  const url=`/api/content/actions?profile=${encodeURIComponent(storageProfile())}${sessionId?'&session='+encodeURIComponent(sessionId):''}`;
@@ -13,6 +13,9 @@ export function RuntimeActionApprovals({sessionId,history=false}:{sessionId?:str
   const refresh=async()=>{try{const response=await fetch(url,{cache:'no-store'});if(!response.ok)return;const data=await response.json();if(active)setActions(data.actions??[]);}catch{/* Keep the last confirmed audit while offline. */}};
   void refresh();const timer=setInterval(()=>void refresh(),1200);return()=>{active=false;clearInterval(timer);};
  },[url]);
+ const pending=actions.some(action=>action.status==='pending');
+ useEffect(()=>{onPendingChange?.(pending);},[pending,onPendingChange]);
+ useEffect(()=>()=>onPendingChange?.(false),[onPendingChange]);
  const visible=actions.filter(action=>history||['pending','approved','running'].includes(action.status));
  async function decide(action:Action,decision:'approve'|'deny'){
   setWorking(action.id);setError('');try{const response=await fetch(`/api/content/actions/${encodeURIComponent(action.id)}?profile=${encodeURIComponent(storageProfile())}`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({hash:action.hash,decision})});const data=await response.json();if(!response.ok)throw new Error(data.error);setActions(current=>current.map(item=>item.id===action.id?data:item));}catch(e){setError(e instanceof Error?e.message:String(e));}finally{setWorking('');}

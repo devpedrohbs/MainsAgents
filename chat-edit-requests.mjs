@@ -186,10 +186,24 @@ export function createChatEditRequests(db,{getCurrentProfile,getAgents,getSessio
   bound(profile,input.sessionId,input.messageId);
   return write(profile,{...read(profile,row.key)??row,status:'started',jobId,runId:run.id,contentId:run.contentId,editor:{id:editor.id,name:editor.name},pair:{...summary,voice},facts,sync:{status:sync.origin,offsetSeconds:sync.offsetSeconds,text:offsetSentence(sync.offsetSeconds),verified:sync.verified,...(Number.isFinite(sync.driftSeconds)?{driftSeconds:sync.driftSeconds}:{})},error:undefined,reason:undefined});
  }
+ async function admitVisual(profile,input,row,{session,agent,message}){
+  const run=row.commandInput?production.get(profile,row.commandInput.id):runFor(profile,session,agent);
+  if(!run||run.workspaceId!==agent.workspaceId||(session.contentId?run.contentId!==session.contentId:![run.sourceSession?.id,run.editorSession?.id].includes(session.id)))return write(profile,{...row,status:'refused',reason:'no-cut-base',error:'Esta conversa ainda não tem um corte base para receber acabamento. Peça primeiro os cortes do vídeo.'});
+  const latest=production.get(profile,run.id),snapshot=contextHash({session,agent,message});
+  const validate=()=>{if(contextHash(bound(profile,input.sessionId,input.messageId))!==snapshot)throw failure(409,'O pedido salvo mudou. Envie o acabamento de novo.');};
+  const phase=latest.editWorkflow?.phase;
+  if(!row.commandInput&&(latest.stage!=='video-review'||!phase))throw failure(409,'Aguarde o corte base deste conteúdo ficar pronto para pedir o acabamento.');
+  const commandInput=row.commandInput??{id:run.id,revision:latest.revision,action:phase==='cuts'?'start-visual-edit':'revise-video',requestId:`chat-visual-${row.key}`,authorize:true,expectedVideo:latest.outputVideo,notes:message.content.trim().slice(0,5000)};
+  write(profile,{...row,status:'admitted',runId:run.id,contentId:run.contentId,commandInput});
+  const result=await production.command(profile,commandInput,validate);
+  bound(profile,input.sessionId,input.messageId);
+  return write(profile,{...read(profile,row.key),status:'started',runId:result.id,contentId:result.contentId,error:undefined});
+ }
  async function admitAdjust(profile,input,row,{session,agent,message},intent){
   const run=row.commandInput?production.get(profile,row.commandInput.id):runFor(profile,session,agent);
   if(run&&(run.workspaceId!==agent.workspaceId||session.contentId&&run.contentId!==session.contentId||!session.contentId&&![run.sourceSession?.id,run.editorSession?.id].includes(session.id)))throw failure(409,'O ajuste salvo não pertence a esta conversa/conteúdo.');
   if(!run)return write(profile,{...row,status:'refused',reason:'no-edited-video',error:'Esta conversa ainda não tem um vídeo editado pelo app para ajustar. Peça a edição primeiro.'});
+  if(run.editWorkflow?.phase==='cuts')return admitVisual(profile,input,{...row,kind:'visual'},{session,agent,message});
   const window=intent.window;
   const requestId=`chat-adjust-${row.key}${input.window?`-${sha(input.window).slice(0,8)}`:''}`;
   write(profile,{...row,status:'admitted',runId:run.id,contentId:run.contentId,window,adjustId:requestId});
@@ -218,7 +232,7 @@ export function createChatEditRequests(db,{getCurrentProfile,getAgents,getSessio
   if(input.sync!==undefined&&!(input.sync&&Number.isFinite(input.sync.offsetSeconds)&&Math.abs(input.sync.offsetSeconds)<=PAIR_LIMITS.maxOffsetSeconds&&Object.keys(input.sync).every(key=>key==='offsetSeconds')))throw failure(400,`Atraso inválido: informe segundos entre −${PAIR_LIMITS.maxOffsetSeconds} e ${PAIR_LIMITS.maxOffsetSeconds}.`);
   if(input.sync!==undefined)input={...input,sync:{offsetSeconds:Math.round(input.sync.offsetSeconds*1000)/1000}};
   const context=bound(profile,input.sessionId,input.messageId),intent=classifyEditRequest(context.message.content);
-  if(!['edit','adjust'].includes(intent.kind))throw failure(422,intent.kind==='ambiguous'?'Este texto não é um pedido inequívoco de edição. Use “Editar este vídeo” para iniciar.':'Esta mensagem não pede uma edição; nada foi iniciado.',{reason:intent.reason});
+  if(!['edit','adjust','visual'].includes(intent.kind))throw failure(422,intent.kind==='ambiguous'?'Este texto não é um pedido inequívoco de edição. Use “Editar este vídeo” para iniciar.':'Esta mensagem não pede uma edição; nada foi iniciado.',{reason:intent.reason});
   const key=ledgerKey(profile,input.sessionId,input.messageId),prior=read(profile,key);
   if(input.window!==undefined&&sha(input.window)!==sha(intent.window))throw failure(409,'O intervalo precisa ser o da mensagem salva. Selecione um trecho em uma nova mensagem.');
   input={...(prior?.selection??{}),...input};
@@ -232,7 +246,7 @@ export function createChatEditRequests(db,{getCurrentProfile,getAgents,getSessio
    if(prior.status==='admitted'&&prior.jobId){const run=production.linkedRun?.(profile,prior.jobId);if(run)return view(write(profile,{...prior,status:'started',runId:run.id,contentId:run.contentId}));}
   }
   const row={key,sessionId:input.sessionId,messageId:input.messageId,contentId:context.session.contentId,kind:intent.kind,classifier:1,signature,contextHash:contextHash(context),selection:Object.fromEntries(Object.entries(payload).filter(([key,value])=>value!==null&&key!=='sync')),...(prior?.snapshot?{snapshot:prior.snapshot}:{}),...(prior?.verifiedSha256?{verifiedSha256:prior.verifiedSha256}:{}),...(prior?.verifiedScreenSha256?{verifiedScreenSha256:prior.verifiedScreenSha256}:{}),...(prior?.measurement?{measurement:prior.measurement}:{}),...(prior?.commandInput?{commandInput:prior.commandInput}:{}),createdAt:prior?.createdAt??new Date().toISOString(),...(prior?.runId?{runId:prior.runId}:{})};
-  try{return view(intent.kind==='edit'?await admitEdit(profile,input,row,context):await admitAdjust(profile,input,row,context,intent));}
+  try{return view(intent.kind==='edit'?await admitEdit(profile,input,row,context):intent.kind==='visual'?await admitVisual(profile,input,row,context):await admitAdjust(profile,input,row,context,intent));}
   catch(error){
    // Fenced/deleted: nothing is written back (the ledger row of a deleted chat is purged with it).
    if(error.status!==410&&!isSessionFenced(db,profile,input.sessionId)){const current=read(profile,key);if(current&&current.status!=='started')write(profile,{...current,status:'failed',error:String(error.message).slice(0,600)});}

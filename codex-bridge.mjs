@@ -15,11 +15,13 @@ import { prepareCodexRuntimeHome, importLegacyCodexThread, threadDynamicToolName
 import { createChatImageArtifacts, isImageGenerationItem, imageGenerationInstructions } from './chat-image-artifacts.mjs';
 import {notionAutomationInstructions} from './notion-automation-policy.mjs';
 import {paperDesignInstructions} from './paper-design.mjs';
+import {codexImageInputs} from './chat-attachments.mjs';
 import {paperImageInstructions} from './paper-image-assets.mjs';
 import {scheduleTool} from './chat-publishing.mjs';
 import {publishingInstructions} from './publishing-automation.mjs';
 import {permittedMcpAction} from './runtime-tool-policy.mjs';
 import {agentFileAccess} from './agent-file-access.mjs';
+import {createCodexTurnUsage} from './provider-usage.mjs';
 import {probeCodexExecutor,skillMarkdownFile,hostSkillContext,executorUnavailableInstructions,classifyThreadError,threadErrorStatus} from './codex-executor-readiness.mjs';
 
 export function codexLaunch({platform=process.platform,cliPath=process.env.CODEX_CLI_PATH,nodePath=process.execPath,appData=process.env.APPDATA??''}={}) {
@@ -161,9 +163,11 @@ export function recordToolResults(message,{imageArtifacts,resolveBinding,paperAs
 }
 
 function connectNotifications(client, delegationCalls, threadDelegation, imageArtifacts,actions,resolveBinding,delegations,{paperAssets,chatPublishing}={}) {
+  const turnUsage = createCodexTurnUsage();
   return client.subscribe((message) => {
     const params = message.params ?? {};
     const turnId = params.turnId ?? params.turn?.id;
+    if (message.method === 'thread/tokenUsage/updated') turnUsage.observe(params);
     if(message.id!==undefined&&message.method==='mcpServer/elicitation/request'){
       if(actions)actions.receive(message,resolveBinding(params.threadId),result=>client.reply(message.id,result));
       else client.reply(message.id,{action:'decline',content:null});return;
@@ -200,6 +204,9 @@ function connectNotifications(client, delegationCalls, threadDelegation, imageAr
       actions?.interrupt(turnId);
       delegationCalls.cancel(turnId);
       const status = params.turn?.status;
+      // One token report per turn, published before the terminal event so the chat still listens.
+      const usage = turnUsage.finish(turnId);
+      if (usage) publish(turnId, { type: 'usage.reported', executionId: turnId, usage });
       if (status === 'completed') publish(turnId, { type: 'execution.completed', executionId: turnId });
       else if (status === 'interrupted') publish(turnId, { type: 'execution.cancelled', executionId: turnId });
       else {
@@ -379,7 +386,7 @@ export async function startCodexBridge({ port = 8787, cwd = process.cwd(), runti
             }
           }
           const turnFileAccess=agentFileAccess(binding?.agent,cwd);
-          const turnConfig = { threadId, cwd:turnFileAccess.cwd,input: [{ type: 'text', text }], approvalPolicy: chatApprovalPolicy, sandboxPolicy:turnFileAccess.sandboxPolicy, ...(typeof input.modelId === 'string' && input.modelId ? { model: input.modelId } : {}), ...(['low','medium','high','xhigh'].includes(input.reasoningEffort) ? { effort: input.reasoningEffort } : {}) };
+          const turnConfig = { threadId, cwd:turnFileAccess.cwd,input: [{ type: 'text', text },...codexImageInputs(input.context)], approvalPolicy: chatApprovalPolicy, sandboxPolicy:turnFileAccess.sandboxPolicy, ...(typeof input.modelId === 'string' && input.modelId ? { model: input.modelId } : {}), ...(['low','medium','high','xhigh'].includes(input.reasoningEffort) ? { effort: input.reasoningEffort } : {}) };
           let result;
           try {
             result = await client.request('turn/start', turnConfig);

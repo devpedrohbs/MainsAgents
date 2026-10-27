@@ -3,7 +3,6 @@ import { Icon } from '../common/Icon';
 import { Breadcrumbs } from './Breadcrumbs';
 import { useLanguage } from '../../app/LanguageProvider';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher';
-import { CodexUsagePopover } from './CodexUsagePopover';
 import { SaveIndicator } from './SaveIndicator';
 
 interface TopbarProps {
@@ -41,7 +40,9 @@ export function Topbar({
       <div className="top-actions">
         <div className="precision-theme-picker" role="group" aria-label={locale==='pt-BR'?'Aparência':'Appearance'}><button type="button" aria-pressed={appearance==='light'} onClick={()=>setAppearance('light')}>{locale==='pt-BR'?'Claro':'Light'}</button><button type="button" aria-pressed={appearance==='dark'} onClick={()=>setAppearance('dark')}>{locale==='pt-BR'?'Escuro':'Dark'}</button></div>
         <SaveIndicator />
-        <CodexUsagePopover />
+        <button className="soft-button codex-usage-trigger" aria-current={page==='usage'?'page':undefined} onClick={() => onNavigate('usage')} title={locale === 'pt-BR' ? 'Uso do Claude e do Codex' : 'Claude and Codex usage'}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18a9 9 0 1 1 16 0M12 12l4-4"/><circle cx="12" cy="12" r="1"/></svg><span>{locale === 'pt-BR' ? 'Uso' : 'Usage'}</span>
+        </button>
         <button
           className="soft-button global-search"
           onClick={onOpenCommand}

@@ -1,5 +1,6 @@
 import type {AgentEditorValues,AgentProviderId,AgentTool} from './model/Agent';
 import {validPaperDesign} from '../../../paper-design.mjs';
+import {isAgentMascot} from './mascot.ts';
 import {validPublishingAutomation} from '../../../publishing-automation.mjs';
 
 /**
@@ -73,6 +74,7 @@ export function agentDraftValuesProblem(values:unknown):string|undefined{
   else if(field==='tools'){if(!stringList(value,agentTools))return `"tools" must be a list of ${agentTools.join(', ')}`;}
   else if(field==='skills'||field==='disabledSkills'){if(!stringList(value))return `"${field}" must be a list of text`;}
   else if(field==='skillFiles'){if(!isRecord(value)||!Object.values(value).every(item=>typeof item==='string'))return '"skillFiles" must map skill names to file paths';}
+  else if(field==='avatarMascot'){if(!isAgentMascot(value))return '"avatarMascot" must be {shape, color #rrggbb, prop, mood} with known values';}
   else if(field==='providerId'){if(!providerIds.includes(value as AgentProviderId))return `"providerId" must be one of ${providerIds.join(', ')}`;}
   else if(field==='mcpPermissions'){if(!stringList(value,mcpPermissionValues))return `"mcpPermissions" must be a list of ${mcpPermissionValues.join(', ')}`;}
   else if(field==='notionAutomation'){if(!exactObject(value,{enabled:'boolean',dataSourceId:'string'}))return '"notionAutomation" must be {enabled: boolean, dataSourceId: text}';}

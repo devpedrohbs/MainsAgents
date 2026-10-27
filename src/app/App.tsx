@@ -17,6 +17,8 @@ import { Flow } from '../pages/Flow';
 import { Agents } from '../pages/Agents';
 import { AgentSettings } from '../pages/AgentSettings';
 import { Sessions } from '../pages/Sessions';
+import { Scopes } from '../pages/Scopes';
+import { Usage } from '../pages/Usage';
 import { Settings } from '../pages/Settings';
 import { useCanvas } from '../components/canvas/CanvasProvider';
 import { useWorkspaces } from './WorkspaceProvider';
@@ -484,6 +486,19 @@ export function App() {
         onActivateAgent={(id) => selectAgent(id)}
         onToast={notify}
       />
+    ) : page === 'scopes' ? (
+      <Scopes
+        key={currentWorkspaceId}
+        onOpenChat={(agentId, sessionId) => {
+          selectAgent(agentId);
+          openSession(agentId, sessionId);
+        }}
+        onOpenStudio={(contentId) => window.dispatchEvent(new CustomEvent('mainsagents:open-content', { detail: { contentId } }))}
+        onCreateAgent={startAgentCreation}
+        onToast={notify}
+      />
+    ) : page === 'usage' ? (
+      <Usage key={currentWorkspaceId} />
     ) : page === 'settings' ? (
       <Settings initialSection={settingsSection} />
     ) : (

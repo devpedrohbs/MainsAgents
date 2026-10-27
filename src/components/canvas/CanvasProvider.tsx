@@ -4,7 +4,10 @@ import { useWorkspaces } from '../../app/WorkspaceProvider';
 import type { Agent, AgentId } from '../../features/agents/model/Agent';
 import type { ChatContextReference, ChatMessageItem } from '../../features/chat/model/Chat';
 import type { CanvasFlowNode, CanvasNodeData, CanvasNodeKind } from './canvasTypes';
-import { usePersistentState } from '../../data/localPersistence';
+import { readPersistentValue, usePersistentState } from '../../data/localPersistence';
+import { useAgents } from '../../features/agents/AgentsProvider';
+import { attachCanvasContext, pendingCanvasNodeIds, pruneCanvasContext, reconcileCanvasGraph, type CanvasGraph, type CanvasPendingContexts } from './canvasState';
+import { canvasSizes, findCanvasPosition } from './canvasGeometry';
 import { browserHome } from './browserNavigation';
 import { chatImageSource } from '../../features/chat/chatImages';
 import { addCollaborationChats, type CollaborationCanvasInput } from './collaborationCanvas';
@@ -18,6 +21,7 @@ interface CanvasContextValue {
   edges:Edge[];
   setNodes:Dispatch<SetStateAction<CanvasFlowNode[]>>;
   setEdges:Dispatch<SetStateAction<Edge[]>>;
+  updateGraph:(update:(graph:CanvasGraph)=>CanvasGraph)=>void;
   onNodesChange:(changes:NodeChange<CanvasFlowNode>[])=>void;
   onEdgesChange:(changes:EdgeChange[])=>void;
   view:CanvasViewState;
@@ -45,17 +49,27 @@ const CanvasContext=createContext<CanvasContextValue|null>(null);
 
 export function CanvasProvider({children}:PropsWithChildren) {
   const {currentWorkspaceId}=useWorkspaces();
+  const {getAgentById}=useAgents();
   const [workspaceCanvases,setWorkspaceCanvases]=usePersistentState<Record<string,WorkspaceCanvasState>>('canvas-workspaces',{});
+  const [contextNodeIds,setContextNodeIds]=useState<CanvasPendingContexts>({});
   const canvasState=workspaceCanvases[currentWorkspaceId]??{nodes:[],edges:[],view:{...initialView,viewport:{...initialView.viewport}}};
   const {nodes,edges,view}=canvasState;
   const allNodes=useMemo(()=>Object.entries(workspaceCanvases).flatMap(([workspaceId,state])=>state.nodes.map((node)=>({workspaceId,node}))),[workspaceCanvases]);
-  const setNodes=useCallback<Dispatch<SetStateAction<CanvasFlowNode[]>>>((update)=>setWorkspaceCanvases((current)=>{const state=current[currentWorkspaceId]??{nodes:[],edges:[],view:{...initialView,viewport:{...initialView.viewport}}};const next=typeof update==='function'?update(state.nodes):update;return {...current,[currentWorkspaceId]:{...state,nodes:next}}}),[currentWorkspaceId]);
-  const setEdges=useCallback<Dispatch<SetStateAction<Edge[]>>>((update)=>setWorkspaceCanvases((current)=>{const state=current[currentWorkspaceId]??{nodes:[],edges:[],view:{...initialView,viewport:{...initialView.viewport}}};const next=typeof update==='function'?update(state.edges):update;return {...current,[currentWorkspaceId]:{...state,edges:next}}}),[currentWorkspaceId]);
-  const [contextNodeIds,setContextNodeIds]=useState<Record<AgentId,string[]>>({});
+  const updateGraph=useCallback((update:(graph:CanvasGraph)=>CanvasGraph)=>{
+    // PersistentState is synchronous: read its live value rather than a render snapshot.
+    const current=readPersistentValue<Record<string,WorkspaceCanvasState>>('canvas-workspaces',{});
+    const state=current[currentWorkspaceId]??{nodes:[],edges:[],view:{...initialView,viewport:{...initialView.viewport}}};
+    const next=reconcileCanvasGraph(update({nodes:state.nodes,edges:state.edges}));
+    if(next.nodes===state.nodes&&next.edges===state.edges)return;
+    setWorkspaceCanvases({...current,[currentWorkspaceId]:{...state,...next}});
+    if(next.nodes!==state.nodes)setContextNodeIds(pending=>pruneCanvasContext(pending,currentWorkspaceId,next.nodes));
+  },[currentWorkspaceId,setWorkspaceCanvases]);
+  const setNodes=useCallback<Dispatch<SetStateAction<CanvasFlowNode[]>>>(update=>updateGraph(current=>({...current,nodes:typeof update==='function'?update(current.nodes):update})),[updateGraph]);
+  const setEdges=useCallback<Dispatch<SetStateAction<Edge[]>>>(update=>updateGraph(current=>({...current,edges:typeof update==='function'?update(current.edges):update})),[updateGraph]);
   const [focusRequest,setFocusRequest]=useState<CanvasContextValue['focusRequest']>(null);
-  const visibleChats=useRef<string[]>([]);
-  const registerVisibleChats=useCallback((sessionIds:string[])=>{visibleChats.current=sessionIds},[]);
-  const hasVisibleChats=useCallback((sourceSessionId:string,targetSessionId:string)=>visibleChats.current.includes(sourceSessionId)&&visibleChats.current.includes(targetSessionId),[]);
+  const visibleChats=useRef<Record<string,string[]>>({});
+  const registerVisibleChats=useCallback((sessionIds:string[])=>{visibleChats.current[currentWorkspaceId]=sessionIds},[currentWorkspaceId]);
+  const hasVisibleChats=useCallback((sourceSessionId:string,targetSessionId:string)=>{const visible=visibleChats.current[currentWorkspaceId]??[];return visible.includes(sourceSessionId)&&visible.includes(targetSessionId)},[currentWorkspaceId]);
   const clearFocusRequest=useCallback((requestId:string)=>setFocusRequest(current=>current?.requestId===requestId?null:current),[]);
   const addCollaboration=useCallback((input:CollaborationCanvasInput)=>{
     setWorkspaceCanvases(current=>{
@@ -69,29 +83,42 @@ export function CanvasProvider({children}:PropsWithChildren) {
   const onNodesChange=useCallback((changes:NodeChange<CanvasFlowNode>[])=>setNodes((current)=>applyNodeChanges(changes,current)),[setNodes]);
   const onEdgesChange=useCallback((changes:EdgeChange[])=>setEdges((current)=>applyEdgeChanges(changes,current)),[setEdges]);
   const updateView=useCallback((viewport:Viewport,width:number,height:number)=>setWorkspaceCanvases((current)=>{const state=current[currentWorkspaceId]??{nodes:[],edges:[],view:initialView};return {...current,[currentWorkspaceId]:{...state,view:{viewport,width,height,ready:true}}}}),[currentWorkspaceId]);
-  const addNode=useCallback((kind:CanvasNodeKind,position?:{x:number;y:number})=>{const nodeId=`node-${kind}-${Date.now().toString(36)}`;setNodes((current)=>[...current.map((node)=>({...node,selected:false})),{id:nodeId,type:kind,position:position??findFreePosition(current,view),selected:true,data:newNodeData(kind,currentWorkspaceId)}]);return nodeId},[currentWorkspaceId,setNodes,view]);
+  const addNode=useCallback((kind:CanvasNodeKind,position?:{x:number;y:number})=>{const nodeId=`node-${kind}-${crypto.randomUUID()}`;setNodes((current)=>[...current.map((node)=>({...node,selected:false})),{id:nodeId,type:kind,position:position??findCanvasPosition(current,view,kind),width:canvasSizes[kind].width,height:canvasSizes[kind].height,selected:true,data:newNodeData(kind,currentWorkspaceId)}]);return nodeId},[currentWorkspaceId,setNodes,view]);
   const updateNodeData=useCallback((workspaceId:string,nodeId:string,change:Partial<CanvasNodeData>|((data:CanvasNodeData)=>CanvasNodeData))=>setWorkspaceCanvases((current)=>{const state=current[workspaceId];if(!state)return current;return {...current,[workspaceId]:{...state,nodes:state.nodes.map((node)=>{if(node.id!==nodeId)return node;return {...node,data:typeof change==='function'?change(node.data):{...node.data,...change}}})}}}),[setWorkspaceCanvases]);
 
   const addAgentResponse=useCallback((message:ChatMessageItem,agent:Agent,link?:{contentId?:string;topicId?:string}):AddResponseResult=>{
     const kind=message.images?.some(image=>chatImageSource(image))?'image':classifyResponse(message.content,agent);
-    const nodeId=`chat-${message.id}-${Date.now().toString(36)}`;
-    setNodes((current)=>{
-      if(current.some((node)=>node.data.sourceMessageId===message.id))return current;
-      const position=findFreePosition(current,view);
-      const node:CanvasFlowNode={id:nodeId,type:kind,position,selected:true,data:{...responseData(kind,message,agent),...link,workspaceId:currentWorkspaceId}};
-      return [...current.map((item)=>({...item,selected:false})),node];
-    });
+    const owner=agent.workspaceId;
+    const current=readPersistentValue<Record<string,WorkspaceCanvasState>>('canvas-workspaces',{});
+    const state=current[owner]??{nodes:[],edges:[],view:{...initialView,viewport:{...initialView.viewport}}};
+    const existing=state.nodes.find(node=>node.data.sourceMessageId===message.id);
+    if(existing)return {kind:existing.type??kind,label:kindLabels[existing.type??kind],nodeId:existing.id};
+    const nodeId=`chat-${message.id}-${crypto.randomUUID()}`;
+    const node:CanvasFlowNode={id:nodeId,type:kind,position:findCanvasPosition(state.nodes,state.view,kind),width:canvasSizes[kind].width,height:canvasSizes[kind].height,selected:true,data:{...responseData(kind,message,agent),...link,workspaceId:owner}};
+    setWorkspaceCanvases({...current,[owner]:{...state,nodes:[...state.nodes.map(item=>({...item,selected:false})),node]}});
     return {kind,label:kindLabels[kind],nodeId};
-  },[currentWorkspaceId,setNodes,view]);
+  },[setWorkspaceCanvases]);
 
-  const attachNodesToAgent=useCallback((agentId:AgentId,nodeIds:string[])=>setContextNodeIds((current)=>({...current,[agentId]:Array.from(new Set([...(current[agentId]??[]),...nodeIds]))})),[]);
-  const removeNodeFromAgentContext=useCallback((agentId:AgentId,nodeId:string)=>setContextNodeIds((current)=>({...current,[agentId]:(current[agentId]??[]).filter((id)=>id!==nodeId)})),[]);
-  const clearAgentContext=useCallback((agentId:AgentId)=>setContextNodeIds((current)=>({...current,[agentId]:[]})),[]);
-  const getAgentContext=useCallback((agentId:AgentId):ChatContextReference[]=>(contextNodeIds[agentId]??[]).flatMap((nodeId)=>{const node=nodes.find((item)=>item.id===nodeId);return node?[{nodeId,label:getNodeContextLabel(node),kind:node.type,content:getNodeContextContent(node)}]:[]}),[contextNodeIds,nodes]);
+  const attachNodesToAgent=useCallback((agentId:AgentId,nodeIds:string[])=>{
+    const current=readPersistentValue<Record<string,WorkspaceCanvasState>>('canvas-workspaces',{});
+    const agent=readPersistentValue<Agent[]>('agents',[]).find(item=>item.id===agentId);
+    setContextNodeIds(pending=>attachCanvasContext(pending,currentWorkspaceId,agent,nodeIds,current[currentWorkspaceId]?.nodes??[]));
+  },[currentWorkspaceId]);
+  const removeNodeFromAgentContext=useCallback((agentId:AgentId,nodeId:string)=>setContextNodeIds(current=>{
+    const entries=current[currentWorkspaceId];if(!entries?.[agentId])return current;
+    return {...current,[currentWorkspaceId]:{...entries,[agentId]:entries[agentId].filter(id=>id!==nodeId)}};
+  }),[currentWorkspaceId]);
+  const clearAgentContext=useCallback((agentId:AgentId)=>setContextNodeIds(current=>{
+    const entries=current[currentWorkspaceId];if(!entries?.[agentId])return current;
+    const next={...entries};delete next[agentId];return {...current,[currentWorkspaceId]:next};
+  }),[currentWorkspaceId]);
+  const getAgentContext=useCallback((agentId:AgentId):ChatContextReference[]=>pendingCanvasNodeIds(contextNodeIds,currentWorkspaceId,getAgentById(agentId),nodes).flatMap(nodeId=>{
+    const node=nodes.find(item=>item.id===nodeId)!;return [{nodeId,label:getNodeContextLabel(node),kind:node.type,content:getNodeContextContent(node)}];
+  }),[contextNodeIds,currentWorkspaceId,getAgentById,nodes]);
   const groupNodes=useCallback((nodeIds:string[])=>{const groupId=`group-${Date.now().toString(36)}`;setNodes((current)=>{const groupNumber=new Set(current.map((node)=>node.data.groupId).filter(Boolean)).size+1;return current.map((node)=>nodeIds.includes(node.id)?{...node,data:{...node.data,groupId,groupLabel:`Group ${String(groupNumber).padStart(2,'0')}`}}:node)});return groupId},[setNodes]);
   const selectNode=useCallback((workspaceId:string,nodeId:string)=>setWorkspaceCanvases((current)=>{const state=current[workspaceId];if(!state)return current;return {...current,[workspaceId]:{...state,nodes:state.nodes.map((node)=>({...node,selected:node.id===nodeId}))}}}),[setWorkspaceCanvases]);
 
-  const value=useMemo<CanvasContextValue>(()=>({nodes,allNodes,edges,setNodes,setEdges,onNodesChange,onEdgesChange,view,updateView,addNode,updateNodeData,addAgentResponse,hasMessageNode:(messageId)=>nodes.some((node)=>node.data.sourceMessageId===messageId),attachNodesToAgent,getAgentContext,removeNodeFromAgentContext,clearAgentContext,groupNodes,selectNode,addCollaboration,focusRequest,clearFocusRequest,registerVisibleChats,hasVisibleChats}),[addAgentResponse,addNode,allNodes,attachNodesToAgent,clearAgentContext,edges,getAgentContext,groupNodes,nodes,onEdgesChange,onNodesChange,removeNodeFromAgentContext,selectNode,updateNodeData,updateView,view,addCollaboration,focusRequest,clearFocusRequest,registerVisibleChats,hasVisibleChats]);
+  const value=useMemo<CanvasContextValue>(()=>({nodes,allNodes,edges,setNodes,setEdges,updateGraph,onNodesChange,onEdgesChange,view,updateView,addNode,updateNodeData,addAgentResponse,hasMessageNode:(messageId)=>nodes.some((node)=>node.data.sourceMessageId===messageId),attachNodesToAgent,getAgentContext,removeNodeFromAgentContext,clearAgentContext,groupNodes,selectNode,addCollaboration,focusRequest,clearFocusRequest,registerVisibleChats,hasVisibleChats}),[addAgentResponse,addNode,allNodes,attachNodesToAgent,clearAgentContext,edges,getAgentContext,groupNodes,nodes,onEdgesChange,onNodesChange,removeNodeFromAgentContext,selectNode,updateGraph,updateNodeData,updateView,view,addCollaboration,focusRequest,clearFocusRequest,registerVisibleChats,hasVisibleChats]);
   return <CanvasContext.Provider value={value}>{children}</CanvasContext.Provider>;
 }
 
@@ -146,15 +173,6 @@ function makeTitle(content:string):string {
 
 function findUrl(content:string):string|undefined { return content.match(/https?:\/\/[^\s)]+/i)?.[0]; }
 function findPlatform(content:string):string { return content.match(/\b(Instagram|TikTok|YouTube|LinkedIn|X|Threads)\b/i)?.[0] ?? 'Content'; }
-
-function findFreePosition(nodes:CanvasFlowNode[],view:CanvasViewState):{x:number;y:number} {
-  const {viewport,width,height}=view;
-  const base={x:(width*.52-viewport.x)/viewport.zoom,y:(height*.46-viewport.y)/viewport.zoom};
-  const stepX=285,stepY=215;
-  const offsets=[[0,0],[stepX,0],[0,stepY],[-stepX,0],[0,-stepY],[stepX,stepY],[-stepX,stepY],[stepX,-stepY],[-stepX,-stepY],[stepX*2,0],[0,stepY*2]];
-  const available=offsets.map(([x,y])=>({x:Math.max(20,base.x+x),y:Math.max(20,base.y+y)})).find((candidate)=>nodes.every((node)=>Math.abs(node.position.x-candidate.x)>250||Math.abs(node.position.y-candidate.y)>180));
-  return available ?? {x:Math.max(20,base.x+nodes.length*24),y:Math.max(20,base.y+nodes.length*24)};
-}
 
 export function getNodeContextLabel(node:CanvasFlowNode):string {
   const data=node.data;

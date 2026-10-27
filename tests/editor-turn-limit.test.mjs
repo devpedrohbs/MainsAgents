@@ -211,7 +211,8 @@ async function fixture(){
  let serial=0;const threads=new Map();
  const codex={providerId:'codex',capabilities:{reconcile:true},createSession:async()=>{const id=`thread-${++serial}`;threads.set(id,{turns:[]});return id},connect:async()=>`thread-${++serial}`,resumeSession:async()=>{},readThread:async id=>threads.get(id)??{turns:[]},cancel:async()=>{},send:async()=>({executionId:`execution-${++serial}`}),events:async function*(){yield {type:'message.completed',content:'Resposta normal.'};yield {type:'execution.completed'}}};
  const authoring=createEditorAuthoring(),scripts=[],claude=scriptedClaude(authoring,scripts),flow=createProductionFlow('space','Fluxo',agents);
- const mediaOptions={inspect,animate:async({inputPath,outputPath})=>copyFile(inputPath,outputPath),animationCapabilities:async()=>({available:true}),stills:stillsStub};
+ // Historical combined-edit fixture: current staged editing is exercised in edit-stages.test.mjs.
+ const mediaOptions={newEditWorkflow:()=>undefined,inspect,animate:async({inputPath,outputPath})=>copyFile(inputPath,outputPath),animationCapabilities:async()=>({available:true}),stills:stillsStub};
  const bridge=createContentWorkflowBridge({dbPath,getCurrentProfile:()=>'owner',getAgents:()=>agents,getFlows:()=>({flows:[flow]}),getSessions:()=>sessions,getRuntime:()=>codex,getChatRuntime:provider=>provider==='claude'?claude:codex,inspect,mediaOptions,timeoutMs:120000});
  const db=new DatabaseSync(dbPath);
  const delegate=callId=>bridge.delegations.dispatch({profileId:'owner',agentId:'conteudo',sessionId:'chat-1'},{threadId:'source-thread',turnId:`turn-${callId}`,callId,arguments:{targetAgentId:'editor-de-video-1',title:'Dicas de edição',instructions:`Edite com motion explicativo: ${title} para quem grava no celular.`,files:[input]}},{targets:[{id:'editor-de-video-1'}]});

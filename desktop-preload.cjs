@@ -8,6 +8,9 @@ contextBridge.exposeInMainWorld('mainsAgentsDesktop', {
   files: {
     pathForFile: file => webUtils.getPathForFile(file),
     selectVideos: () => ipcRenderer.invoke('files:select-videos'),
+    selectAttachments: kind => ipcRenderer.invoke('files:select-attachments',kind),
+    attachmentInfo: paths => ipcRenderer.invoke('files:attachment-info',paths),
+    savePasted: (bytes,type) => ipcRenderer.invoke('files:save-pasted',bytes,type),
     select: (profile,contentId,multiple=true) => ipcRenderer.invoke('files:select',profile,contentId,multiple),
     inspect: (profile,contentId,paths) => ipcRenderer.invoke('files:inspect',profile,contentId,paths),
     verify: (profile,contentId) => ipcRenderer.invoke('files:verify',profile,contentId),

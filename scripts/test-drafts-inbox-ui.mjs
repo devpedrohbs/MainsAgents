@@ -53,15 +53,12 @@ async function openChat() { await evaluate("document.querySelector('.agent-nav')
 app.whenReady().then(async () => {
   try {
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve)); await open();
-    // Home keeps the inbox compact: two rows plus a "View all (N)" toggle; all three pending items must be reachable.
-    await until(() => evaluate("document.querySelector('.editorial-inbox .inbox-count')?.textContent === '3'"));
-    assert.equal(await evaluate("document.querySelectorAll('.inbox-row').length"), 2);
-    assert.equal(await evaluate("document.querySelector('.editorial-inbox .panel-footer-action').getAttribute('aria-expanded')"), 'false');
-    await evaluate("document.querySelector('.editorial-inbox .panel-footer-action').click()");
-    await until(() => evaluate("document.querySelectorAll('.inbox-row').length === 3"));
-    assert.equal(await evaluate("document.querySelector('.editorial-inbox .panel-footer-action').getAttribute('aria-expanded')"), 'true');
+    // Home lists everything that waits on the user in one "Precisa de você" card; up to five rows show without expanding.
+    await until(() => evaluate("document.querySelector('.ov-needs .ov-needs-count')?.textContent === '3'"));
+    assert.equal(await evaluate("document.querySelectorAll('.ov-needs .inbox-row').length"), 3);
+    assert.equal(await evaluate("Boolean(document.querySelector('.ov-needs .ov-more'))"), false);
     assert.equal(await evaluate("document.querySelector('.inbox-row').textContent.includes('Pesquisa interrompida')"), true);
-    assert.equal(await evaluate("document.querySelector('.editorial-inbox').textContent.includes('OUTRO_WORKSPACE')"), false);
+    assert.equal(await evaluate("document.querySelector('.ov-needs').textContent.includes('OUTRO_WORKSPACE')"), false);
     await evaluate("[...document.querySelectorAll('.inbox-row')].find(row => row.textContent.includes('Pauta correta')).click()");
     await until(() => evaluate("!!document.querySelector('.editorial-review input')"));
     assert.equal(await evaluate("document.querySelector('.editorial-review input').value"), 'Pauta correta');
@@ -69,12 +66,12 @@ app.whenReady().then(async () => {
     await evaluate("[...document.querySelectorAll('button')].find(button => button.textContent.trim() === 'Descartar pauta').click()");
     await until(() => editorial.topics.find(item => item.id === 'target').status === 'rejected');
     await evaluate("location.hash = 'home'"); await until(() => evaluate("document.querySelectorAll('.inbox-row').length === 2"));
-    jobsFailed = true; await until(() => evaluate("document.querySelector('.editorial-inbox').textContent.includes('QUEUE_UNAVAILABLE')"));
+    jobsFailed = true; await until(() => evaluate("document.querySelector('.ov-needs').textContent.includes('QUEUE_UNAVAILABLE')"));
     assert.equal(await evaluate("document.querySelectorAll('.inbox-row').length"), 2); jobsFailed = false;
-    await until(() => evaluate("!document.querySelector('.editorial-inbox [role=alert]')"));
+    await until(() => evaluate("!document.querySelector('.ov-needs [role=alert]')"));
     writeFileSync(join(root, '.mainsagents-workspaces/inbox-light.png'), await captureReadyPng(window.webContents));
     window.setSize(760, 900); await evaluate("document.documentElement.dataset.appearance = 'dark'");
-    assert.equal(await evaluate("(() => { const panel=document.querySelector('.editorial-inbox'); return panel.scrollWidth <= panel.clientWidth + 1; })()"), true);
+    assert.equal(await evaluate("(() => { const panel=document.querySelector('.ov-needs'); return panel.scrollWidth <= panel.clientWidth + 1; })()"), true);
     writeFileSync(join(root, '.mainsagents-workspaces/inbox-dark-compact.png'), await captureReadyPng(window.webContents));
     window.setSize(1440, 940); await evaluate("document.documentElement.dataset.appearance = 'light'");
     await openChat(); assert.equal(await evaluate("document.querySelector('.composer textarea').value"), draft.text);

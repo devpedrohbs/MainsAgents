@@ -1,5 +1,13 @@
 # Publicação e recuperação do MainsAgents (Windows)
 
+## Atualização local atual — 0.3.78 (27/10/2026)
+
+Instalada nesta máquina sobre a 0.3.77, sem publicação de release: pacote completo do checkout atual, correções de canvas e estado, fluxo visual, chat/modelos/anexos/uso e preservação da edição em três etapas. `package.json` e lockfile sincronizados. NSIS silencioso por usuário, retorno 0; FileVersion `0.3.78`, ProductVersion `0.3.78.0`; ASAR instalado idêntico ao verificado. Os nove bancos, arquivos locais e skills permaneceram logicamente idênticos; app mantido fechado, nenhum trabalho pessoal iniciado. [Relatório, limites e backup](docs/analysis/local-update-0.3.78-2026-10-27.md).
+
+- Instalador local: `release/r78-20261027/MainsAgents-Setup-0.3.78.exe`, SHA-256 `05d1674a77fee224bcbc38b75f9263383a9244c415851b6cb2a55cc8f09042a7`.
+- ASAR do pacote e instalado: SHA-256 `dcae863f9915a1a82f8dd834654809601d557d479efa9d7230582f0ef29d2e7b`.
+- Build completo, quatro smokes de interface, três fixtures atualizadas e quatro verificações isoladas do pacote aprovados. Suíte geral: 843/844 na primeira execução, com a única falha transitória `EPERM` de rotação aprovada em repetição isolada, sem mudar código.
+
 ## Estado das versões (07/10/2026)
 
 - **Local:** `package.json` = 0.3.57, instalado nesta máquina em 08/10/2026 (0.3.56 → 0.3.57: check-up B01–B03/B05/B07/B09–B11; estado preservado, instalador `e2e780f6…0e40d`, app.asar `80de0d37…b4e9`; detalhes em [docs/analysis/local-update-0.3.57.md](docs/analysis/local-update-0.3.57.md)). Anterior: 0.3.56, instalado nesta máquina em 07/10/2026 (0.3.55 → 0.3.56: gate de roteiro, Claude por etapa, pacote de gravação, capas locais e biblioteca de referências; estado preservado, instalador `d461084e…b7bc`, app.asar `054b22c0…7000`; detalhes em [docs/analysis/local-update-0.3.56.md](docs/analysis/local-update-0.3.56.md)). Anterior: 0.3.55 ([docs/analysis/local-update-0.3.55.md](docs/analysis/local-update-0.3.55.md)).

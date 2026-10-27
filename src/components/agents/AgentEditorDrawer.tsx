@@ -3,6 +3,7 @@ import type { Agent, AgentEditorValues, AgentTool } from '../../features/agents/
 import { agentToolDetails } from '../../features/agents/model/Agent';
 import { Icon } from '../common/Icon';
 import { AgentAvatar } from './AgentAvatar';
+import { AvatarPicker } from './AvatarPicker';
 import { useWorkspaces } from '../../app/WorkspaceProvider';
 import { useLanguage } from '../../app/LanguageProvider';
 import { SelectMenu } from '../common/SelectMenu';
@@ -184,7 +185,7 @@ export function AgentEditorDrawer({ agent, initialValues, onClose, onSave, onDel
       <aside ref={drawerRef} className={`agent-drawer ${focusMode?'focus-writing':''}`} role="dialog" aria-modal="true" aria-labelledby="agent-editor-title">
         <header className="drawer-head">
           <div className="drawer-identity">
-            <AgentAvatar name={values.name || (locale==='pt-BR'?'Novo Agente':'New Agent')} image={values.avatarImage} />
+            <AgentAvatar name={values.name || (locale==='pt-BR'?'Novo Agente':'New Agent')} image={values.avatarImage} mascot={values.avatarMascot} role={values.role} />
             <div><p>{t(editing ? 'Agent configuration' : 'New specialist')}</p><h2 id="agent-editor-title">{editing ? agent?.name : t('Create agent')}</h2></div>
           </div>
           <button className="icon-button" type="button" onClick={close} aria-label="Close agent editor">×</button>
@@ -200,7 +201,7 @@ export function AgentEditorDrawer({ agent, initialValues, onClose, onSave, onDel
             {editorSection==='notion'&&providerId==='gemini'&&<p className="skill-status">{locale==='pt-BR'?'A autorização automática Notion deste app está disponível para agentes Codex CLI e Claude Code CLI.':'This app’s automatic Notion permission is available to Codex CLI and Claude Code CLI agents.'}</p>}
             <section className="drawer-section" data-editor-section="identity" hidden={editorSection!=='identity'}>
               <div className="drawer-section-title"><b>{t('Identity')}</b><span>{t('How this agent appears across the workspace.')}</span></div>
-              <div className="agent-avatar-editor"><AgentAvatar name={values.name||(locale==='pt-BR'?'Novo Agente':'New Agent')} image={values.avatarImage}/><div><b>{t('Profile image')}</b><span>{t('Add a photo or illustrated icon to recognize this agent.')}</span><div><button className="soft-button" type="button" onClick={()=>avatarInputRef.current?.click()}>{t(values.avatarImage?'Change image':'Choose image')}</button>{values.avatarImage&&<button className="soft-button" type="button" onClick={()=>setField('avatarImage','')}>{t('Remove')}</button>}</div><input ref={avatarInputRef} hidden type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(event)=>void chooseAvatar(event)}/></div></div>
+              <AvatarPicker name={values.name} role={values.role} image={values.avatarImage??''} mascot={values.avatarMascot} pt={locale==='pt-BR'} onImage={image=>setField('avatarImage',image)} onMascot={avatarMascot=>setValues(current=>({...current,avatarMascot}))} onChoosePhoto={()=>avatarInputRef.current?.click()}/><input ref={avatarInputRef} hidden type="file" accept="image/png,image/jpeg,image/webp,image/gif" onChange={(event)=>void chooseAvatar(event)}/>
               <label className="field"><span>{t('Name')} *</span><input ref={nameRef} required value={values.name} onChange={(event) => setField('name', event.target.value)} placeholder={locale==='pt-BR'?'ex.: Editor de Pesquisa':'e.g. Research Editor'} /></label>
               <label className="field"><span>{t('Role')} *</span><input required value={values.role} onChange={(event) => setField('role', event.target.value)} placeholder={locale==='pt-BR'?'ex.: Pesquisador editorial':'e.g. Editorial researcher'} /></label>
               <label className="field"><span>{t('Description')}</span><textarea rows={3} value={values.description} onChange={(event) => setField('description', event.target.value)} placeholder={locale==='pt-BR'?'Uma explicação breve do que este agente faz.':'A concise explanation of what this agent does.'} /></label>
@@ -303,5 +304,6 @@ function pickValues(agent: Agent): AgentEditorValues {
     disabledSkills: [...(agent.disabledSkills ?? [])],
     skillsInstallKey:agent.skillsInstallKey??agent.id,
     avatarImage: agent.avatarImage ?? '',
+    avatarMascot: agent.avatarMascot,
   };
 }

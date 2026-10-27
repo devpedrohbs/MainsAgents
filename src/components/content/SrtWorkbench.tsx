@@ -49,7 +49,7 @@ export function SrtWorkbench({contentId,workspaceId,videos,defaultVideo,pt,embed
  const discard=()=>{setMemory(null);try{setSaved('');}catch{/* rascunho só em memória */}};
  const errors=srtRowErrors(rows),valid=rows.length>0&&!Object.keys(errors).length,dirty=!!latest&&!sameBlocks(rows,latest.blocks);
  const video=videos.find(item=>item.assetId===videoKey)??videos.find(item=>sameRef(item,defaultVideo))??videos[0]??null;
- const sourceVideo:SrtVideoRef|null=doc?.source.kind==='video'?doc.source:doc?.alignment??null;
+ const sourceVideo:SrtVideoRef|null=doc?.source.kind==='video'?doc.source:doc?.alignment??doc?.targetVideo??null;
  const listenVideo=sourceVideo?videos.find(item=>sameRef(item,sourceVideo))??null:defaultVideo?videos.find(item=>sameRef(item,defaultVideo))??null:null;
  const playerSrc=listenVideo?`/api/content/media/file?profile=${encodeURIComponent(storageProfile())}&contentId=${encodeURIComponent(contentId)}&assetId=${encodeURIComponent(listenVideo.assetId)}&versionId=${encodeURIComponent(listenVideo.versionId)}`:'';
  const live=rows.findIndex(row=>{const start=parseClock(row.start),end=parseClock(row.end);return time>=start&&time<end;});
@@ -58,7 +58,7 @@ export function SrtWorkbench({contentId,workspaceId,videos,defaultVideo,pt,embed
 
  const act=async<T,>(work:(signal:AbortSignal)=>Promise<T>)=>{setBusy(true);setError('');try{return await scoped(work);}catch(failure){if(currentScope.current===scopeId&&!(failure instanceof DOMException&&failure.name==='AbortError'))setError(failure instanceof Error?failure.message:String(failure));return undefined;}finally{setBusy(false);}};
  const adopt=(next:SrtDocument)=>{setDocs(current=>[next,...(current??[]).filter(item=>item.id!==next.id)]);setDocId(next.id);setReceipt(null);};
- const importSrt=async(file:File|undefined)=>{if(!file)return;if(file.size>2_000_000){setError(say('Arquivo SRT grande demais (máximo 2 MB).','SRT file too large (max 2 MB).'));return;}const text=await file.text();const next=await act(signal=>srtCommand({action:'import',contentId,name:file.name,srt:text,maxWords},signal));if(next)adopt(next);};
+ const importSrt=async(file:File|undefined)=>{if(!file)return;if(file.size>2_000_000){setError(say('Arquivo SRT grande demais (máximo 2 MB).','SRT file too large (max 2 MB).'));return;}const text=await file.text();const next=await act(signal=>srtCommand({action:'import',contentId,name:file.name,srt:text,maxWords,...(embedded&&defaultVideo?{targetVideo:defaultVideo}:{})},signal));if(next)adopt(next);};
  const generate=async()=>{if(!video)return;const next=await act(signal=>srtCommand({action:'generate',contentId,assetId:video.assetId,versionId:video.versionId,sha256:video.sha256,maxWords},signal));if(next)adopt(next);};
  // Toda ação parte da versão atual (CAS) e leva junto o rascunho válido, que o servidor salva antes (sem etapa de aprovação).
  const base=()=>({contentId,docId:doc!.id,baseVersion:latest!.version,baseHash:latest!.hash,...(dirty?{blocks:blocksFromRows(rows)}:{})});

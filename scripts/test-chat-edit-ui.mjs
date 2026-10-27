@@ -132,10 +132,10 @@ app.whenReady().then(async()=>{const report={};try{
  await until(async()=>(await cardText()).includes('Ajuste cancelado'));assert.equal(execution,beforeRestart);report.restart={newEditorTurns:execution-beforeRestart};
  await openChat();
  // 5) Dark appearance and a 420 px window.
- await js('localStorage.setItem("mainsagents-appearance","dark")');await win.webContents.reload();await openChat();
+ await js('localStorage.setItem("mainsagents-appearance-v2","dark")');await win.webContents.reload();await openChat();
  await until(async()=>(await cardText()).includes('Versão anterior restaurada'));assert.equal(await js('document.documentElement.dataset.appearance'),'dark');await shot('05-escuro','.chat-edit-card');
  win.setContentSize(420,860);await until(()=>js('innerWidth<=430'));await until(noOverflow);assert.equal(await js('document.querySelector(".chat-layer").getBoundingClientRect().width>=innerWidth-2'),true,'mobile chat fills the available width');await shot('06-escuro-420px','.chat-edit-card');
- await js('localStorage.setItem("mainsagents-appearance","light")');await win.webContents.reload();await openChat();await until(noOverflow);assert.equal(await js('document.documentElement.dataset.appearance'),'light');await shot('07-claro-420px','.chat-edit-card');
+ await js('localStorage.setItem("mainsagents-appearance-v2","light")');await win.webContents.reload();await openChat();await until(noOverflow);assert.equal(await js('document.documentElement.dataset.appearance'),'light');await shot('07-claro-420px','.chat-edit-card');
  assert.deepEqual(errors,[]);
  report.runs=bridge.production.list(profile).map(run=>({stage:run.stage,adjustments:run.localAdjustments?.map(item=>item.status),director:run.editDirector}));report.chatSends=chatSends.length;report.out=out;
  writeFileSync(join(out,'report.json'),JSON.stringify(report,null,1));console.log('CHAT_EDIT_UI_OK',out);

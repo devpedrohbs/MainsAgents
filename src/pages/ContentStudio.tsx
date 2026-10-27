@@ -42,6 +42,19 @@ const topicStatus: Record<EditorialTopic['status'], [string, string]> = {
   rejected: ['Descartada', 'Rejected'],
   error: ['Falha na pesquisa', 'Research failed'],
 };
+/** What the person does next on this topic, from the same state as the stage track (no new rule, no automatic action). */
+function studioNextAction({topic,hasContent,hasOptions,hasApproved,notionConfirmed,pt}:{topic:EditorialTopic;hasContent:boolean;hasOptions:boolean;hasApproved:boolean;notionConfirmed:boolean;pt:boolean}):{title:string;detail:string;target?:'topic'|'content'}{
+  const say=(ptText:[string,string],enText:[string,string])=>({title:pt?ptText[0]:enText[0],detail:pt?ptText[1]:enText[1]});
+  if(topic.status==='error')return {...say(['Tentar a pesquisa de novo','A última pesquisa falhou. Confira o erro e peça de novo.'],['Retry the research','The last research failed. Check the error and ask again.']),target:'topic'};
+  if(topic.status==='researching')return say(['Aguardando a pesquisa','O agente está buscando fontes e ângulos. A pauta atualiza sozinha quando terminar.'],['Waiting for the research','The agent is gathering sources and angles. The topic updates when it finishes.']);
+  if(topic.status==='rejected')return say(['Pauta descartada','Nada mais a fazer aqui. Crie outra pauta quando quiser.'],['Topic rejected','Nothing else to do here. Create another topic when you like.']);
+  if(!hasContent&&!topic.researchArtifactId)return {...say(['Pesquisar a pauta','Peça ao agente fontes e ângulos antes de decidir.'],['Research the topic','Ask the agent for sources and angles before deciding.']),target:'topic'};
+  if(!hasContent&&topic.status!=='approved')return {...say(['Decidir a pauta','Leia o resumo e as fontes, então aprove ou descarte.'],['Decide on the topic','Read the summary and sources, then approve or reject.']),target:'topic'};
+  if(!hasContent||!hasOptions)return {...say(['Gerar opções de roteiro','Peça as opções de roteiro no card de conteúdo.'],['Generate script options','Ask for script options in the content card.']),target:'content'};
+  if(!hasApproved)return {...say(['Escolher o roteiro','Compare as opções e aprove uma para seguir.'],['Choose the script','Compare the options and approve one to continue.']),target:'content'};
+  if(!notionConfirmed)return {...say(['Levar para a produção','Roteiro aprovado. Envie ao Notion se usar, grave o vídeo e siga no Fluxo.'],['Move to production','Script approved. Send it to Notion if you use it, record and continue in Flow.']),target:'content'};
+  return say(['Roteiro pronto','Tudo registrado. Grave o vídeo e acompanhe a produção no Fluxo.'],['Script ready','Everything is recorded. Record the video and follow production in Flow.']);
+}
 const contentStatus: Record<EditorialContent['status'], [string, string]> = {
   planning: ['Roteiro pendente', 'Script needed'],
   generating: ['Gerando roteiro', 'Generating script'],
@@ -306,6 +319,8 @@ useEffect(() => {
         requestAnimationFrame(()=>{document.querySelector<HTMLTextAreaElement>('.editorial-intake textarea')?.focus();document.querySelector('.editorial-intake')?.scrollIntoView({block:'nearest'});});
       }}/>:view==='calendar'?<PublicationCalendar key={currentWorkspaceId} workspaceId={currentWorkspaceId}/>:<>
 
+<div className="editorial-grid">
+        <aside className="editorial-rail">
       <form className="editorial-card editorial-intake" aria-label={pt?"Nova pauta":"New topic"} onSubmit={submit}>
             <h2>{pt ? 'Nova pauta' : 'New topic'}</h2>
             <div className="studio-intake-header"><div
@@ -413,8 +428,6 @@ useEffect(() => {
                     : 'Save topic'}
             </button>
           </form>
-<div className="editorial-grid">
-        <aside className="editorial-rail">
 
           <div className="editorial-card editorial-list">
             <div className="editorial-section-head">
@@ -457,7 +470,7 @@ useEffect(() => {
             </div>
           ) : (
             <>
-              <section className="editorial-card">
+              <section className="editorial-card" id="studio-topic-card">
                 <div className="editorial-section-head">
                   <div>
                     <span className="editorial-kicker">
@@ -482,6 +495,9 @@ useEffect(() => {
           </li>
         ))}
       </ol>
+                {(()=>{const next=studioNextAction({topic,hasContent:!!content,hasOptions:!!optionsArtifact,hasApproved:!!approvedArtifact,notionConfirmed,pt});
+                  return <div className="studio-next-action" role="status"><i aria-hidden="true"/><div><b>{pt?'Próxima ação':'Next step'}: {next.title}</b><span>{next.detail}</span></div>
+                    {next.target&&<button type="button" className="soft-button" onClick={()=>document.getElementById(next.target==='content'?'studio-content-card':'studio-topic-card')?.scrollIntoView({behavior:'smooth',block:'start'})}>{pt?'Ir para a etapa':'Go to step'}</button>}</div>;})()}
 <p className="editorial-provenance">
                   {pt ? 'Entrada original' : 'Original input'}:{' '}
                   {topic.originUrl ? (
@@ -666,7 +682,7 @@ useEffect(() => {
               {content && <ContentMediaEditor key={`media-${content.id}`} content={content}/>}
               {content && <ContentPublications key={`publications-${content.id}`} content={content}/>}
               {content && (
-                <section className="editorial-card">
+                <section className="editorial-card" id="studio-content-card">
                   <div className="editorial-section-head">
                     <div>
                       <span className="editorial-kicker">{pt ? 'CARD DE CONTEÚDO' : 'CONTENT CARD'}</span>

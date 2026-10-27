@@ -241,14 +241,6 @@ body{font-family:var(--font-body);-webkit-font-smoothing:antialiased}
 .flow-context-bar .production-summary>.soft-button{order:3;background:var(--primary-bg,var(--accent));color:var(--primary-fg,#fff);border-color:transparent;font-weight:500}
 
 /* Sidebar — cartão de uso do Codex (handoff) */
-.sidebar-usage{margin:0 4px 8px;padding:12px;border-radius:10px;background:var(--sidebar-active);display:grid;gap:8px}
-.sidebar-usage>div{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px}
-.sidebar-usage b{font-weight:600;color:var(--sidebar-fg)}
-.sidebar-usage span{font-family:'Geist Mono',ui-monospace,monospace;font-size:11px;color:var(--sidebar-muted)}
-.sidebar-usage progress{appearance:none;-webkit-appearance:none;width:100%;height:5px;border:0;border-radius:999px;background:var(--sidebar-border,var(--border));overflow:hidden}
-.sidebar-usage progress::-webkit-progress-bar{background:var(--sidebar-border,var(--border));border-radius:999px}
-.sidebar-usage progress::-webkit-progress-value{background:var(--accent);border-radius:999px}
-.sidebar-usage small{font-size:11px;color:var(--sidebar-muted)}
 
 /* Estúdio — grade, lista de pautas e barra de etapas (handoff) */
 .studio-shell .editorial-grid{grid-template-columns:minmax(300px,400px) minmax(0,1fr);gap:16px}

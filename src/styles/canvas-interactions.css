@@ -1,0 +1,85 @@
+/* Canvas interaction rules live together so older page styles cannot stretch its controls. */
+.studio-shell .canvas-layout .selection-bar {
+  top:74px; bottom:auto; left:50%; right:auto; transform:translateX(-50%);
+  display:flex; align-items:center; flex-wrap:nowrap; justify-content:flex-start;
+  width:max-content; height:auto; min-height:44px; max-height:64px;
+  max-width:calc(100% - 32px); padding:6px 8px; gap:6px; overflow-x:auto;
+}
+.canvas-size-readout { color:var(--muted); font-size:11px; white-space:nowrap; font-variant-numeric:tabular-nums; padding:0 5px; }
+.studio-shell .canvas-layout .selection-bar .selection-label { white-space:nowrap; }
+.studio-shell .canvas-layout .canvas-add-wrap,.canvas-objects-wrap { position:relative; flex-shrink:0; }
+.studio-shell .canvas-layout .canvas-add-menu {
+  inset:auto 0 calc(100% + 12px) auto; width:244px; min-width:0; height:auto;
+  max-width:calc(100vw - 40px); max-height:min(440px,calc(100dvh - 190px)); overflow:auto;
+}
+.canvas-objects-popover {
+  position:absolute; z-index:20; right:0; bottom:calc(100% + 12px); width:300px;
+  max-width:calc(100vw - 40px); padding:8px; border:1px solid var(--border);
+  border-radius:12px; background:var(--surface); color:var(--fg); box-shadow:var(--elev-raised);
+}
+.canvas-objects-popover .search-field { margin:0 0 6px; width:100%; min-width:0; }
+.canvas-object-results { max-height:min(320px,calc(100dvh - 260px)); overflow:auto; }
+.canvas-object-result { display:flex; align-items:center; gap:10px; width:100%; padding:9px; border:0; border-radius:7px; background:transparent; color:var(--fg); text-align:left; }
+.canvas-object-result:hover,.canvas-object-result:focus-visible { background:var(--surface-2); }
+.canvas-object-result>svg { flex-shrink:0; width:16px; height:16px; fill:none; stroke:currentColor; }
+.canvas-object-result>span { display:grid; gap:3px; min-width:0; }
+.canvas-object-result b { overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-size:12px; font-weight:500; }
+.canvas-object-result small { color:var(--muted); font-size:11px; }
+.studio-shell .canvas-layout .canvas-tool { cursor:pointer; }
+.studio-shell .canvas-layout .canvas-tool[draggable=true] { cursor:grab; }
+
+/* Defaults also cover saved nodes created before sizes were persisted. Inline dimensions win after resizing. */
+.canvas-layout .react-flow__node-note { width:280px; height:240px; }
+.canvas-layout .react-flow__node-research { width:320px; height:300px; }
+.canvas-layout .react-flow__node-image { width:340px; height:320px; }
+.canvas-layout .react-flow__node-contentIdea { width:320px; height:280px; }
+.canvas-layout .react-flow__node-hook { width:320px; height:240px; }
+.canvas-layout .react-flow__node-script { width:340px; height:320px; }
+.canvas-layout .react-flow__node-browser { width:720px; height:520px; }
+.canvas-layout .react-flow__node-chat { width:420px; height:560px; }
+.studio-shell .canvas-layout .flow-node {
+  display:flex; flex-direction:column; width:100%; height:100%; min-width:0; min-height:0;
+  max-width:none; padding:0; box-sizing:border-box;
+}
+.studio-shell .canvas-layout .react-flow__node>.flow-node.selected { outline:0; box-shadow:none; }
+.studio-shell .canvas-layout .react-flow__node>.flow-node { width:100%; height:100%; min-width:0; min-height:0; }
+:root[data-appearance=dark] .studio-shell .canvas-layout .flow-node.note .sticky-note-grip { color:#dfcd83; }
+:root[data-appearance=dark] .studio-shell .canvas-layout .flow-node.note .note-editor::placeholder { color:#d5c78b; }
+.canvas-layout .canvas-node-drag-handle { flex-shrink:0; min-width:0; cursor:grab; user-select:none; }
+.canvas-layout .canvas-node-drag-handle:active { cursor:grabbing; }
+.studio-shell .canvas-layout .flow-node .flow-node-content {
+  flex:1; min-width:0; min-height:0; margin:0; overflow:auto; overscroll-behavior:contain;
+}
+.studio-shell .canvas-layout .flow-node>footer,.studio-shell .canvas-layout .flow-node>button { flex-shrink:0; }
+.studio-shell .canvas-layout .flow-node.note .flow-node-content { display:flex; padding:0; }
+.studio-shell .canvas-layout .flow-node.note .note-editor {
+  flex:1; width:100%; height:100%; min-height:0; max-height:none; resize:none; box-sizing:border-box;
+}
+.studio-shell .canvas-layout .flow-node.image .flow-node-content { display:flex; flex-direction:column; gap:8px; }
+.studio-shell .canvas-layout .flow-image { flex:1; min-height:0; width:100%; max-height:none; object-fit:contain; }
+.studio-shell .canvas-layout .flow-node.browser .flow-node-content {
+  display:flex; flex-direction:column; overflow:hidden; padding:0;
+}
+.studio-shell .canvas-layout .browser-navigation,.studio-shell .canvas-layout .browser-foot { flex-shrink:0; }
+.studio-shell .canvas-layout .canvas-browser-surface { flex:1; width:100%; height:auto; min-height:0; }
+.studio-shell .canvas-layout .browser-frame { width:100%; height:100%; min-height:0; }
+.studio-shell .canvas-layout .flow-node.chat .flow-node-content { display:flex; flex-direction:column; overflow:hidden; padding:12px; }
+.studio-shell .canvas-layout .canvas-chat-transcript { flex:1; min-height:0; max-height:none; overflow:auto; }
+.studio-shell .canvas-layout .canvas-chat-composer,.studio-shell .canvas-layout .canvas-chat-head,.studio-shell .canvas-layout .canvas-chat-connections { flex-shrink:0; }
+.studio-shell .canvas-layout .flow-node .flow-node-type { text-transform:none; letter-spacing:0; }
+.studio-shell .canvas-layout .react-flow__node>.canvas-resize-handle { width:9px; height:9px; border:2px solid var(--surface); border-radius:3px; box-shadow:none; z-index:8; }
+.studio-shell .canvas-layout .react-flow__node>.canvas-resize-line { border-width:1px; z-index:7; box-shadow:none; }
+.canvas-layout.canvas-space-pan .react-flow__node * { pointer-events:none; }
+.canvas-layout.canvas-space-pan .react-flow__pane { cursor:grab; }
+.canvas-layout.canvas-space-pan .react-flow__pane:active { cursor:grabbing; }
+.studio-shell .canvas-layout .canvas-detail { bottom:auto; max-height:calc(100% - 90px); width:min(300px,calc(100% - 24px)); box-sizing:border-box; }
+.canvas-size-fields { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.canvas-size-fields input { min-width:0; }
+.studio-shell .canvas-layout .canvas-add-menu button:focus-visible,.canvas-object-result:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; }
+@media(max-width:760px) {
+  .studio-shell .canvas-layout .selection-bar { top:74px; bottom:auto; left:12px; right:auto; transform:none; max-width:calc(100% - 24px); }
+  .canvas-size-readout { display:none; }
+  .studio-shell .canvas-layout .selection-bar .soft-button { font-size:11px; min-width:max-content; }
+}
+
+.studio-shell .canvas-layout .flow-handle { width:9px; height:9px; border:1px solid var(--accent); background:var(--surface); z-index:9; }

@@ -145,6 +145,19 @@ const latest=doc=>doc.versions.at(-1);
 const cas=doc=>({baseVersion:latest(doc).version,baseHash:latest(doc).hash});
 const files=f=>{try{return readdirSync(join(f.root,'srt','p1','c1','srt'));}catch{return [];}};
 
+test('CapCut import binds the chosen final video without pretending word alignment; stale or foreign versions are refused',async()=>{
+ const f=fixture(),targetVideo={assetId:f.video.id,versionId:'v1',sha256:f.video.versions[0].sha256};
+ try{
+  const doc=await f.service.command('p1',{action:'import',contentId:'c1',name:'capcut-final.srt',srt:capcut,targetVideo});
+  assert.deepEqual(doc.targetVideo,targetVideo);assert.equal(doc.alignment,undefined);
+  assert.ok(latest(doc).blocks.every(block=>block.timing!=='aligned'));
+  await assert.rejects(f.service.command('p1',{action:'import',contentId:'c2',srt:capcut,targetVideo}),/versão atual/);
+  f.newVideoVersion();
+  await assert.rejects(f.service.command('p1',{action:'import',contentId:'c1',srt:capcut,targetVideo}),/versão atual/);
+  await assert.rejects(f.service.command('p1',{action:'export',contentId:'c1',docId:doc.id,...cas(doc)}),/vídeo.*mudou/i);
+ }finally{await f.service.close();f.db.close();}
+});
+
 test('correct a word → download directly (save+export in one action) → re-split 3→2 keeps the correction and limits', async()=>{
  const f=fixture(),before=JSON.stringify(f.editorial().assets[0]);
  const doc=await f.service.command('p1',{action:'import',contentId:'c1',name:'capcut.srt',srt:capcut});

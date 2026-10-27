@@ -54,11 +54,13 @@ export const routes: Record<PageId, RouteDefinition> = {
   },
   sessions: {
     id: 'sessions',
-    label: 'Sessions',
-    title: 'Sessions',
+    label: 'History',
+    title: 'History',
     sidebarPage: 'sessions',
-    breadcrumbs: ['Content', 'Sessions'],
+    breadcrumbs: ['Content', 'History'],
   },
+  scopes: { id: 'scopes', label: 'Scopes', title: 'Scopes', sidebarPage: 'scopes', breadcrumbs: ['Content', 'Scopes'] },
+  usage: { id: 'usage', label: 'Usage', title: 'Usage', sidebarPage: 'usage', breadcrumbs: ['Content', 'Usage'] },
   settings: {
     id: 'settings',
     label: 'Settings',

@@ -240,7 +240,9 @@ export function ContentWorkflowProvider({children}:PropsWithChildren){
     await saveCoordinator.flush();
     await storage.command(`/api/content/chat-deliveries?profile=${encodeURIComponent(profile())}`,{sessionId,messageId,expectedContent,contentId});
     const artifacts=storage.state.artifacts.filter(item=>item.source?.sessionId===sessionId&&item.source?.messageId===messageId);
-    if(artifacts.length===1){const artifact=artifacts[0];updatePersistentValue<AgentSession[]>('sessions',[],sessions=>sessions.map(session=>session.id===sessionId?{...session,contentId:artifact.contentId,topicId:artifact.topicId}:session));}
+    // A General chat is linked to what it delivered; a chat that already belongs to a content stays in it (a research
+    // delivery creates a new topic without content and must never pull the chat out of its own content).
+    if(artifacts.length===1){const artifact=artifacts[0];updatePersistentValue<AgentSession[]>('sessions',[],sessions=>sessions.map(session=>session.id===sessionId&&!session.contentId?{...session,contentId:artifact.contentId,topicId:artifact.topicId}:session));}
   },[storage]);
   const approveScript=useCallback(async(contentId:string,script:ApprovedScript,notes:string,syncNotion=false,review?:{artifact:EditorialArtifact;destination?:string})=>{
     const content=stateRef.current.contents.find((item)=>item.id===contentId);

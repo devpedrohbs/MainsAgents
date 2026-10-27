@@ -1,4 +1,5 @@
 import { createUsageCollector } from './claude-usage.mjs';
+import { createClaudeLimitSnapshot } from './provider-usage.mjs';
 import { createClaudeLimitObserver, limitFailure } from './provider-limits.mjs';
 import { execFileSync, spawn } from 'node:child_process';
 import { createServer } from 'node:http';
@@ -9,6 +10,7 @@ import { extname, join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { notionAutomationInstructions } from './notion-automation-policy.mjs';
 import { paperDesignInstructions } from './paper-design.mjs';
+import { attachmentDirectories } from './chat-attachments.mjs';
 import { scheduleTool } from './chat-publishing.mjs';
 import { publishingInstructions } from './publishing-automation.mjs';
 import { permittedMcpAction } from './runtime-tool-policy.mjs';
@@ -179,6 +181,8 @@ export function createClaudeCodeBridge({
   inspectPaper = inspectPaperDesktop,
 } = {}) {
   const executions = new Map();
+  // Plan limits as last reported by any Claude turn (the CLI has no call that reads them on demand).
+  const planLimits = createClaudeLimitSnapshot();
   // Local permission gate: Claude's --permission-prompt-tool reaches this loopback server with a per-execution token.
   const gateTokens = new Map();
   let gate;
@@ -336,6 +340,11 @@ export function createClaudeCodeBridge({
     // Final structured report, validated by the CLI; JSON cannot pass through the Windows .cmd launcher, so it is then skipped.
     record.editorReport = editor && !['.cmd', '.bat'].includes(extname(resolved.command).toLowerCase());
     if (record.editorReport) args.push('--json-schema', JSON.stringify(EDITOR_REPORT_SCHEMA));
+    // Files the person attached to this message: their folders become readable for this turn only. Attaching is the consent,
+    // so an agent without the Files tool still gets Read (only Read) for this turn; nothing else in its tool policy changes.
+    const attachedDirs = editor ? [] : attachmentDirectories(input.context);
+    if (attachedDirs.length && !tools.includes('Read')) { tools.push('Read'); allowed.push('Read'); }
+    for (const dir of attachedDirs) args.push('--add-dir', dir);
     args.push('--tools', tools.join(','));
     if (allowed.length) args.push('--allowedTools', ...allowed);
     if (input.modelId) {
@@ -371,6 +380,7 @@ export function createClaudeCodeBridge({
       try { message = JSON.parse(line); } catch { return; }
       usageCollector.observe(message);
       limitObserver.observe(message);
+      planLimits.observe(message);
       if (message.type === 'stream_event') {
         const event = message.event;
         if (event?.type === 'content_block_start' && event.content_block?.type === 'tool_use') {
@@ -478,6 +488,7 @@ export function createClaudeCodeBridge({
     const route = match[1] ?? '';
     try {
       if (request.method === 'GET' && route === 'status') return json(response, 200, await status());
+      if (request.method === 'GET' && route === 'usage') return json(response, 200, planLimits.read());
       if (request.method === 'GET' && route === 'models') return json(response, 200, { models: modelOptions });
       if (request.method === 'GET' && route === 'paper') return json(response, 200, await inspectPaper());
       if (request.method === 'POST' && route === 'sessions') {

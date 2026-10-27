@@ -12,6 +12,7 @@ export interface SrtDocument {
  source:{kind:'srt';name:string;sha256:string;cues:{start:number;end:number;text:string}[];warnings?:string[]}|({kind:'video';name:string;wordCount?:number;engine?:string}&SrtVideoRef);
  versions:SrtVersion[];exports:SrtExport[];
  job?:{id:string;kind:'transcribe';status:'running'|'done'|'failed'|'canceled'|'interrupted';error?:string;target:SrtVideoRef;maxWords:number};
+ targetVideo?:SrtVideoRef;
  alignment?:SrtVideoRef&{engine?:string;wordCount?:number};
  createdAt:string;updatedAt:string;
 }

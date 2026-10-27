@@ -123,10 +123,10 @@ app.whenReady().then(async()=>{try{
  await newContent('Vídeo LinkedIn Skills');const main=byTitle('Vídeo LinkedIn Skills');
  await button('Começar com vídeo já gravado');await until(()=>js('Boolean(document.querySelector(".recorded-entry"))'),'entry dialog');pick=videoA;await button('Associar vídeo do computador');
  await until(()=>js(`document.querySelector('[aria-label="Vídeo gravado"]')?.textContent.includes('LinkedinSkills-fixture.mp4')`),'video selected');await inputText('[aria-label="Contexto do vídeo"]','CONTEXTO_DO_VIDEO: tutorial de skills.');
- await until(()=>js(`document.querySelector('.recorded-entry .production-preflight [role=status]')?.textContent.includes('Nenhum bloqueio')`),'preflight ok');// Synthetic tone without speech: motion has nothing to animate, so the fixture explicitly chooses the existing "Sem motion" option.
- await js(`document.querySelector('.recorded-entry button[aria-label="Movimento na edição do vídeo gravado"]').click()`);await until(()=>js(`Boolean(Array.from(document.querySelectorAll('[role=listbox] .select-menu-option')).find(el=>el.textContent.includes('Sem motion')))`),'motion menu');await js(`Array.from(document.querySelectorAll('[role=listbox] .select-menu-option')).find(el=>el.textContent.includes('Sem motion')).click()`);
+ await until(()=>js(`document.querySelector('.recorded-entry .production-preflight [role=status]')?.textContent.includes('Nenhum bloqueio')`),'preflight ok');// New edits start with cuts/audio; visual editing must not be offered before the cut review.
+ assert(await js(`document.querySelector('.recorded-entry').textContent.includes('1. Cortes e ' )`),'cuts-first stages explained');assert.equal(await js(`Boolean(document.querySelector('.recorded-entry [aria-label^="Movimento"]'))`),false,'no premature visual/motion selector');
  await click('.recorded-entry-review .production-check input');await button('Iniciar edição do vídeo gravado');
- await until(()=>['video-review','blocked'].includes(runsFor(main.contentId)[0]?.stage),'edited');const run=runsFor(main.contentId)[0];assert.equal(run.stage,'video-review',run.error);assert.equal(run.sourceSession.id,main.id);
+ await until(()=>['video-review','blocked'].includes(runsFor(main.contentId)[0]?.stage),'edited');const run=runsFor(main.contentId)[0];assert.equal(run.stage,'video-review',run.error);assert.equal(run.sourceSession.id,main.id);assert.equal(run.editWorkflow.phase,'cuts','new production remains in cut review');
  const editorPrompts=prompts.filter(p=>p.agent==='editor').length,revision=run.revision;
  await click('button[aria-label="Nova sessão"]');await until(()=>sessions().filter(s=>s.contentId===main.contentId&&s.agentId==='source').length===2,'second chat of the content');
  const fresh=sessions().find(s=>s.contentId===main.contentId&&s.agentId==='source'&&s.id!==main.id);assert.equal(fresh.remoteSessionId,undefined,'never inherits the main chat thread');
@@ -136,10 +136,10 @@ app.whenReady().then(async()=>{try{
  assert(asked.content.includes('"conductedIn":"main-session"'),'read-only snapshot reaches the agent');assert(asked.content.includes('LinkedinSkills-fixture.mp4'));assert.match(asked.content,/never say the video was sent/);assert.notEqual(asked.thread,byId(main.id).remoteSessionId);
  assert.equal(prompts.filter(p=>p.agent==='editor').length,editorPrompts,'a chat answer never edits by itself');
  // Real action from the second chat: the production controls of THAT run (coordinator command with receipt), not a chat claim.
- await button('Abrir etapa atual');await until(()=>js(`document.querySelector('.production-panel-body')?.textContent.includes('Enviar ajuste ao editor')`),'real run controls');
+ await button('Abrir etapa atual');await until(()=>js(`document.querySelector('.production-panel-body')?.textContent.includes('Pedir nova versão desta etapa')`),'real run controls');
  assert(await js(`document.querySelector('.flow-dialog h2')?.textContent.includes('Vídeo LinkedIn Skills')||document.querySelector('.flow-dialog')?.textContent.includes('Entrada com vídeo já gravado')`),'the dialog is the content run');
- await js(`(()=>{const label=Array.from(document.querySelectorAll('.production-panel-body label')).find(l=>l.textContent.startsWith('Pedir ajuste'));const el=label.querySelector('textarea');Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(el,'AJUSTE_DO_SEGUNDO_CHAT: cortar o início');el.dispatchEvent(new Event('input',{bubbles:true}))})()`);
- await button('Enviar ajuste ao editor');await until(()=>runsFor(main.contentId)[0].revision>revision&&['video-review','blocked'].includes(runsFor(main.contentId)[0].stage)&&prompts.filter(p=>p.agent==='editor').length>editorPrompts,'revision edited');await pause(800);
+ await js(`(()=>{const label=Array.from(document.querySelectorAll('.production-panel-body label')).find(l=>l.textContent.startsWith('O que corrigir nos cortes?'));const el=label.querySelector('textarea');Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(el,'AJUSTE_DO_SEGUNDO_CHAT: cortar o início');el.dispatchEvent(new Event('input',{bubbles:true}))})()`);
+ await button('Pedir nova versão desta etapa');await until(()=>runsFor(main.contentId)[0].revision>revision&&['video-review','blocked'].includes(runsFor(main.contentId)[0].stage)&&prompts.filter(p=>p.agent==='editor').length>editorPrompts,'revision edited');await pause(800);
  const after=runsFor(main.contentId);assert.equal(after.length,1,'same run, no duplicate');assert.equal(after[0].id,run.id);assert.equal(after[0].sourceSession.id,main.id,'run session unchanged');assert.equal(after[0].stage,'video-review',after[0].error);
  const revisionPrompts=prompts.filter(p=>p.agent==='editor').slice(editorPrompts);assert(revisionPrompts.length>=1&&revisionPrompts.every(p=>p.agent==='editor'));assert(revisionPrompts.some(p=>p.text.includes('AJUSTE_DO_SEGUNDO_CHAT')),'the real editor received the note');
  assert(after[0].events.some(e=>e.action==='revise-video'),'coordinator receipt recorded');
@@ -154,9 +154,9 @@ app.whenReady().then(async()=>{try{
  await key('Escape');await until(()=>js('!document.querySelector(".flow-dialog")'),'dialog closed on second Escape');
  report.push('Escape: menu -> dialog');
  // 8) Agent editor: Tab contained, Escape menu-first, focus restored, drafts per workspace.
- const creatorButton="Array.from(document.querySelectorAll('button')).find(el=>el.textContent.trim()==='Criar agente'&&el.getClientRects().length)";
+ const creatorButton="document.querySelector('[data-od-id=\"create-agent\"]')";
  const openCreator=async()=>{
-  if(!await js(`Boolean(${creatorButton})`)){await js(`(()=>{const nav=Array.from(document.querySelectorAll('button,a')).find(el=>['Agentes','Gerenciar equipe'].includes(el.textContent.trim())||el.getAttribute('title')==='Agentes');nav?.click();return !!nav})()`);await until(()=>js(`Boolean(${creatorButton})`),'agents page');}
+  if(!await js(`Boolean(${creatorButton})`)){await click('[data-od-id="nav-agents"]');await until(()=>js(`Boolean(${creatorButton})`),'agents page');}
   await js(`(()=>{const b=${creatorButton};b.setAttribute('data-qa-trigger','1');b.focus();b.click();return true})()`);await until(()=>js('Boolean(document.querySelector(".agent-drawer"))'),'drawer');};
  await openCreator();await until(()=>js(`document.activeElement?.tagName==='INPUT'&&!!document.activeElement.closest('.agent-drawer')`),'name focused');
  await js(`(()=>{const el=document.activeElement;Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(el,'RASCUNHO_ESPACO_1');el.dispatchEvent(new Event('input',{bubbles:true}))})()`);

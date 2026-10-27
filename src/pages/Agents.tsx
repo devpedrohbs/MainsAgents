@@ -37,81 +37,43 @@ export function Agents({
   );
   const activeCount = agents.filter((agent) => agent.status === 'working').length;
   const reviewCount = agents.filter((agent) => agent.status === 'review').length;
+  const providers = Array.from(new Set(agents.map((agent) => agent.providerId ?? 'codex')));
   const skillCount = agents.reduce((count, agent) => count + (agent.skills?.length ?? 0), 0);
   return (
-    <div className={`team-workspace ${selected?'has-details':''}`}><div className="page agents-page" data-od-id="agents-page">
-      <div className="page-head">
+    <div className={`team-workspace ${selected?'has-details':''}`}><div className="page agents-page ag" data-od-id="agents-page">
+      <div className="ag-head">
         <div>
-          <p className="eyebrow">{currentWorkspace.name} / {t('Agents')}</p>
           <h1>{pt ? 'Sua equipe' : 'Your team'}</h1>
-          <p>{t('Specialists with clear roles, tools, and working context.')}</p>
+          <p>{agents.length
+            ? [pt ? `${agents.length} agente${agents.length === 1 ? '' : 's'}` : `${agents.length} agent${agents.length === 1 ? '' : 's'}`,
+               activeCount ? (pt ? `${activeCount} trabalhando agora` : `${activeCount} working now`) : '',
+               reviewCount ? (pt ? `${reviewCount} com entrega para revisar` : `${reviewCount} with work to review`) : '',
+               skillCount ? `${skillCount} skills` : ''].filter(Boolean).join(' · ') + '.'
+            : t('Specialists with clear roles, tools, and working context.')}</p>
         </div>
-        <button className="primary-button" onClick={onCreate} data-od-id="create-agent">
-          <Icon name="plus" />
-          {t('Create agent')}
-        </button>
-      </div>
-      {agents.length > 0 && (
-        <div className="agent-overview" aria-label={pt ? 'Resumo da equipe' : 'Team overview'}>
-          <div>
-            <strong>{agents.length}</strong>
-            <span>{pt ? 'agentes no workspace' : 'agents in workspace'}</span>
-          </div>
-          <div>
-            <strong>{activeCount}</strong>
-            <span>{pt ? 'em atividade' : 'working now'}</span>
-          </div>
-          <div>
-            <strong>{reviewCount}</strong>
-            <span>{pt ? 'precisam de revisão' : 'need review'}</span>
-          </div>
-          <div>
-            <strong>{skillCount}</strong>
-            <span>{pt ? 'skills vinculadas' : 'associated skills'}</span>
-          </div>
-        </div>
-      )}
-      {agents.length > 0 && (
-        <div className="collection-toolbar" data-od-id="agent-filters">
+        {agents.length > 0 && <>
           <label className="search-field">
             <Icon name="search" />
-            <input
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder={pt ? 'Buscar por nome ou função…' : 'Search by name or role…'}
-              aria-label={pt ? 'Buscar agentes' : 'Search agents'}
-            />
+            <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={pt ? 'Buscar por nome ou função…' : 'Search by name or role…'} aria-label={pt ? 'Buscar agentes' : 'Search agents'} />
           </label>
-          <SelectMenu
-            className="filter-select"
-            value={status}
-            onChange={(value) => setStatus(value as typeof status)}
-            ariaLabel={pt ? 'Status do agente' : 'Agent status'}
+          <div className="ag-segment" role="group" aria-label={pt ? 'Filtrar por IA' : 'Filter by AI'} data-od-id="agent-filters">
+            {[['all', pt ? 'Todas as IAs' : 'All AIs'], ...providers.map((id) => [id, id === 'claude' ? 'Claude' : id === 'gemini' ? 'Gemini' : 'Codex'])].map(([id, label]) => (
+              <button key={id} aria-pressed={provider === id} onClick={() => setProvider(id)}>{label}</button>
+            ))}
+          </div>
+          <SelectMenu className="filter-select" value={status} onChange={(value) => setStatus(value as typeof status)} ariaLabel={pt ? 'Status do agente' : 'Agent status'}
             options={[
               { value: 'all', label: pt ? 'Todos os status' : 'All statuses' },
               { value: 'working', label: pt ? 'Em atividade' : 'Working' },
               { value: 'review', label: t('Needs review') },
               { value: 'idle', label: t('Ready') },
-            ]}
-          />
-          <SelectMenu
-            ariaLabel={pt ? 'Filtrar por IA' : 'Filter by AI'}
-            value={provider}
-            onChange={setProvider}
-            options={[
-              { value: 'all', label: pt ? 'Todas as IAs' : 'All AI providers' },
-              ...Array.from(new Set(agents.map((agent) => agent.providerId ?? 'codex'))).map((id) => ({
-                value: id,
-                label: id === 'codex' ? 'Codex CLI' : id === 'claude' ? 'Claude Code CLI' : id,
-              })),
-            ]}
-          />
-          <span className="result-count" role="status">
-            {filtered.length} {pt ? 'agentes' : 'agents'}
-          </span>
-        </div>
-      )}
+            ]} />
+        </>}
+        <button className="primary-button" onClick={onCreate} data-od-id="create-agent">
+          <Icon name="plus" />
+          {t('Create agent')}
+        </button>
+      </div>
       {agents.length === 0 ? (
         <section className="work-panel workspace-empty" data-od-id="agents-empty">
           <span className="empty-symbol">
@@ -125,7 +87,14 @@ export function Agents({
           </button>
         </section>
       ) : filtered.length ? (
-        <AgentList agents={filtered} selectedId={selected?.id} onSelect={setSelectedId} onConfigure={onSelect} onChat={id=>{setSelectedId(null);onChat(id);}} />
+        <div className="ag-grid">
+          <AgentList agents={filtered} selectedId={selected?.id} onSelect={setSelectedId} onConfigure={onSelect} onChat={id=>{setSelectedId(null);onChat(id);}} />
+          <button className="ag-new" onClick={onCreate}>
+            <span aria-hidden="true"><Icon name="plus" /></span>
+            <b>{t('Create agent')}</b>
+            <small>{pt ? 'Um especialista para cada parte do trabalho. Escolha o boneco, a IA e as ferramentas.' : 'A specialist for each part of the work. Pick the mascot, the AI and the tools.'}</small>
+          </button>
+        </div>
       ) : (
         <section className="work-panel workspace-empty" data-od-id="agents-no-results">
           <h2>{t('No results')}</h2>
@@ -146,7 +115,6 @@ export function Agents({
           </button>
         </section>
       )}
-      {agents.length>0 && <div className="team-page-tip"><Icon name="link"/><div><strong>{pt?'Contexto transforma especialistas em uma equipe.':'Context brings specialists together.'}</strong><p>{pt?'Organize as referências no Canvas e envie-as como contexto na conversa.':'Organize references on the Canvas and send them as conversation context.'}</p></div><a className="soft-button" href="#canvas">{pt?'Abrir Canvas':'Open Canvas'}</a></div>}
     </div>{selected && <AgentDetails key={selected.id} agent={selected} workspaceName={currentWorkspace.name} onClose={()=>setSelectedId(null)} onChat={()=>{setSelectedId(null);onChat(selected.id);}} onConfigure={()=>onSelect(selected.id)}/>}</div>
   );
 }

@@ -2,7 +2,7 @@
  * Deterministic classification of a chat message as an edit request (browser-safe, no imports). Shared by the renderer
  * (to route the send) and the host (which decides again on the SAVED message; the renderer never authorizes anything).
  */
-export const CHAT_EDIT_CLASSIFIER_VERSION=1;
+export const CHAT_EDIT_CLASSIFIER_VERSION=2;
 export const chatVideoPattern=/\.(mp4|mov|m4v|mkv|webm|avi)$/i;
 const norm=value=>String(value??'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
 
@@ -57,6 +57,16 @@ export function classifyEditRequest(text){
  if(question&&QUESTION_START.test(s))return {kind:'none',reason:'question'};
  if(!imperative&&ANALYSIS.test(s))return {kind:'none',reason:'analysis'};
  if(imperative&&question&&!polite)return {kind:'ambiguous',reason:'question'};
+ const visualSubject=/\b(?:motion|motions|animac\w*|anima[rd]|animar|acabamento(?: visual)?|efeitos visuais|visual effects)\b/.test(s);
+ const visualRequest=/(?:^|[.!;,]\s*|\b(?:agora|entao|por favor|please|now|then)\s+)(?:adicione|adiciona|coloque|coloca|aplique|aplica|comece|comeca|inicie|inicia|faca|faz|crie|cria|anime|anima|add|apply|start|animate)\b/.test(s)
+  ||/(?:^|[.!;,]\s*)(?:(?:voce|vc)\s+)?(?:pode|poderia|consegue|could you|can you)\s+(?:por favor\s+)?(?:adicionar|aplicar|comecar|iniciar|fazer|criar|animar|add|apply|start|animate)\b/.test(s)
+  ||/\b(?:quero|preciso|gostaria)\s+(?:(?:que\s+(?:voce|vc)\s+)|de\s+)?(?:adicionar|adicione|aplicar|aplique|comecar|comece|iniciar|inicie|fazer|faca|criar|crie|animar|anime|motion|animacoes|acabamento)\b/.test(s)
+  ||/\bi (?:want|need) (?:you )?to (?:add|apply|start|animate)\b/.test(s);
+ const visual=visualSubject&&visualRequest&&!/\b(?:pensando|talvez|pretendo|planejo|ainda nao|nao agora|later|not yet)\b/.test(s);
+ if(visual&&!/\b(?:nao|sem|evite|never|without|no)\s+(?:\w+\s+){0,2}(?:motion|anim\w*|acabamento|efeitos)\b/.test(s)){
+  if(ANALYSIS.test(s)||QUESTION_START.test(s)&&!POLITE_ASK.test(s))return {kind:'none',reason:'analysis'};
+  return {kind:'visual',reason:'visual-request'};
+ }
  if(imperative)return {kind:'edit',reason:'imperative'};
  if(/\b(?:edit\w*|edicao|cort\w*|cut|trim)\b/.test(s)&&/\b(?:video|gravacao|clipe|recording|clip)\b/.test(s))return {kind:'ambiguous',reason:POLITE_ASK.test(s)?'polite':'mention'};
  return {kind:'none',reason:'no-request'};

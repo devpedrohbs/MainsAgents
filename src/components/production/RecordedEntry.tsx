@@ -11,7 +11,7 @@ import {SelectMenu} from '../common/SelectMenu';
 import {ProductionPreflight} from './ProductionPreflight';
 import {storageProfile} from '../../data/IndexedDbStateStore';
 import {useStudioDraftField,clearStudioDraft,studioDraftKey} from '../../features/content/studioDrafts';
-import {MotionIntensityField,motionIntensity} from './MotionIntensity';
+import {motionIntensity} from './MotionIntensity';
 import {EditDirectorField} from './EditDirector';
 import type {PreflightReport} from '../../../production-preflight.mjs';
 import './production.css';
@@ -30,7 +30,7 @@ export function RecordedEntry({agent,session,content,onClose,onStarted}:{agent:A
  const flows=production.flows.flows.filter(flow=>flow.workspaceId===agent.workspaceId&&flow.nodes.some(node=>node.kind==='content-agent'&&node.agentId===agent.id));
  const [savedFlow,setFlow]=useStudioDraftField(scope,'flow',flows[0]?.id??''),flowId=flows.some(flow=>flow.id===savedFlow)?savedFlow:flows[0]?.id??'';
  const [origin,setOrigin]=useStudioDraftField(scope,'origin','text'),[cardInput,setCardInput]=useStudioDraftField(scope,'card',''),[text,setText]=useStudioDraftField(scope,'text','');
- const [savedVideo,setVideo]=useStudioDraftField(scope,'video',''),[format,setFormat]=useStudioDraftField(scope,'format','original'),[editMode,setEditMode]=useStudioDraftField(scope,'editMode','smart'),[motion,setMotion]=useStudioDraftField(scope,'motion','balanced');
+ const [savedVideo,setVideo]=useStudioDraftField(scope,'video',''),[format,setFormat]=useStudioDraftField(scope,'format','original'),[editMode]=useStudioDraftField(scope,'editMode','smart'),[motion]=useStudioDraftField(scope,'motion','balanced');
  const [card,setCard]=useState<CardRead|null>(null),[authorize,setAuthorize]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[preflight,setPreflight]=useState<PreflightReport|null>(null);
  const videos=(editorial.state.assets??[]).filter(asset=>asset.contentId===content.id&&asset.workspaceId===content.workspaceId&&asset.kind==='video'&&asset.role==='source');
  const video=videos.find(asset=>asset.id===savedVideo&&asset.status==='available')?.id??'';
@@ -69,8 +69,8 @@ export function RecordedEntry({agent,session,content,onClose,onStarted}:{agent:A
    </fieldset>
    <div className="production-section"><h3>{pt?'3. Edição':'3. Editing'}</h3>
     {flows.length>1&&<label>{pt?'Fluxo':'Flow'}<SelectMenu ariaLabel={pt?'Fluxo do conteúdo':'Content flow'} value={flowId} disabled={busy} onChange={setFlow} options={flows.map(item=>({value:item.id,label:item.name}))}/></label>}
-    <label>{pt?'Tipo de edição':'Editing mode'}<SelectMenu ariaLabel={pt?'Tipo de edição do vídeo gravado':'Recorded video editing mode'} value={editMode==='basic'?'basic':'smart'} disabled={busy} onChange={setEditMode} options={[{value:'smart',label:pt?'Automática: cortar silêncios e animar':'Automatic: cut silences and animate'},{value:'basic',label:pt?'Básica: um corte contínuo':'Basic: one continuous cut'}]}/></label>
-    {editMode!=='basic'&&<MotionIntensityField value={motion} onChange={setMotion} pt={pt} disabled={busy} ariaLabel={pt?'Movimento na edição do vídeo gravado':'Recorded video motion'}/>}{editMode!=='basic'&&<EditDirectorField pt={pt} busy={busy} workspaceId={content.workspaceId} editorName={agentName('video-agent')}/>}
+    <p>{pt?'1. Cortes e áudio para sua revisão. 2. Acabamento visual só depois do seu pedido. 3. Legendas SRT para o CapCut.':'1. Cuts and audio for review. 2. Visual editing only after your request. 3. SRT captions for CapCut.'}</p>
+    <EditDirectorField pt={pt} busy={busy} workspaceId={content.workspaceId} editorName={agentName('video-agent')}/>
     <label>{pt?'Formato autorizado':'Authorized format'}<SelectMenu ariaLabel={pt?'Formato do vídeo gravado':'Recorded video format'} value={format==='portrait'?'portrait':'original'} disabled={busy} onChange={setFormat} options={[{value:'original',label:pt?'Preservar enquadramento':'Keep framing'},{value:'portrait',label:pt?'Recortar para vertical 9:16':'Crop to vertical 9:16'}]}/></label></div>
    <div className="production-section recorded-entry-review" aria-label={pt?'Revisão antes de iniciar':'Review before starting'}><h3>{pt?'Revisão':'Review'}</h3>
     <ul>

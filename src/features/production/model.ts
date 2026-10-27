@@ -23,7 +23,7 @@ export interface ProductionCovers {
 /** Agent snapshot saved at start: the provider/model that actually runs each role. */
 export interface ProductionAgentRef {id:string;name:string;providerId?:string;modelId?:string}
 export interface ProductionRun {
- id:string;revision:number;workspaceId:string;contentId:string;topicId:string;flowId:string;name:string;stage:string;resumeStage?:string;error?:string;imported?:boolean;
+ id:string;revision:number;epoch:number;workspaceId:string;contentId:string;topicId:string;flowId:string;name:string;stage:string;resumeStage?:string;error?:string;imported?:boolean;
  sourceAgent:ProductionAgentRef;editorAgent:ProductionAgentRef;publisherAgent?:ProductionAgentRef;sourceSession:AgentSession;editorSession:AgentSession;publisherSession?:AgentSession;topic:EditorialTopic;
  /** B07: 'local' = approved script releases recording without Notion; absent = Notion mode (default/legacy). */
  scriptMode?:'local';notionDestination?:string;notion?:{url:string;pageId:string;scriptVersion?:number;scriptHash?:string;imported?:boolean};
@@ -31,6 +31,7 @@ export interface ProductionRun {
  entry?:{kind:'recorded';origin:'notion'|'text'|'delegation';delegationJobIds?:string[];requestedBy?:string;context:{kind:'notion';pageId:string;url:string;fetchedAt:string;chars:number}|{kind:'text';text:string;hash:string};video:PublicationMedia&{name:string};sessionId:string;authorizedAt:string};
  /** Read-only card text read for this run (server-owned); package stage may re-read it. */
  notionRead?:{text:string;fetchedAt?:string};packageNotionRead?:{text:string;fetchedAt?:string};editPlan?:{summary?:string;motionSummary?:string};
+ editWorkflow?:{version:1;phase:'cuts'|'visual'|'captions';base?:{outputVideo:PublicationMedia};finalVideo?:PublicationMedia;approvedAt?:string;completedAt?:string};
  inputVideo?:PublicationMedia;editPreferences?:{format:'original'|'portrait';mode:'smart'|'basic';motion?:'off'|'subtle'|'balanced'|'intense';style?:string;acceptBasic?:{at:string;reason:string}};
  /** Who directs edits/motion for this run (absent on older runs = the editor agent itself). Display: `editDirector` below. */
  editDirector?:{name:string;provider:string;model?:string;choice:'claude'|'codex'|'agent'};
@@ -67,6 +68,12 @@ export interface EditorExecution {index:number;kind:'initial'|'continuation';con
 export interface EditorStop {code:string;numTurns:number|null;maxTurns:number|null;callsAtStart?:number|null;calls:number|null;callsLeft:number|null;revision:number|null;finalized?:boolean;reason?:string;continuable:boolean;continuationsUsed?:number;maxContinuations?:number;at:string}
 export interface ScheduleTarget {platform:string;provider:'zernio'|'publora';accountId:string;networkSettings?:PublicationDelivery['networkSettings']}
 export const productionStageLabel=(stage:string,pt=true):string=>({writing:pt?'Estruturando roteiro':'Structuring script','script-review':pt?'Aguardando aprovação do roteiro':'Waiting for script approval',notion:pt?'Registrando no Notion':'Saving to Notion',recording:pt?'Aguardando gravação':'Waiting for recording','planning-edit':pt?'Editor preparando o plano':'Editor preparing the plan',editing:pt?'Editando vídeo':'Editing video','video-review':pt?'Aguardando aprovação do vídeo':'Waiting for video approval',platforms:pt?'Escolher plataformas':'Choose platforms','preparing-package':pt?'Preparando legendas':'Preparing captions','generating-cover':pt?'Gerando capas':'Generating covers','covers-review':pt?'Escolher capas':'Choose covers','package-review':pt?'Aguardando aprovação do pacote':'Waiting for package approval',schedule:pt?'Escolher horário e contas':'Choose time and accounts',scheduling:pt?'Agendando':'Scheduling',complete:pt?'Agendamentos confirmados':'Schedules confirmed',paused:pt?'Produção pausada':'Production paused',blocked:pt?'Precisa de atenção':'Needs attention',canceled:pt?'Produção cancelada':'Production canceled'}[stage]??stage);
+/** User-facing stage of the staged editor; legacy productions retain their existing labels. */
+export function editingStageLabel(run:ProductionRun,pt=true):string{
+ if(!run.editWorkflow||!['planning-edit','editing','video-review'].includes(run.stage))return productionStageLabel(run.stage,pt);
+ const phase=run.editWorkflow.phase;
+ return phase==='cuts'?(pt?'1. Cortes para revisão':'1. Cuts for review'):phase==='visual'?(pt?'2. Acabamento visual':'2. Visual editing'):(pt?'3. Legendas para o CapCut':'3. Captions for CapCut');
+}
 /** Absolute local paths never reach a prompt: the chat agent gets file names and states, not disk locations. */
 const withoutPaths=(text:string)=>text.replace(/[A-Za-z]:[\\/][^\s"'<>|]+/g,'[arquivo local]').replace(/(^|[\s(])\/(?:Users|home|tmp|var|private|mnt|Volumes)\/[^\s"'<>]+/g,'$1[arquivo local]');
 const clip=(text:unknown,max:number)=>typeof text==='string'?withoutPaths(text).slice(0,max):undefined;
@@ -79,7 +86,7 @@ export function productionChatContext(run:ProductionRun,results:readonly ChatIte
  const last=[...(run.events??[])].reverse().find(event=>!['recording-prep'].includes(event.action));
  const entry=run.entry?{origin:run.entry.origin,video:run.entry.video.name,context:run.entry.context.kind==='text'?clip(run.entry.context.text,6000):clip(run.notionRead?.text,6000),...cut(run.entry.context.kind==='text'?run.entry.context.text:run.notionRead?.text,6000),...(run.entry.context.kind==='notion'?{cardUrl:run.entry.context.url}:{})}:undefined;
  const script=run.script??run.scriptVersions?.at(-1);
- return {id:run.id,stage:run.stage,stageLabel:productionStageLabel(run.stage),title:clip(run.topic?.title,200),notionUrl:run.notion?.url,
+ return {id:run.id,stage:run.stage,stageLabel:editingStageLabel(run),title:clip(run.topic?.title,200),notionUrl:run.notion?.url,
   ...(entry?{entry}:{}),
   ...(script&&!entry?{script:{status:run.scriptApproval?`aprovado v${run.scriptApproval.version}`:'aguardando revisão',hook:clip(script.hook,500),cta:clip(script.cta,500),text:clip(script.text,6000),...cut(script.text,6000)}}:{}),
   ...(!entry&&run.notionRead?.text?{cardNotes:clip(run.packageNotionRead?.text??run.notionRead.text,3000),...(cut(run.packageNotionRead?.text??run.notionRead.text,3000).truncated?{cardNotesTruncated:cut(run.packageNotionRead?.text??run.notionRead.text,3000).truncated}:{})}:{}),

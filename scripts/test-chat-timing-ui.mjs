@@ -44,28 +44,32 @@ app.whenReady().then(async()=>{try{
  const lines=()=>js('[...document.querySelectorAll(".chat-run-status")].map(el=>({state:el.dataset.state,text:el.querySelector(".run-status-label").textContent,time:el.querySelector("time")?.textContent}))');
  await ask('Test elapsed response');
  await until(()=>js('Boolean(document.querySelector(".chat-run-status[data-state=running]"))'));await until(()=>js('Boolean(document.querySelector(".runtime-action[data-action-status=pending]"))'));
- // While successive tool events stream in: always one line, always "Trabalhando", never a per-tool row, never a premature final state.
+ // While successive tool events stream in: always one line saying what really happens (the Notion call, then the wait for
+ // approval), never a raw tool name, never a per-tool row, never a premature final state.
  const seen=new Set();for(let i=0;i<30;i++){const now=await lines();assert.equal(now.length,1);seen.add(now[0].state+':'+now[0].text);assert.equal(await js('document.querySelectorAll(".tool-activity").length'),0);await new Promise(r=>setTimeout(r,40));}
- assert.deepEqual([...seen],['running:Trabalhando']);
+ assert([...seen].every(item=>['running:Usando o Notion…','running:Aguardando sua aprovação'].includes(item)),[...seen].join(', '));
+ await until(async()=>(await lines())[0].text==='Aguardando sua aprovação');
+ if(process.env.CHAT_TIMING_LIVE_SHOT){await js(`document.querySelector(".chat-run-status").scrollIntoView({block:"center"})`);await new Promise(r=>setTimeout(r,500));}if(process.env.CHAT_TIMING_LIVE_SHOT)writeFileSync(process.env.CHAT_TIMING_LIVE_SHOT,await captureReadyPng(window.webContents));
  assert(!/Used |commandExecution|fileChange/.test(await js('document.querySelector(".chat-body").innerText')),'tool noise must not reach the feed');
- await until(async()=>(await lines())[0].time!=='00:00');assert(!approved);
+ await until(async()=>(await lines())[0].time!=='0 s');assert(!approved);
  const bounds=await js('(()=>{const dock=document.querySelector(".chat-approval-dock"),notice=document.querySelector(".runtime-approval-notice"),button=dock.querySelector(".primary-button");dock.scrollTop=dock.scrollHeight;const b=button.getBoundingClientRect(),d=dock.getBoundingClientRect();return {outside:!dock.closest(".chat-body"),notice:notice.textContent,visible:b.bottom<=d.bottom+1&&b.top>=d.top,height:innerHeight,bottom:d.bottom};})()');assert(bounds.outside);assert(bounds.visible);assert(bounds.bottom<=bounds.height);assert(bounds.notice.includes('aguardando sua aprovação'));
  await js('document.querySelector(".chat-approval-dock .primary-button").click()');await until(()=>state.sessions[0]?.responseTiming?.outcome==='completed');
- await until(async()=>(await lines())[0].text==='Finalizado');
+ await until(async()=>(await lines())[0].text==='Trabalhou por');
  const final=(await lines())[0].time;await new Promise(r=>setTimeout(r,1200));assert.equal((await lines())[0].time,final,'final duration frozen');
  assert(state.sessions[0].messages.find(m=>m.content==='FIXTURE_RESPONSE').responseDurationMs>=1000);
  assert(await js('document.body.innerText.includes("FIXTURE_RESPONSE")'));
- assert(Number((await js('document.querySelector(".run-status-steps summary").textContent')).match(/\d+/)[0])>=12,'steps kept as diagnostics');
+ assert.equal(await js('document.querySelector(".run-status-steps .run-status-count").textContent'),'1 etapa','thinking noise folded away');
+ assert(await js('document.querySelector(".run-status-steps ol").textContent.includes("Usou o Notion")'),'the real step is listed');
  // Failure: true status, partial reply kept, real error visible, earlier line untouched.
  await ask('Second request');await until(async()=>(await lines()).length===2&&(await lines())[1].state==='running');
- await until(async()=>(await lines())[1].state==='error');let now=await lines();assert.equal(now[1].text,'Falhou');assert.equal(now[0].time,final);
+ await until(async()=>(await lines())[1].state==='error');let now=await lines();assert.equal(now[1].text,'Falhou em');assert.equal(now[0].time,final);
  assert(await js('document.body.innerText.includes("FIXTURE_FAILURE")'));const failedTime=now[1].time;await new Promise(r=>setTimeout(r,1100));assert.equal((await lines())[1].time,failedTime);
  // Cancellation: "Interrompido", frozen.
  await ask('Third request');await until(async()=>(await lines()).length===3&&(await lines())[2].state==='running');await new Promise(r=>setTimeout(r,1100));
- await js('document.querySelector(".send-button.stop").click()');await until(async()=>(await lines())[2].state==='interrupted');now=await lines();assert.equal(now[2].text,'Interrompido');
+ await js('document.querySelector(".send-button.stop").click()');await until(async()=>(await lines())[2].state==='interrupted');now=await lines();assert.equal(now[2].text,'Interrompido em');
  const cancelledTime=now[2].time;await new Promise(r=>setTimeout(r,1100));assert.equal((await lines())[2].time,cancelledTime);
  // Reopen: same three lines, same frozen durations.
  const before=await lines();await js('window.mainsAgentsSaveNow()');window.destroy();await open();await until(async()=>(await lines()).length===3);assert.deepEqual(await lines(),before);assert.deepEqual(errors,[]);
  if(process.env.CHAT_TIMING_SHOT){await js('document.querySelector(".run-status-steps")?.removeAttribute("open")');await new Promise(r=>setTimeout(r,300));writeFileSync(process.env.CHAT_TIMING_SHOT,await captureReadyPng(window.webContents));}
- console.log('PASS: one status line per execution (no per-tool rows) through 12 successive tool events + approval wait; Finalizado/Falhou/Interrompido with frozen time; steps kept as folded diagnostics; durations restored after reopening. Local fixtures only.');window.destroy();await bridge.close();server.close();app.exit(0);
+ console.log('PASS: one live status line per execution (real step, then the approval wait; no per-tool rows) through 12 successive tool events; Trabalhou por/Falhou em/Interrompido em with frozen time; real steps folded inside; durations restored after reopening. Local fixtures only.');window.destroy();await bridge.close();server.close();app.exit(0);
 }catch(error){console.error(error);if(window&&!window.isDestroyed()){console.log(await js('document.body.innerText'));window.destroy();}stream?.end();await bridge.close();server.close();app.exit(1);}});

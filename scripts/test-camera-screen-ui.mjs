@@ -156,11 +156,11 @@ app.whenReady().then(async()=>{const report={};try{
  await shot('06-retomado-entregue-claro','.chat-edit-card');
  await openChat('Editor de Vídeo');await until(()=>js('!document.querySelector(".composer-provider-wait")'),30000);await openChat('Editor de Conteúdo');
  // 3) Dark and 420 px.
- await js('localStorage.setItem("mainsagents-appearance","dark")');await win.webContents.reload();await openChat('Editor de Conteúdo');
+ await js('localStorage.setItem("mainsagents-appearance-v2","dark")');await win.webContents.reload();await openChat('Editor de Conteúdo');
  await until(async()=>(await cardText()).includes('Vídeo editado entregue'));assert.equal(await js('document.documentElement.dataset.appearance'),'dark');await shot('07-escuro','.chat-edit-card');
  win.setContentSize(420,860);await until(()=>js('innerWidth<=430'));picked=[pos.camera,pos.screen];await js('document.querySelector(".composer-attach").click()');await until(()=>js('document.querySelectorAll(".composer-pair-row").length===2'));
  await until(noOverflow);await shot('08-escuro-420px-par','.composer-pair');
- await js('localStorage.setItem("mainsagents-appearance","light")');await win.webContents.reload();await openChat('Editor de Conteúdo');await until(noOverflow);await shot('09-claro-420px','.chat-edit-card');
+ await js('localStorage.setItem("mainsagents-appearance-v2","light")');await win.webContents.reload();await openChat('Editor de Conteúdo');await until(noOverflow);await shot('09-claro-420px','.chat-edit-card');
  assert.deepEqual(errors,[]);
  report.runs=bridge.production.list(profile).map(run=>({stage:run.stage,pair:run.sourcePair&&{voice:run.sourcePair.voice,layout:run.sourcePair.layout,sync:run.sourcePair.sync},waitResumes:run.authoring?.waitResumes??0,director:run.editDirector}));report.chatSends=chatSends.length;report.editorTurns=execution;report.out=out;
  writeFileSync(join(out,'report.json'),JSON.stringify(report,null,1));console.log('CAMERA_SCREEN_UI_OK',out);

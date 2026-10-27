@@ -30,7 +30,8 @@ async function fixture({animate=true,editorProvider='codex',claude=true}={}){
   send:async(_thread,prompt)=>{prompts.push(prompt);const id=`execution-${++serial}`;outputs.set(id,reply(prompt));return {executionId:id}},
   events:async function*(id){const text=outputs.get(id);yield {type:'message.delta',delta:text};yield {type:'message.completed',content:text};yield {type:'execution.completed'}}};
  const flow=createProductionFlow('space','Fluxo',agents);
- const mediaOptions={inspect,...(animate?{animate:async({inputPath,outputPath})=>copyFile(inputPath,outputPath),animationCapabilities:async()=>({available:true})}:{})};
+ // Historical combined-edit fixture: current staged editing is exercised in edit-stages.test.mjs.
+ const mediaOptions={newEditWorkflow:()=>undefined,inspect,...(animate?{animate:async({inputPath,outputPath})=>copyFile(inputPath,outputPath),animationCapabilities:async()=>({available:true})}:{})};
  const bridge=createContentWorkflowBridge({dbPath,getCurrentProfile:()=>'owner',getAgents:()=>agents,getFlows:()=>({flows:[flow]}),getSessions:()=>sessions,getRuntime:()=>runtime,getChatRuntime:provider=>provider==='claude'&&!claude?null:runtime,inspect,mediaOptions,timeoutMs:60000});
  const db=new DatabaseSync(dbPath);
  const delegate=(callId,args)=>bridge.delegations.dispatch({profileId:'owner',agentId:'conteudo',sessionId:'chat-1'},{threadId:'source-thread',turnId:'turn-1',callId,arguments:args},{targets:[{id:'editor-de-video-1'}]});

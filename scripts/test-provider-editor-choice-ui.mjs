@@ -139,8 +139,8 @@ app.whenReady().then(async()=>{try{
  await click('[aria-label="Quem dirige a edição"]');await option('Codex');
  await until(async()=>(await textOf('[data-od-id="production-edit-director"]')).includes('Codex (só nesta produção, ao enviar o vídeo)'),'pending label');
  assert.equal(commands.length,2,'choosing before sending sends nothing');await js(`${q('[data-od-id="edit-director"]')}.scrollIntoView({block:'center'})`);await shot('09-recording-choice-light');
- await js(`Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='Enviar vídeo e iniciar edição automática').click()`);await until(()=>commands.length===3,'video');
- assert.equal(commands[2].action,'video');assert.deepEqual(commands[2].director,{providerId:'codex'});assert.equal(directorWrites.length,0);assert.equal(workspaceDirector.providerId,'claude');
+ await js(`Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='Enviar vídeo e preparar cortes').click()`);await until(()=>commands.length===3,'video');
+ assert.equal(commands[2].action,'video');assert.equal(commands[2].editMode,'smart','the staged editor is used');assert.equal(await js(`Boolean(document.querySelector('[aria-label="Movimento"]'))`),false,'visual effects are not chosen in recording');assert.deepEqual(commands[2].director,{providerId:'codex'});assert.equal(directorWrites.length,0);assert.equal(workspaceDirector.providerId,'claude');
  win.setSize(560,1000);await shot('10-after-video-narrow-light');
  assert.equal(state.agents.length,1);assert.deepEqual(state.agents[0],originalAgent,'agent profile unchanged');assert.deepEqual(errors,[]);assert.deepEqual(blockedRequests,[]);
  // 7. Turn-limit stop: useful diagnostics, effective vs configured, one Resume (no step-by-step approvals); opening sends nothing.

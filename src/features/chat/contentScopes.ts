@@ -113,6 +113,20 @@ export function mergeContentScopes(current:unknown,incoming:unknown):ContentScop
  return {schemaVersion:1,selected:{...other.selected,...local.selected},active:{...other.active,...local.active}};
 }
 
+/**
+ * Agents an agent may consult on its own from this chat: in a content scope only the scope's members (agents with a chat of that
+ * content), so building the scope decides who works together; General keeps every candidate. The host refuses any target outside
+ * the catalog it receives. Explicit user actions (manual handoff, connecting an agent) still add an agent to the scope.
+ */
+export function scopeMemberIds(sessions:readonly Pick<AgentSession,'agentId'|'contentId'>[],contentId:string){
+ return new Set(sessions.filter(session=>session.contentId===contentId).map(session=>session.agentId));
+}
+export function scopedTargets<T extends {id:string}>(targets:readonly T[],session:Pick<AgentSession,'contentId'>,sessions:readonly Pick<AgentSession,'agentId'|'contentId'>[]):T[]{
+ if(!session.contentId)return [...targets];
+ const members=scopeMemberIds(sessions,session.contentId);
+ return targets.filter(target=>members.has(target.id));
+}
+
 /** Content box shown in the chat selector and on the Sessions page. */
 export interface ContentSpace {
  scope:ScopeKey;kind:'general'|'content'|'recovery';title:string;stage?:string;content?:EditorialContent;archived?:boolean;

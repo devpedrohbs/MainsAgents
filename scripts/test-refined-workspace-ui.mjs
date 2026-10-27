@@ -34,9 +34,13 @@ app.whenReady().then(async()=>{try{
  win=new BrowserWindow({show:false,width:1440,height:1000,webPreferences:{preload:resolve(root,'tests/fixtures/assets-ui-preload.cjs'),contextIsolation:true,sandbox:true,offscreen:true,backgroundThrottling:false}});
  win.webContents.on('console-message',event=>{if(/Uncaught|Maximum update depth|Cannot update a component/.test(event.message))errors.push(event.message)});
  await win.loadURL(`http://127.0.0.1:${server.address().port}/app.html#home`);
- await until(()=>js('Boolean(document.querySelector(".overview-priorities"))'));
+ await until(()=>js('Boolean(document.querySelector(".ov-needs"))'));
  assert.equal(await js('getComputedStyle(document.querySelector(".sidebar")).width'),'244px');
- assert.equal(await js('getComputedStyle(document.documentElement).getPropertyValue("--accent").trim()'),'#3557f5');
+ // Dark Studio: dark is the default appearance; light keeps the cobalt accent.
+ assert.equal(await js('document.documentElement.dataset.appearance'),'dark');
+ assert.equal(await js('getComputedStyle(document.documentElement).getPropertyValue("--accent").trim()'),'#5b8cff');
+ await js('document.documentElement.dataset.appearance="light"');
+ assert.equal(await js('getComputedStyle(document.documentElement).getPropertyValue("--accent").trim()'),'#2f6feb');
  await js('document.fonts.ready');assert(await js('document.fonts.check("500 13px Geist")'));
  await screenshot('overview-light');await js('document.documentElement.dataset.appearance="dark"');await screenshot('overview-dark');await js('document.documentElement.dataset.appearance="light"');await click('[data-od-id="nav-calendar"]');
  await until(()=>js('Boolean(document.querySelector(".publishing-grid"))'));

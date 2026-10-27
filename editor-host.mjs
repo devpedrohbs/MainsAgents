@@ -1,3 +1,4 @@
+import {editStageProblems,editStageGuide} from './edit-stages.mjs';
 /**
  * Host callbacks of the editor-authoring contract (mainsagents.editor-authoring/1, editor-authoring.mjs) for ONE edit run.
  * The editor (Claude with mainsagents_editor tools) sees the recording, writes plan revisions, renders short previews and
@@ -47,7 +48,7 @@ const shownTexts=layer=>{switch(layer?.type){case 'text':case 'callout':case 'ch
  * patch: {window,basePlan,inside} = localized visual adjustment of a delivered edit (cuts/audio frozen, only the window may
  * change). retakes: semantic-cut candidates of this source (editor-retakes.mjs), evidence for the editor; it decides.
  */
-export function createEditorHost({profile,binding,motionRequired=false,read,bindingOf,update,guard,media,ref,base,brief,transcript:rawTranscript,guidance,userTexts=[],planSchema,finalExport,exportStatus,authoringRoot,patch,retakes=[]}){
+export function createEditorHost({profile,binding,motionRequired=false,editStage=null,read,bindingOf,update,guard,media,ref,base,brief,transcript:rawTranscript,guidance,userTexts=[],planSchema,finalExport,exportStatus,authoringRoot,patch,retakes=[]}){
  const transcript=hostTranscript(rawTranscript),{words,...transcriptInfo}=transcript;
  // Fact proof (A): numbers/quotes on screen must exist in the speech that SURVIVES the cuts of this plan (a corrected take that
  // was cut out is not a source) or in the brief; 'user' facts only in what the user typed.
@@ -89,8 +90,9 @@ export function createEditorHost({profile,binding,motionRequired=false,read,bind
    return {metadata:c.metadata,outputDuration:c.outputDuration,
     ...(c.pair?{screenRecording:{...c.pair,sceneScreen:{off:'camera only (its own camera.layout)',full:'the screen recording fills the frame (camera hidden)','with-camera':'the screen recording plus the camera in the top-right corner (the screen is placed left/below it, never covered)'},note:'Two sources of the SAME content: the camera is the primary timeline (segments are camera times; voice, cuts and retakes apply to both). Choose per scene with storyboard scene.screen. The screen is always shown contained (real interface, aspect preserved). Where the edited timeline has no screen (editedScreenWindows), the camera is shown full automatically. Inspect the screen with get_frames/contact_sheet target "screen" (camera timeline times).'}}:{}),transcript:transcript.segments.length||words.length?{...transcriptInfo,words:words.length}:undefined,brief,
     ...(guidance?.items?.length||guidance?.skipped?.length?{guidance}:{}),
-    capabilities:{storyboard:true,stills:true,preview:true,assets:c.assets},planSchema,
-    currentPlan:p?.authoring?.plan??(patch?patch.basePlan:{segments:base.segments,theme:base.theme,normalizeAudio:base.normalizeAudio}),
+    ...(editStage?{editStage:{phase:editStage,instruction:editStageGuide(editStage),...(editStage==='visual'?{frozen:['segments','format','audio','normalizeAudio']}:{} )}}:{}),
+    capabilities:{storyboard:editStage!=='cuts',stills:true,preview:true,assets:c.assets},planSchema,
+    currentPlan:p?.authoring?.plan??structuredClone(base),
     ...(retakes.length&&!patch?{retakes:{note:'Evidence only (approximate word times, source timeline). Decide by meaning: keep the complete take, never cut expressive pauses or intentional repetition by rule. Declare each decision in write_plan.cutDecisions (cut|keep|review + reason).',candidates:retakes}}:{}),
     ...(patch?{localAdjust:{window:patch.window,label:windowLabel(patch.window),editedTimeline:true,frozen:['segments (cuts)','audio, normalizeAudio and storyboard.sfx','storyboard style/assets/timeline','every scene shown outside the window (including the camera layout a neighbour scene inherits)'],editableScenes:patch.inside??[],previewWindow:{start:Math.max(0,patch.window.start-LOCAL_PATCH_LIMITS.previewMargin),end:patch.window.end+LOCAL_PATCH_LIMITS.previewMargin}}}:{}),
     ...(!p?.authoring?.plan&&p?.authoring?.previousPlan?{previousPlan:p.authoring.previousPlan}:{}),
@@ -123,8 +125,10 @@ export function createEditorHost({profile,binding,motionRequired=false,read,bind
   async validatePlan({plan,cutDecisions,signal}={}){
    try{
     // Local adjustment: a different cut list is refused with the reason before any generic storyboard check.
+    const stageErrors=editStageProblems(editStage,merged(plan),base);if(stageErrors.length)return {ok:false,errors:stageErrors};
     if(patch&&JSON.stringify(merged(plan).segments)!==JSON.stringify(patch.basePlan.segments))return {ok:false,errors:['Os cortes não podem mudar num ajuste de trecho (a fala e a linha do tempo ficam idênticas). Mantenha segments iguais aos do plano entregue; para cortar ou reordenar, a pessoa pede um ajuste geral.']};
     const result=await media.plan(profile,{...ref,plan:merged(plan)});
+    const normalizedErrors=editStageProblems(editStage,result.plan,base);if(normalizedErrors.length)return {ok:false,errors:normalizedErrors};
     if(patch&&cutDecisions?.length)return {ok:false,errors:['A local visual adjustment keeps every cut: send no cutDecisions.']};
     const decisions=cutDecisionReport(cutDecisions,{segments:result.plan.segments,words,candidates:retakes});
     if(decisions.errors.length)return {ok:false,errors:decisions.errors.slice(0,12)};

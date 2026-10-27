@@ -1,0 +1,176 @@
+/* Chat, cleaner and alive (design round 7). Loaded last: one header row, a quiet context strip, icon actions on hover,
+   a live status line that follows the real tool steps, and the composer's model picker. Dark Studio tokens only. */
+
+.sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0 0 0 0)!important;white-space:nowrap!important;border:0!important}
+
+/* Header: one row, no divider. */
+.studio-shell .chat-clean .chat-head{display:flex;flex-wrap:nowrap;align-items:center;gap:10px;min-height:0;padding:12px 10px 6px 14px;border:0}
+.studio-shell .chat-clean .conversation-avatar .agent-avatar{width:32px;min-width:32px;height:32px;border-radius:10px}
+.studio-shell .chat-clean .conversation-avatar>i{border-color:var(--bg)}
+.studio-shell .chat-clean .chat-head-identity{gap:0}
+.studio-shell .chat-clean .chat-head-identity{align-items:flex-start}
+.studio-shell .chat-clean .conversation-agent-picker{flex:0 1 auto;max-width:100%}
+.studio-shell .chat-clean .chat-head-identity .select-menu-trigger{width:auto;max-width:100%;gap:6px;font-size:14px;font-weight:600}
+.studio-shell .chat-clean .chat-head-subtitle{display:block;max-width:100%;padding:0;border:0;background:none;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.studio-shell .chat-clean .chat-head-subtitle.active-session-bar>span{font:inherit;font-weight:400;color:inherit}
+.studio-shell .chat-clean .chat-top,.studio-shell .chat-clean .chat-body,.studio-shell .chat-clean .chat-approval-dock{border-top:0;border-bottom:0;box-shadow:none}
+.studio-shell .chat-clean .chat-head-actions{flex:0 0 auto;width:auto;margin:0 0 0 auto;gap:2px}
+.studio-shell .chat-clean .chat-head-actions>.icon-button,.studio-shell .chat-clean .conversation-options summary{width:32px;min-width:32px;height:32px;min-height:32px;padding:0;border:0;border-radius:8px;background:transparent;color:var(--muted);display:grid;place-items:center}
+.studio-shell .chat-clean .chat-head-actions>.icon-button:hover:not(:disabled),.studio-shell .chat-clean .conversation-options summary:hover,.studio-shell .chat-clean .conversation-options[open] summary{background:var(--surface-2);color:var(--fg)}
+.studio-shell .chat-clean .chat-head-actions svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+/* ⋯ menu: everything that used to sit in bars above the thread. */
+.studio-shell .chat-clean .conversation-options>.conversation-menu{position:absolute;top:calc(100% + 6px);right:0;z-index:40;display:grid;gap:1px;width:260px;max-height:min(70vh,560px);overflow:auto;padding:6px;border:1px solid var(--border);border-radius:12px;background:var(--surface);box-shadow:var(--elev-raised,0 16px 40px rgba(0,0,0,.45))}
+.studio-shell .chat-clean .conversation-menu>button{display:flex;align-items:center;gap:10px;width:100%;min-height:34px;padding:0 10px;border:0;border-radius:8px;background:transparent;color:var(--fg);font:inherit;font-size:13px;text-align:left;cursor:pointer}
+.studio-shell .chat-clean .conversation-menu>button:hover:not(:disabled),.studio-shell .chat-clean .conversation-menu>button:focus-visible{background:var(--surface-2)}
+.studio-shell .chat-clean .conversation-menu>button:disabled{opacity:.45;cursor:default}
+.studio-shell .chat-clean .conversation-menu>button svg{width:15px;height:15px;flex:0 0 15px;color:var(--muted)}
+.studio-shell .chat-clean .conversation-menu-label{padding:10px 10px 4px;font-size:11px;font-weight:600;color:var(--meta)}
+.studio-shell .chat-clean .conversation-menu-label:first-child{padding-top:4px}
+.studio-shell .chat-clean .conversation-menu .agent-connection-bar{padding:4px 10px 6px;border:0;border-radius:8px;background:transparent}
+.studio-shell .chat-clean .conversation-menu .agent-connection-bar.connected{background:var(--surface-2)}
+.studio-shell .chat-clean .conversation-menu .agent-connection-controls{flex-wrap:wrap;gap:8px}
+.studio-shell .chat-clean .conversation-menu .agent-connection-switch{min-height:30px;font-size:13px}
+.studio-shell .chat-clean .conversation-menu .agent-connection-bar p{margin:4px 0 0;font-size:12px;line-height:1.45;color:var(--muted)}
+
+/* Context strip: content, production and who edits it, on one quiet line. */
+.studio-shell .chat-clean .chat-context-strip{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;min-width:0;padding:0 12px 8px 14px}
+.studio-shell .chat-clean .chat-context-strip:empty{display:none}
+.studio-shell .chat-clean .content-scope-bar{display:flex;flex:1 1 auto;flex-wrap:wrap;align-items:center;gap:4px 8px;min-width:0;padding:0;border:0;background:transparent}
+.studio-shell .chat-clean .content-scope-row{flex:0 1 auto;gap:2px;min-width:0}
+.studio-shell .chat-clean .content-scope-picker{flex:0 1 auto}
+.studio-shell .chat-clean .content-scope-picker .select-menu-trigger{width:auto;max-width:100%;min-height:26px;height:26px;padding:0 8px;border:0;border-radius:7px;background:transparent;box-shadow:none;color:var(--muted);font-size:12px;gap:4px}
+.studio-shell .chat-clean .content-scope-picker .select-menu-trigger:hover{background:var(--surface-2);color:var(--fg)}
+.studio-shell .chat-clean .content-scope-row>.icon-button,.studio-shell .chat-clean .content-scope-row .content-actions .icon-button{width:26px;min-width:26px;height:26px;padding:0;border:0;border-radius:7px;background:transparent;color:var(--faint);opacity:0;transition:opacity .15s}
+.studio-shell .chat-clean .chat-context-strip:hover .content-scope-row :is(.icon-button),.studio-shell .chat-clean .content-scope-row :is(.icon-button):focus-visible,.studio-shell .chat-clean .content-scope-row .content-actions:has([aria-expanded=true]) .icon-button{opacity:1}
+.studio-shell .chat-clean .content-scope-row .icon-button:hover{background:var(--surface-2);color:var(--fg)}
+.studio-shell .chat-clean .content-scope-row .icon-button svg{width:14px;height:14px}
+.studio-shell .chat-clean .content-scope-meta{flex:1 1 auto;gap:6px}
+.studio-shell .chat-clean .content-scope-stage{padding:0;border:0;background:none;color:var(--meta);font-size:12px}
+.studio-shell .chat-clean .content-scope-stage::before{content:"· ";color:var(--faint)}
+.studio-shell .chat-clean .content-scope-agents button{height:24px;padding:0 8px;font-size:12px}
+.studio-shell .chat-clean .content-scope-note{flex-basis:100%;margin:2px 8px 0;font-size:12px;color:var(--muted)}
+.studio-shell .chat-clean .chat-context-chip{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 8px;border-radius:7px;background:var(--surface-2);color:var(--fg-2,var(--fg));font-size:12px;white-space:nowrap}
+.studio-shell .chat-clean .chat-context-chip>i{width:6px;height:6px;border-radius:50%;background:var(--accent)}
+.studio-shell .chat-clean .chat-context-strip .provider-choice-editing{height:24px;padding:0 8px;border:0;border-radius:7px;background:transparent;color:var(--muted);font-size:12px}
+.studio-shell .chat-clean .chat-context-strip button.provider-choice-editing:hover{background:var(--surface-2);color:var(--fg)}
+.studio-shell .chat-clean .chat-context-production{display:inline-flex;align-items:center;gap:7px;height:26px;margin:0 0 0 auto;padding:0 8px;border:0;border-radius:7px;background:transparent;color:var(--muted);font:inherit;font-size:12px;cursor:pointer;white-space:nowrap}
+.studio-shell .chat-clean .chat-context-production:hover{background:var(--surface-2);color:var(--fg)}
+.studio-shell .chat-clean .chat-context-production>i{width:6px;height:6px;border-radius:50%;background:var(--faint)}
+.studio-shell .chat-clean .chat-context-production>i.is-live{background:var(--accent)}
+
+/* Content session card: a soft panel, no border stack. */
+.studio-shell .chat-clean .content-session-card{border:0;background:var(--surface);border-radius:12px}
+
+/* Messages: replies breathe; actions appear on hover or focus, and stay on the latest reply. */
+.studio-shell .chat-clean .message-actions{display:flex;gap:2px;margin:6px 0 0 -6px;opacity:0;transition:opacity .15s}
+.studio-shell .chat-clean .chat-message:hover .message-actions,.studio-shell .chat-clean .message-actions:focus-within,.studio-shell .chat-clean .message-actions.is-latest{opacity:1}
+.studio-shell .chat-clean .message-actions button{display:grid;place-items:center;width:28px;min-width:28px;height:28px;min-height:28px;padding:0;border:0;border-radius:7px;background:transparent;color:var(--meta)}
+.studio-shell .chat-clean .message-actions button:hover:not(:disabled){background:var(--surface-2);color:var(--fg)}
+.studio-shell .chat-clean .message-actions button:disabled{opacity:.4}
+.studio-shell .chat-clean .message-actions svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+@media (hover:none){.studio-shell .chat-clean .message-actions{opacity:1}}
+
+/* Live status: mascot, what is happening now, the last finished steps. Each new phrase fades in. */
+.studio-shell .chat-clean .chat-run-status.is-live{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;column-gap:12px;row-gap:8px;width:100%;padding:4px 0}
+.studio-shell .chat-clean .chat-run-status.is-live .run-status-mascot{width:36px;height:36px;min-width:36px;border-radius:11px}
+.studio-shell .chat-clean .chat-run-status.is-live .run-status-label{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;animation:mascot-shimmer 2s linear infinite,chat-step-in .22s ease-out both}
+.studio-shell .chat-clean .chat-run-status.is-live[data-tone=wait] .run-status-label{background:none;color:var(--warn);animation:chat-step-in .22s ease-out both}
+.studio-shell .chat-clean .run-status-meta{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+.studio-shell .chat-clean .run-status-meta time{font-variant-numeric:tabular-nums;color:inherit}
+.studio-shell .chat-clean .run-status-trail{grid-column:1/-1;display:grid;gap:5px;margin:0 0 0 17px;padding:0 0 0 18px;border-left:1px solid var(--border);list-style:none}
+.studio-shell .chat-clean .run-status-trail li{display:flex;align-items:center;gap:8px;min-width:0;font-size:12px;color:var(--meta);animation:chat-step-in .22s ease-out both}
+.studio-shell .chat-clean .run-status-check{width:12px;height:12px;flex:0 0 12px;fill:none;stroke:var(--success);stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+@keyframes chat-step-in{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+
+/* Finished: "Worked for 14 s · 5 steps ›", the steps fold inside. */
+.studio-shell .chat-clean .chat-run-status:not(.is-live){font-size:12px;color:var(--meta)}
+.studio-shell .chat-clean .chat-run-status:not(.is-live) .run-status-dot{display:none}
+.studio-shell .chat-clean .chat-run-status time{color:inherit;font-variant-numeric:tabular-nums}
+.studio-shell .chat-clean .chat-run-status .run-status-steps,.studio-shell .chat-clean .chat-run-status .run-status-steps:not([open]){flex-basis:100%;margin:0}
+.studio-shell .chat-clean .chat-run-status .run-status-steps summary{display:inline-flex;align-items:center;gap:6px;height:24px;margin-left:-6px;padding:0 6px;border-radius:6px;font-size:12px;opacity:1;cursor:pointer}
+.studio-shell .chat-clean .chat-run-status .run-status-steps summary:hover,.studio-shell .chat-clean .chat-run-status .run-status-steps summary:focus-visible{background:var(--surface-2);color:var(--fg);text-decoration:none}
+.studio-shell .chat-clean .run-status-chevron{width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;transition:transform .15s}
+.studio-shell .chat-clean .run-status-steps[open] .run-status-chevron{transform:rotate(90deg)}
+.studio-shell .chat-clean .chat-run-status .run-status-steps ol{display:grid;gap:6px;margin:6px 0 2px;padding:0 0 0 4px;list-style:none;font-size:12px;color:var(--muted)}
+.studio-shell .chat-clean .chat-run-status .run-status-steps li{display:flex;align-items:center;gap:8px}
+.studio-shell .chat-clean .run-status-fail{display:grid;place-items:center;width:12px;height:12px;border-radius:50%;background:var(--danger-soft);color:var(--danger);font-size:9px;font-weight:700}
+.studio-shell .chat-clean .chat-run-status[data-state=error] .run-status-label{color:var(--danger)}
+
+/* Composer: text, attach, model pill, send/stop. Nothing else around it. */
+.studio-shell .chat-clean .chat-compose{padding:4px 12px 12px;border:0}
+.studio-shell .chat-clean .composer{border:1px solid var(--border);border-radius:16px;background:var(--surface);box-shadow:none}
+.studio-shell .chat-clean .composer:focus-within{border-color:color-mix(in srgb,var(--fg) 22%,var(--border));box-shadow:0 0 0 3px color-mix(in srgb,var(--fg) 6%,transparent)}
+.studio-shell .chat-clean .composer-bar{display:flex;flex-wrap:nowrap;align-items:center;gap:4px;padding:4px 8px 8px}
+.studio-shell .chat-clean .composer-bar-spacer{flex:1 1 auto}
+.studio-shell .chat-clean .composer-plus{width:30px;height:30px;border:0;border-radius:8px;color:var(--muted)}
+.studio-shell .chat-clean .composer-plus:hover,.studio-shell .chat-clean .composer-plus[aria-expanded=true]{background:var(--surface-2);color:var(--fg)}
+.studio-shell .chat-clean .send-button svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.studio-shell .chat-clean .send-button.stop{background:transparent;border:1px solid var(--line-strong,var(--border));color:var(--fg)}
+.studio-shell .chat-clean .send-stop-glyph{width:10px;height:10px;border-radius:2px;background:currentColor}
+.studio-shell .chat-clean .composer-connection{display:flex;align-items:center;gap:8px;margin:0 4px 8px;padding:0;font-size:12px;color:var(--muted)}
+.studio-shell .chat-clean .composer-connection::before{content:"";flex:0 0 6px;height:6px;border-radius:50%;background:var(--warn)}
+.studio-shell .chat-clean .composer-connection .text-link{margin-left:auto}
+
+/* Model picker: one pill (provider dot, model, effort bars); the panel lists models and four effort steps. */
+.studio-shell .chat-clean .model-picker{position:relative;display:flex;align-items:center;gap:6px;min-width:0}
+.studio-shell .chat-clean .model-picker-trigger{display:flex;align-items:center;gap:7px;width:auto;max-width:240px;height:30px;padding:0 8px 0 10px;border:0;border-radius:999px;background:transparent;color:var(--muted);font:inherit;font-size:12px;cursor:pointer}
+.studio-shell .chat-clean .model-picker-trigger:hover,.studio-shell .chat-clean .model-picker-trigger[aria-expanded=true]{background:var(--surface-2);color:var(--fg)}
+.studio-shell .chat-clean .model-picker-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.studio-shell .chat-clean .model-picker-chevron{width:11px;height:11px;flex:0 0 11px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;transform:rotate(90deg);transition:transform .15s}
+.studio-shell .chat-clean .model-picker-trigger[aria-expanded=true] .model-picker-chevron{transform:rotate(-90deg)}
+.studio-shell .chat-clean .model-picker-dot{flex:0 0 8px;width:8px;height:8px;border-radius:50%;background:var(--fg)}
+.studio-shell .chat-clean .model-picker[data-provider=claude] .model-picker-dot{background:#d97757}
+.studio-shell .chat-clean .model-picker[data-provider=gemini] .model-picker-dot{background:var(--accent)}
+.studio-shell .chat-clean .model-picker-status{font-size:12px;color:var(--warn);white-space:nowrap}
+.studio-shell .chat-clean .effort-bars{display:inline-flex;align-items:flex-end;gap:2px;height:11px}
+.studio-shell .chat-clean .effort-bars i{width:3px;border-radius:1px;background:var(--border)}
+.studio-shell .chat-clean .effort-bars i:nth-child(1){height:4px}.studio-shell .chat-clean .effort-bars i:nth-child(2){height:6px}.studio-shell .chat-clean .effort-bars i:nth-child(3){height:8px}.studio-shell .chat-clean .effort-bars i:nth-child(4){height:11px}
+.studio-shell .chat-clean .effort-bars i.on{background:currentColor}
+
+.studio-shell .chat-clean .model-picker-pop{position:absolute;left:-6px;bottom:calc(100% + 12px);z-index:40;display:grid;gap:14px;width:320px;max-width:calc(100vw - 48px);max-height:min(70vh,560px);overflow:auto;padding:14px;border:1px solid var(--border);border-radius:14px;background:var(--surface);color:var(--fg);box-shadow:var(--elev-raised,0 16px 40px rgba(0,0,0,.45));animation:chat-step-in .16s ease-out both}
+.studio-shell .chat-clean .model-picker-pop[hidden]{display:none}
+.studio-shell .chat-clean .model-picker-provider{display:flex;align-items:center;gap:10px;padding:2px 2px 12px;border-bottom:1px solid var(--border-soft,var(--border))}
+.studio-shell .chat-clean .model-picker-provider-text{display:grid;flex:1;min-width:0}
+.studio-shell .chat-clean .model-picker-provider-text b{font-size:14px;font-weight:600}
+.studio-shell .chat-clean .model-picker-provider-text small{font-size:12px;color:var(--muted)}
+.studio-shell .chat-clean .model-picker-provider .provider-choice-chip{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 10px;border:1px solid var(--border);border-radius:8px;background:transparent;color:var(--fg);font:inherit;font-size:12px;white-space:nowrap}
+.studio-shell .chat-clean .model-picker-provider .model-picker-switch{cursor:pointer;font-size:0}
+.studio-shell .chat-clean .model-picker-provider .model-picker-switch::after{content:attr(data-action);font-size:12px}
+.studio-shell .chat-clean .model-picker-provider .model-picker-switch:hover:not(:disabled){background:var(--surface-2)}
+.studio-shell .chat-clean .model-picker-provider .model-picker-switch:disabled{opacity:.45;cursor:default}
+.studio-shell .chat-clean .model-picker-note{margin:0;padding:8px 10px;border-radius:8px;background:var(--warn-soft);color:var(--warn);font-size:12px;line-height:1.45}
+.studio-shell .chat-clean .model-picker-section{display:grid;gap:8px}
+.studio-shell .chat-clean .model-picker-heading{display:flex;align-items:baseline;justify-content:space-between;font-size:11px;font-weight:600;color:var(--meta)}
+.studio-shell .chat-clean .model-picker-heading small{font-size:11px;font-weight:400;color:var(--faint)}
+.studio-shell .chat-clean .model-select{display:grid;gap:2px;max-height:220px;overflow:auto}
+.studio-shell .chat-clean .model-option{display:flex;align-items:center;gap:10px;width:100%;min-height:38px;padding:6px 10px;border:0;border-radius:9px;background:transparent;color:var(--fg);font:inherit;text-align:left;cursor:pointer}
+.studio-shell .chat-clean .model-option:hover:not(:disabled){background:var(--surface-2)}
+.studio-shell .chat-clean .model-option.is-selected{background:var(--surface-2)}
+.studio-shell .chat-clean .model-option:disabled{cursor:default;opacity:.55}
+.studio-shell .chat-clean .model-option-text{display:grid;flex:1;min-width:0}
+.studio-shell .chat-clean .model-option-text b{font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.studio-shell .chat-clean .model-option-text small{font-size:11px;color:var(--muted)}
+.studio-shell .chat-clean .model-option-check{width:14px;height:14px;flex:0 0 14px;fill:none;stroke:var(--accent);stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+.studio-shell .chat-clean .model-picker-empty{margin:0;padding:6px 10px;font-size:12px;line-height:1.45;color:var(--muted)}
+.studio-shell .chat-clean .effort-select{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;padding:3px;border-radius:10px;background:var(--bg)}
+.studio-shell .chat-clean .effort-option{display:grid;justify-items:center;gap:5px;padding:8px 2px 6px;border:0;border-radius:8px;background:transparent;color:var(--muted);font:inherit;font-size:12px;cursor:pointer}
+.studio-shell .chat-clean .effort-option:hover:not(:disabled){color:var(--fg)}
+.studio-shell .chat-clean .effort-option.is-selected{background:var(--surface-2);color:var(--fg)}
+.studio-shell .chat-clean .effort-option.is-selected .effort-bars i.on{background:var(--accent)}
+.studio-shell .chat-clean .effort-option:disabled{opacity:.5;cursor:default}
+.studio-shell .chat-clean .model-picker-actions{display:grid;gap:2px;padding-top:10px;border-top:1px solid var(--border-soft,var(--border))}
+.studio-shell .chat-clean .model-picker-actions .composer-skill-action{display:flex;align-items:center;gap:10px;min-height:32px;padding:0 8px;border-radius:8px;color:var(--fg-2,var(--fg));font-size:13px}
+.studio-shell .chat-clean .model-picker-actions .composer-skill-action:hover:not(:disabled){background:var(--surface-2)}
+.studio-shell .chat-clean .model-picker-actions .composer-skill-action>span{margin-left:auto;color:var(--faint)}
+.studio-shell .chat-clean .model-picker-actions svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;color:var(--muted)}
+.studio-shell .chat-clean :is(.model-option,.effort-option,.model-picker-trigger,.model-picker-switch,.conversation-menu>button,.message-actions button,.chat-context-production):focus-visible{outline:none;box-shadow:var(--focus-ring,0 0 0 2px var(--accent))}
+
+/* Floating (large) chat: same pieces, roomier header and a centered reading column. */
+.studio-shell .chat-layer.floating .chat-clean .chat-head{padding:16px 16px 8px 20px}
+.studio-shell .chat-layer.floating .chat-clean .chat-context-strip{padding:0 16px 10px 20px}
+
+@media (prefers-reduced-motion:reduce){
+ .studio-shell .chat-clean .chat-run-status.is-live .run-status-label,.studio-shell .chat-clean .run-status-trail li,.studio-shell .chat-clean .model-picker-pop{animation:none}
+ .studio-shell .chat-clean .chat-run-status.is-live .run-status-label{background:none;color:var(--fg)}
+}
