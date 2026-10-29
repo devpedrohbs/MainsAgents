@@ -1,6 +1,6 @@
 import {createZernioPublicationConnector} from './zernio-publication-connector.mjs';
 import { setDesktopDiagnosticWriter } from './desktop-diagnostics.mjs';
-import { app, BrowserWindow, dialog, ipcMain, nativeImage, safeStorage, session, shell, Notification } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, nativeImage, safeStorage, session, shell, Notification, powerMonitor } from 'electron';
 import { attachCanvasBrowserPolicy } from './canvas-browser-security.mjs';
 import { desktopStorageDirectory, openDesktopWorkspaceStore } from './desktop-storage-location.mjs';
 import { findSkills } from './skill-discovery.mjs';
@@ -94,6 +94,16 @@ for(const action of ['status','save','remove'])ipcMain.handle(`calendar:key:${ac
  if(!contentWorkflowBridge)throw Error('Calendar storage is unavailable.');
  return contentWorkflowBridge.calendarCredentials[action](profile,key);
 });
+for(const action of ['status','save','remove'])ipcMain.handle(`radar:key:${action}`,(event,profile,key)=>{
+ assertTrustedSender(event);if(!desktopStateStore||profile!==desktopStateStore.currentProfile())throw Error('Active profile changed.');
+ if(!contentWorkflowBridge?.radar?.credentials)throw Error('Radar storage is unavailable.');
+ return contentWorkflowBridge.radar.credentials[action](profile,key);
+});
+async function refreshRadarDue(reason){
+ if(shuttingDown)return;
+ try{await contentWorkflowBridge?.radar?.refreshDue?.({reason});}
+ catch(error){logStartup(`Radar ${reason} refresh failed: ${error instanceof Error?error.message:String(error)}`);}
+}
 function saveAccountToken(config,rawToken,email,userId){if(!safeStorage.isEncryptionAvailable())throw new Error('Secure credential storage is unavailable');writeAccountConfig({...config,encryptedToken:safeStorage.encryptString(rawToken).toString('base64'),email,userId});desktopStateStore?.selectProfile(userId)}
 async function accountRequest(path,method='GET',data,authenticated=true){const config=readAccountConfig();if(!config.serverUrl)throw new Error('Configure the account service first');const raw=authenticated?accountToken(config):'';if(authenticated&&!raw)throw new Error('Sign in to MainsAgents first');const response=await fetch(`${config.serverUrl}${path}`,{method,redirect:'error',headers:{'content-type':'application/json',...(raw?{authorization:`Bearer ${raw}`}:{})},body:data===undefined?undefined:JSON.stringify(data),signal:AbortSignal.timeout(30000)});const result=await response.json().catch(()=>({error:'Invalid account service response'}));if(!response.ok)throw new Error(result.error??`Account service returned ${response.status}`);return result}
 
@@ -388,6 +398,7 @@ async function createWindow() {
   catch(error){logStartup(`Codex unavailable: ${error instanceof Error?error.message:String(error)}`);}
   contentWorkflowBridge.jobs.kick();
   contentWorkflowBridge.work.kick();
+  void refreshRadarDue('startup');
   const web = await startWebServer(join(app.getAppPath(), 'dist'));
   webServer = web.server;
   logStartup(`Web application ready on ${web.port}`);
@@ -468,7 +479,10 @@ else {
       mainWindow.focus();
     }
   });
-  app.whenReady().then(createWindow).catch((error) => {
+  app.whenReady().then(() => {
+    powerMonitor.on('resume', () => { void refreshRadarDue('resume'); });
+    return createWindow();
+  }).catch((error) => {
     logStartup(`Startup failed: ${error?.stack ?? error}`);
     console.error(error);
     app.quit();

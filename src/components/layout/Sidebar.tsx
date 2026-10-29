@@ -13,7 +13,7 @@ import '../../styles/ux-flow.css';
 
 interface SidebarProps { currentPage:PageId; agents:readonly Agent[]; onNavigate:(page:PageId)=>void; onSelectAgent:(agentId:string)=>void; onClose:()=>void; onOpenCommand:()=>void }
 // Grouped by intent and ordered as the work flows: start, produce, schedule, then the supporting tools.
-const primary:[PageId,IconName,string][]=[['home','home','Home'],['content','script','Content Studio'],['references','play','Editing references']];
+const primary:[PageId,IconName,string][]=[['home','home','Home'],['content','script','Content Studio'],['radar','globe','Radar'],['references','play','Editing references']];
 const tools:[PageId,IconName,string][]=[['board','board','Board'],['flow','link','Flow'],['canvas','canvas','Canvas']];
 const workspace:[PageId,IconName,string][]=[['agents','users','Agents'],['scopes','folder','Scopes'],['sessions','history','History']];
 /** One line on what each area is for, shown in the item's tooltip. */
@@ -21,6 +21,7 @@ const navHints:Record<string,[string,string]>={
   home:['o que precisa de você e o que está em produção','what needs you and what is in production'],
   content:['da pauta ao roteiro e às entregas','from idea to script and deliveries'],
   references:['vídeos que ensinam seu estilo, Meu estilo e Kit de motion','videos that teach your style, My style and Motion kit'],
+  radar:['canais, notícias e métricas observadas nas coletas','channels, news, and metrics observed during collection'],
   calendar:['datas e redes de cada publicação','dates and channels for each post'],
   board:['tarefas avulsas por status','standalone tasks by status'],
   flow:['a ordem das etapas e quem faz cada uma','the order of stages and who does each one'],

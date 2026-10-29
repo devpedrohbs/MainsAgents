@@ -65,6 +65,11 @@ interface Window {
       save(profile:string,key:string):Promise<{configured:boolean;secureStorage:boolean}>;
       remove(profile:string):Promise<{configured:boolean;secureStorage:boolean}>;
     };
+    radarKey?:{
+      status(profile:string):Promise<{configured:boolean;secureStorage:boolean}>;
+      save(profile:string,key:string):Promise<{configured:boolean;secureStorage:boolean}>;
+      remove(profile:string):Promise<{configured:boolean;secureStorage:boolean}>;
+    };
     account: {
       status():Promise<{configured:boolean;signedIn:boolean;serverUrl?:string;email?:string;userId?:string;error?:string}>;
       googleConfigured():Promise<boolean>;

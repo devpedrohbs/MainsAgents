@@ -20,6 +20,7 @@ import { Sessions } from '../pages/Sessions';
 import { Scopes } from '../pages/Scopes';
 import { Usage } from '../pages/Usage';
 import { EditingReferences } from '../pages/EditingReferences';
+import { Radar } from '../pages/Radar';
 import { Settings } from '../pages/Settings';
 import { useCanvas } from '../components/canvas/CanvasProvider';
 import { useWorkspaces } from './WorkspaceProvider';
@@ -520,6 +521,8 @@ export function App() {
       <Usage key={currentWorkspaceId} />
     ) : page === 'references' ? (
       <EditingReferences key={currentWorkspaceId} onOpenStudio={(contentId) => contentId ? window.dispatchEvent(new CustomEvent('mainsagents:open-content', { detail: { contentId } })) : (updatePersistentValue('studio-view','studio','studio'), navigate('content'))} />
+    ) : page === 'radar' ? (
+      <Radar key={currentWorkspaceId} />
     ) : page === 'settings' ? (
       <Settings initialSection={settingsSection} />
     ) : (

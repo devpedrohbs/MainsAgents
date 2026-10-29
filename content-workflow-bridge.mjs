@@ -20,6 +20,7 @@ import {createContentSrt} from './content-srt.mjs';
 import {createPublicationStatusRefresh} from './publication-status-refresh.mjs';
 import {createInspirationAnalysis} from './editor-inspiration-analysis.mjs';
 import {createEditingReferences} from './editing-reference-runtime.mjs';
+import {createRadar} from './radar-runtime.mjs';
 import {inspectLocalAsset} from './editorial-local-files.mjs';
 import {createDeliveryReceipts} from './delivery-receipts.mjs';
 import {createVerifiedImageIndex,createPaperAssetLedger} from './paper-image-assets.mjs';
@@ -68,7 +69,7 @@ async function readBody(request) {
   return JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
 }
 
-export function createContentWorkflowBridge({ dbPath, getConnector, getPublicationConnector, getCalendarConnector, secureStorage, suggestConnection = () => '',getRuntime,getChatRuntime,getProviderStatus,getAgents,getFlows,getSessions,getCurrentProfile,inspect,timeoutMs,mediaOptions,paperAssetOptions,deletionOptions,editingReferenceOptions,hostExclusive=false }) {
+export function createContentWorkflowBridge({ dbPath, getConnector, getPublicationConnector, getCalendarConnector, secureStorage, suggestConnection = () => '',getRuntime,getChatRuntime,getProviderStatus,getAgents,getFlows,getSessions,getCurrentProfile,inspect,timeoutMs,mediaOptions,paperAssetOptions,deletionOptions,editingReferenceOptions,radarOptions,hostExclusive=false }) {
   mkdirSync(dirname(dbPath), { recursive: true });
   const db = new DatabaseSync(dbPath);
   db.exec('PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000; CREATE TABLE IF NOT EXISTS editorial_state (profile_id TEXT PRIMARY KEY, revision INTEGER NOT NULL, state_json TEXT NOT NULL, updated_at TEXT NOT NULL)');
@@ -91,6 +92,8 @@ export function createContentWorkflowBridge({ dbPath, getConnector, getPublicati
   const media=createEditorialMedia(db,{directory:join(dirname(dbPath),'media'),getCurrentProfile,receipts,...mediaOptions});
   const analyses=createInspirationAnalysis(db,{media,getRuntime,getChatRuntime,getProviderStatus,getAgents,getCurrentProfile,inspect:inspect??inspectLocalAsset,...(mediaOptions?.thumbnails?{thumbnails:mediaOptions.thumbnails}:{})});
   const editingReferences=createEditingReferences(db,{directory:join(dirname(dbPath),'editing-references'),getCurrentProfile,getAgents,getChatRuntime,getRuntime,getProviderStatus,...editingReferenceOptions});
+  // Radar editorial: deterministic daily collection of free sources (radar-contract.d.mts); the schedule ticks only in the host.
+  const radar=createRadar(db,{secureStorage,getCurrentProfile,autoTick:hostExclusive,...radarOptions});
   production=createProductionCoordinator(db,{editingReferences,getBriefings:(profile,topicId,options)=>analyses.briefingsFor(profile,topicId,options),getRuntime,getChatRuntime,getProviderStatus,getAgents,getFlows,getSessions,getCurrentProfile,getNotion:getConnector,jobs,media,publications,publishing,directory:join(dirname(dbPath),'production-media'),inspect,receipts,...mediaOptions});
   // SRT editável separado do MP4 (CapCut): versões, exportação idempotente por hash; nunca renderiza nem toca vídeos.
   const srt=createContentSrt(db,{directory:join(dirname(dbPath),'srt'),inspect:inspect??inspectLocalAsset,media,getCurrentProfile});
@@ -134,6 +137,18 @@ export function createContentWorkflowBridge({ dbPath, getConnector, getPublicati
     if (!profilePattern.test(profileId)) { send(response, 400, { error: 'Invalid local profile.' }); return true; }
     try {
       if(getCurrentProfile&&getCurrentProfile()!==profileId){send(response,409,{error:'The active profile changed. Reopen the workspace.'});return true;}
+      if(url.pathname==='/api/content/radar'||url.pathname.startsWith('/api/content/radar/')){
+        const scope={profile:profileId,workspaceId:url.searchParams.get('workspaceId')??''},path=url.pathname.slice('/api/content/radar'.length);
+        try{
+          if(path===''&&request.method==='GET'){send(response,200,radar.snapshot(scope,{kind:url.searchParams.get('kind')||undefined,highlight:url.searchParams.get('highlight')==='1',cursor:url.searchParams.get('cursor')??undefined,limit:url.searchParams.get('limit')??undefined}));return true;}
+          if(path==='/config'&&request.method==='PUT'){send(response,200,radar.configure(scope,await readBody(request)));return true;}
+          if(path==='/collect'&&request.method==='POST'){const input=await readBody(request);send(response,202,radar.collect(scope,{kind:input.kind}));return true;}
+          const historyRoute=path.match(/^\/items\/([^/]+)\/history$/);
+          if(historyRoute&&request.method==='GET'){send(response,200,radar.history(scope,decodeURIComponent(historyRoute[1])));return true;}
+          if((path==='/synthesize'||/^\/items\/[^/]+\/promote$/.test(path))&&request.method==='POST'){send(response,501,{error:'Disponível na próxima etapa do Radar.',code:'not_implemented'});return true;}
+          send(response,404,{error:'Radar operation not found',code:'not_found'});
+        }catch(error){send(response,error.status??400,{error:error.message,code:error.code??'radar_operation_failed',...(error.code==='already_running'?{runId:radar.snapshot(scope).running?.id??null}:{})});}return true;
+      }
       if(url.pathname.startsWith('/api/content/editing-references')){
         const scope={profile:profileId,workspaceId:url.searchParams.get('workspaceId')??''};
         try{
@@ -291,5 +306,5 @@ export function createContentWorkflowBridge({ dbPath, getConnector, getPublicati
     }
   }
 
-  return { handle, deletion, production,editingReferences,chatEdits,receipts,paperAssets,chatPublishing,sessionBinding,jobs, work, deliveries, publications,publishing,statusRefresh,analyses,calendar,calendarCredentials,media,actions,binding,claudeBinding:remoteSessionId=>binding(remoteSessionId,undefined,'claude'),delegations,agents:()=>getAgents?.(getCurrentProfile?.())??[], srt, close: async () => {await editingReferences.close();srt.close();await statusRefresh.close();await analyses.close();await production.close();actions.close();await calendar.close();await publishing.close();await media.close();await delegations.close();await work.close();await jobs.close();db.close();} };
+  return { handle, deletion, production,editingReferences,radar,chatEdits,receipts,paperAssets,chatPublishing,sessionBinding,jobs, work, deliveries, publications,publishing,statusRefresh,analyses,calendar,calendarCredentials,media,actions,binding,claudeBinding:remoteSessionId=>binding(remoteSessionId,undefined,'claude'),delegations,agents:()=>getAgents?.(getCurrentProfile?.())??[], srt, close: async () => {await radar.close();await editingReferences.close();srt.close();await statusRefresh.close();await analyses.close();await production.close();actions.close();await calendar.close();await publishing.close();await media.close();await delegations.close();await work.close();await jobs.close();db.close();} };
 }

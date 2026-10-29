@@ -30,6 +30,7 @@ export const routes: Record<PageId, RouteDefinition> = {
     sidebarPage: 'references',
     breadcrumbs: ['Content', 'Editing references'],
   },
+  radar: { id: 'radar', label: 'Radar', title: 'Radar', sidebarPage: 'radar', breadcrumbs: ['Content', 'Radar'] },
   board: {
     id: 'board',
     label: 'Board',

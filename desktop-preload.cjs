@@ -78,6 +78,11 @@ contextBridge.exposeInMainWorld('mainsAgentsDesktop', {
     save: (profile,key) => ipcRenderer.invoke('calendar:key:save',profile,key),
     remove: (profile) => ipcRenderer.invoke('calendar:key:remove',profile),
   },
+  radarKey: {
+    status: (profile) => ipcRenderer.invoke('radar:key:status',profile),
+    save: (profile,key) => ipcRenderer.invoke('radar:key:save',profile,key),
+    remove: (profile) => ipcRenderer.invoke('radar:key:remove',profile),
+  },
   account: {
     status: () => ipcRenderer.invoke('account:status'),
     googleConfigured: () => ipcRenderer.invoke('account:google-configured'),
