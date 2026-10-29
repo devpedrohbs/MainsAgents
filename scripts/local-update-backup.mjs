@@ -42,6 +42,9 @@ export function snapshot(){
   result.databases[name]=entry;}finally{db.close();}}
  result.files['storage/images']=fileTree(join(storage,'images'));
  result.files['codex-runtime/sessions']=fileTree(join(codexRuntime,'sessions'));
+ // Managed copies of editing references (0.3.80+) and editorial media live next to editorial.sqlite.
+ result.files['appdata/editing-references']=fileTree(join(roaming,'editing-references'));
+ result.files['appdata/media']=fileTree(join(roaming,'media'));
  result.files.skills=Object.fromEntries(skillFiles().map((file,index)=>[`skill-${index}:${basename(dirname(file))}`,sha(readFileSync(file)).slice(0,16)]));
  return result;
 }
@@ -111,7 +114,7 @@ export function compare(before,after,{allowLeases=true}={}){
   if(b.integrity!=='ok')differences.push(`${name}: integrity ${b.integrity}`);
   for(const table of new Set([...Object.keys(a.tables),...Object.keys(b.tables)]))if(a.tables[table]!==b.tables[table]&&!(allowLeases&&leases.includes(table)))differences.push(`${name}.${table}: ${a.tables[table]} -> ${b.tables[table]}`);
   for(const key of new Set([...Object.keys(a.state??{}),...Object.keys(b.state??{})]))if(a.state?.[key]!==b.state?.[key])differences.push(`${name} state ${key}: changed`);}
- for(const label of ['storage/images','codex-runtime/sessions'])if(JSON.stringify(before.files[label])!==JSON.stringify(after.files[label]))differences.push(`${label}: ${JSON.stringify(before.files[label])} -> ${JSON.stringify(after.files[label])}`);
+ for(const label of ['storage/images','codex-runtime/sessions','appdata/editing-references','appdata/media'])if(JSON.stringify(before.files[label])!==JSON.stringify(after.files[label]))differences.push(`${label}: ${JSON.stringify(before.files[label])} -> ${JSON.stringify(after.files[label])}`);
  if(JSON.stringify(before.files.skills)!==JSON.stringify(after.files.skills))differences.push('skills: changed');
  return differences;
 }

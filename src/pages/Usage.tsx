@@ -68,7 +68,11 @@ export function Usage() {
   const rowName = (key: string) => group === 'agent' ? agentName(key) : group === 'scope' ? scopeName(key) : key || (pt ? 'Modelo não informado' : 'Model not reported');
   const observed = claude && limits.usage?.observedAt ? new Date(limits.usage.observedAt).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' }) : null;
   const limitNote = claude
-    ? observed ? (pt ? `Informado pelo Claude na resposta das ${observed}` : `Reported by Claude at ${observed}`) : (pt ? 'Aparece depois da próxima resposta do Claude' : 'Shows after Claude’s next reply')
+    ? limits.usage?.error==='login-required' ? (pt ? 'Entre no Claude Code com claude auth login' : 'Sign in to Claude Code with claude auth login')
+      : limits.usage?.error==='api-billing' ? (pt ? 'Claude configurado para cobrança por API; limites da assinatura não se aplicam.' : 'Claude uses API billing; subscription limits do not apply.')
+      : limits.usage?.stale ? (pt ? `Última leitura da conta às ${observed}. Atualização temporariamente indisponível.` : `Last account reading at ${observed}. Refresh temporarily unavailable.`)
+      : limits.error||limits.usage?.error ? (pt ? 'Não foi possível consultar o consumo. Tente atualizar em alguns minutos.' : 'Could not read usage. Try refreshing in a few minutes.')
+      : observed ? (pt ? `Lido da conta Claude às ${observed}${limits.usage?.plan?` · ${limits.usage.plan}`:''}` : `Read from Claude account at ${observed}${limits.usage?.plan?` · ${limits.usage.plan}`:''}`) : (pt ? 'Consultando a conta Claude conectada' : 'Reading the connected Claude account')
     : limits.error ? (pt ? 'Confira o login do Codex CLI' : 'Check your Codex CLI login') : limits.usage?.plan ? `${pt ? 'Plano' : 'Plan'} ${limits.usage.plan}` : (pt ? 'Lido da conta conectada' : 'Read from the connected account');
   const tiles: [string, string][] = [
     [pt ? 'Entrada' : 'Input', compact(totals.tokens.input, locale)],

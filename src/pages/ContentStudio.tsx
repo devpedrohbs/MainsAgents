@@ -1,6 +1,7 @@
 import {InspirationLibrary} from '../components/content/InspirationLibrary';
 import {ReferenceAnalysisPanel,useReferenceAnalyses} from '../components/content/ReferenceAnalysis';
 import {parseInspirationState} from '../features/content/inspiration';
+import {peekReferenceForStudio} from '../features/references/viewModel';
 import {useStudioDraftField,studioDraftKey,clearStudioDraft} from '../features/content/studioDrafts';
 import {CarouselReview} from '../components/content/CarouselReview';
 import {carouselScript} from '../../editorial-protocol.mjs';
@@ -79,6 +80,7 @@ export function ContentStudio({
   const { locale } = useLanguage();
   const pt = locale === 'pt-BR';
   const [view,setView]=usePersistentState<'studio'|'calendar'|'references'>('studio-view','studio');
+  const [pendingReference,setPendingReference]=useState(peekReferenceForStudio);
   const [reviewArtifact,setReviewArtifact]=useState<EditorialArtifact|null>(null);
   const [contentToDelete,setContentToDelete]=useState<{contentId:string;title:string}|null>(null);
   useEffect(()=>{const open=()=>setView('calendar');window.addEventListener('mainsagents:publication-calendar',open);return()=>window.removeEventListener('mainsagents:publication-calendar',open)},[]);
@@ -305,6 +307,12 @@ useEffect(() => {
       {storageError && (
         <p className="editorial-alert" role="alert">
           {storageError}
+        </p>
+      )}
+      {pendingReference && view==='studio' && (
+        <p className="editorial-alert" role="status">
+          {pt?'Referência pronta para usar: abra a produção do vídeo e, na etapa de cortes ou visual, marque-a em “Conhecimento de edição deste vídeo”.':'Reference ready to use: open the video production and, in the cuts or visual stage, tick it in “Editing knowledge for this video”.'}
+          <button type="button" className="text-link" onClick={()=>setPendingReference(null)}>{pt?'Ok':'OK'}</button>
         </p>
       )}
       {feedback && (

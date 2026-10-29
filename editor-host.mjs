@@ -48,7 +48,7 @@ const shownTexts=layer=>{switch(layer?.type){case 'text':case 'callout':case 'ch
  * patch: {window,basePlan,inside} = localized visual adjustment of a delivered edit (cuts/audio frozen, only the window may
  * change). retakes: semantic-cut candidates of this source (editor-retakes.mjs), evidence for the editor; it decides.
  */
-export function createEditorHost({profile,binding,motionRequired=false,editStage=null,read,bindingOf,update,guard,media,ref,base,brief,transcript:rawTranscript,guidance,userTexts=[],planSchema,finalExport,exportStatus,authoringRoot,patch,retakes=[]}){
+export function createEditorHost({profile,binding,motionRequired=false,editStage=null,read,bindingOf,update,guard,media,ref,base,brief,transcript:rawTranscript,guidance,userTexts=[],planSchema,finalExport,exportStatus,authoringRoot,patch,retakes=[],editingKnowledge,motionStudy}){
  const transcript=hostTranscript(rawTranscript),{words,...transcriptInfo}=transcript;
  // Fact proof (A): numbers/quotes on screen must exist in the speech that SURVIVES the cuts of this plan (a corrected take that
  // was cut out is not a source) or in the brief; 'user' facts only in what the user typed.
@@ -81,6 +81,8 @@ export function createEditorHost({profile,binding,motionRequired=false,editStage
  const saved=revision=>{const authoring=read()?.authoring;const entry=authoring?.revisions?.find(item=>item.revision===revision);if(!entry)throw new Error('Unknown plan revision.');return entry;};
  const authoring=(input,signal)=>media.authoring(profile,{...ref,...input,folder},{signal});
  return {
+  editingKnowledge(){const p=read();guard(p);if(!editingKnowledge)throw Error('Editing knowledge is unavailable');return editingKnowledge();},
+  async motionStudy(args){const p=read();guard(p);if(editStage==='cuts'||patch)throw Error('Motion creation is unavailable during cuts or a frozen local patch');if(!motionStudy)throw Error('HyperFrames tools are unavailable');return motionStudy(args);},
   // Re-read on every call: epoch, editor agent, source version and authority come from the saved run, never a cached copy.
   currentBinding(){const p=read();if(!p)throw new Error('The production was removed.');guard(p);return {...binding,epoch:p.epoch,...(bindingOf?bindingOf(p):{})};},
   /** A camera+screen content: the director must also look at the screen recording before finalizing. */

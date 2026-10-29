@@ -23,6 +23,13 @@ export const routes: Record<PageId, RouteDefinition> = {
     sidebarPage: 'content',
     breadcrumbs: ['Content', 'Content Studio'],
   },
+  references: {
+    id: 'references',
+    label: 'Editing references',
+    title: 'Editing references',
+    sidebarPage: 'references',
+    breadcrumbs: ['Content', 'Editing references'],
+  },
   board: {
     id: 'board',
     label: 'Board',

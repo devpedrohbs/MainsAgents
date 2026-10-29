@@ -89,7 +89,7 @@ export function adoptEditorConfigRun(p,liveEditor,{at=stamp()}={}){
 /** One authoritative production record per content. UI surfaces only submit decisions.
  * newEditWorkflow is an injected record factory (default: staged); legacy regression fixtures may create historical records.
  */
-export function createProductionCoordinator(db,{getBriefings,thumbnails=thumbnailEngine,captionEngine=captionsModule,captionPreviewEngine=captionPreviewModule,getRuntime,getChatRuntime,getProviderStatus,getAgents,getFlows,getSessions,getCurrentProfile,getNotion,jobs,media,publications,publishing,directory,inspect=inspectLocalAsset,run=runMediaProcess,ffmpeg='ffmpeg',receipts,newEditWorkflow=initialEditWorkflow}={}){
+export function createProductionCoordinator(db,{getBriefings,thumbnails=thumbnailEngine,captionEngine=captionsModule,captionPreviewEngine=captionPreviewModule,getRuntime,getChatRuntime,getProviderStatus,getAgents,getFlows,getSessions,getCurrentProfile,getNotion,jobs,media,publications,publishing,directory,inspect=inspectLocalAsset,run=runMediaProcess,ffmpeg='ffmpeg',receipts,newEditWorkflow=initialEditWorkflow,editingReferences}={}){
  db.exec(`CREATE TABLE IF NOT EXISTS production_runs(id TEXT PRIMARY KEY,profile_id TEXT NOT NULL,workspace_id TEXT NOT NULL,content_id TEXT NOT NULL,revision INTEGER NOT NULL,data_json TEXT NOT NULL,updated_at TEXT NOT NULL);
  CREATE TABLE IF NOT EXISTS production_commands(profile_id TEXT NOT NULL,request_id TEXT NOT NULL,signature TEXT NOT NULL,run_id TEXT NOT NULL,PRIMARY KEY(profile_id,request_id));
  CREATE TABLE IF NOT EXISTS production_authority(profile_id TEXT NOT NULL,run_id TEXT NOT NULL,hash TEXT NOT NULL,PRIMARY KEY(profile_id,run_id));
@@ -274,6 +274,10 @@ Ao terminar, responda só com o JSON do relatório {"status":"finalized"|"not-fi
   const userTexts=[patch?.request,p.feedback,p.entry?.origin!=='delegation'?p.entry?.context?.text:undefined].filter(text=>typeof text==='string'&&text.trim());
   // Editing guidance: the app guide + the editor agent's ENABLED skills, read here (host) from the snapshot's configured files only.
   const guidance=loadEditorGuidance(p.editorAgent);audit(p,'editor-guidance',`${guidance.items.map(item=>`${item.name}${item.truncated?' (truncado)':''}`).join(', ')}${guidance.skipped.length?` · ignoradas: ${guidance.skipped.map(item=>`${item.name}: ${item.reason}`).join('; ')}`:''} · ${guidance.hash.slice(0,12)}`);
+  const knowledgeScope={profile:p.profileId,workspaceId:p.workspaceId};
+  const selectedKnowledge=editingReferences?.projectContext(knowledgeScope,p.contentId,`${p.id}:${p.epoch}`);
+  const knowledge=selectedKnowledge&&(selectedKnowledge.guidelines.length||selectedKnowledge.references.length||selectedKnowledge.kit.length)?selectedKnowledge:null;
+  if(knowledge){guidance.items.unshift({name:'approved-editing-knowledge',origin:'approved-user-knowledge',text:knowledge.text,sha256:artifactHash(knowledge.text),bytes:Buffer.byteLength(knowledge.text),truncated:knowledge.truncated});}
   const host=createEditorHost({profile:p.profileId,binding,motionRequired:!patch&&motionRequested(p),editStage:editPhase(p),...(patch?{patch:{window:patch.window,basePlan:patch.base.editPlan.plan,inside:patch.inside}}:{}),retakes,read:()=>read(p.profileId,p.id),bindingOf:fresh=>({epoch:fresh.epoch,agentId:fresh.editorAgent.id,authorityHash:bindingHash(fresh),source:{assetId:fresh.inputVideo.assetId,versionId:fresh.inputVideo.versionId,sha256:fresh.inputVideo.sha256}}),update:change=>{change(p);put(p);},guard,media,ref,base,brief,transcript:heard?{...heard,segments:transcript}:transcript,guidance,userTexts,planSchema:authoringPlanSchema(),
    // The media executor's authoring folder for this profile (sibling of this coordinator's folder); only used to re-bind previews.
    ...(directory?{authoringRoot:join(dirname(directory),'media',p.profileId,'authoring')}:{}),
@@ -295,6 +299,7 @@ Ao terminar, responda só com o JSON do relatório {"status":"finalized"|"not-fi
      :{mode:'smart',authoring:'editor-tools',plan:entry.plan,planHash:hash,outputDuration:entry.outputDuration,sourceDuration:analysis.metadata.duration,removedSeconds:Math.round(removed*10)/10,cuts:Math.max(0,entry.plan.segments.length-1+(entry.plan.segments[0]?.start>0?1:0)),limitations:analysis.limitations,possibleRetakes:[],transcribed:transcript.length>0,summary:String(summary??'').slice(0,2000),...(qa?{qa}:{}),...(entry.cutDecisions?.length?{cutDecisions:entry.cutDecisions}:{}),...(reviewPoints.length?{reviewPoints}:{}),...(retakes.length?{retakeCandidates:retakes.length}:{})};
     p.videoJobId=job.id;p.authoring={...p.authoring,export:{requestKey,jobId:job.id,revision}};audit(p,'editor-finalized',`r${revision} · ${hash.slice(0,12)}`);put(p);return {status:'pending',jobId:job.id};
    },
+   ...(knowledge?{editingKnowledge:()=>knowledge,motionStudy:args=>editingReferences.agentStudy(knowledgeScope,p.contentId,`${p.id}:${p.epoch}`,args)}:{}),
    exportStatus:async({jobId,requestKey})=>status(exportJob(jobId),requestKey)});
   const opened=rt.openEditorSession({binding,host,limits:{},grant:{scope:'edit-local',authorityHash:binding.authorityHash},...(p.authoring.checkpoint?.epoch===p.epoch&&p.authoring.checkpoint.authorityHash===authority?{checkpoint:p.authoring.checkpoint,...(p.authoring.plan?{plan:p.authoring.plan}:{})}:{})});
   const sessionId=(await opened)?.sessionId;if(!sessionId)throw Error('O editor de edição não abriu a sessão de ferramentas.');
@@ -468,7 +473,11 @@ Retorne SOMENTE JSON: {"removeSilences":true,"silence":{"thresholdDb":-35,"minDu
   guard(p);step.budgetKey=`${step.id}:${artifactHash(prompt).slice(0,16)}`;
   // Reserve durably before dispatch: a crash after this point counts the call, never refunds it.
   const call=reserveCall(p,{key:step.budgetKey,stage:p.stage,attempt:step.attempt},stamp());step.callId=call.id;step.phase='sending';delete p.providerResume;put(p);
-  let execution;try{execution=await rt.send(step.threadId,`[MainsAgents work ${step.id} attempt ${step.attempt}]\n${prompt}`,sendAgent??agent);}catch(error){markCall(p,call.id,'uncertain',stamp());throw error;}
+  let knowledgeText='';
+  if(editingReferences&&p.stage==='planning-edit'){
+   const manifest=editingReferences.projectContext({profile:p.profileId,workspaceId:p.workspaceId},p.contentId,`${step.id}:${step.attempt}`);knowledgeText=`\n${manifest.text}\n`;p.editingKnowledgeManifestId=manifest.id;put(p);
+  }
+  let execution;try{execution=await rt.send(step.threadId,`[MainsAgents work ${step.id} attempt ${step.attempt}]\n${knowledgeText}${prompt}`,sendAgent??agent);}catch(error){markCall(p,call.id,'uncertain',stamp());throw error;}
   markCall(p,call.id,'sent',stamp());step.executionId=execution.executionId;step.phase='streaming';put(p);
   let completed=false,last=0,failed=false;try{for await(const event of rt.events(step.executionId,controller.signal)){
    if(closed||controller.signal.aborted)throw Error('Etapa interrompida.');

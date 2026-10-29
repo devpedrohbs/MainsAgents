@@ -64,10 +64,11 @@ export function usageGroups(entries:readonly UsageEntry[],keyOf:(entry:UsageEntr
  return [...groups].map(([key,list])=>({key,...usageTotals(list)}));
 }
 
-export async function readClaudeUsage(signal:AbortSignal):Promise<CodexUsage&{observedAt:string|null}>{
- const response=await fetch('/api/providers/claude/usage',{signal,cache:'no-store'});
+export type ClaudeAccountLimits=CodexUsage&{observedAt:string|null;source?:'account';stale?:boolean;error?:string};
+export async function readClaudeUsage(signal:AbortSignal,refresh=false):Promise<ClaudeAccountLimits>{
+ const response=await fetch(`/api/providers/claude/usage${refresh?'?refresh=1':''}`,{signal,cache:'no-store'});
  if(!response.ok)throw new Error('Claude usage unavailable');
- const data=await response.json() as {fiveHours?:UsageWindow|null;weekly?:UsageWindow|null;observedAt?:string|null;fetchedAt?:string};
+ const data=await response.json() as Partial<ClaudeAccountLimits>;
  const window=(value?:UsageWindow|null)=>value&&typeof value.usedPercent==='number'?{usedPercent:Math.max(0,Math.min(100,value.usedPercent)),resetsAt:typeof value.resetsAt==='number'?value.resetsAt:null}:null;
- return {fiveHours:window(data.fiveHours),weekly:window(data.weekly),plan:null,fetchedAt:data.fetchedAt??new Date().toISOString(),observedAt:data.observedAt??null};
+ return {fiveHours:window(data.fiveHours),weekly:window(data.weekly),plan:data.plan??null,fetchedAt:data.fetchedAt??new Date().toISOString(),observedAt:data.observedAt??null,source:data.source,stale:data.stale,error:data.error};
 }

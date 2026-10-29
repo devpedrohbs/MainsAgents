@@ -1,5 +1,6 @@
 import { createUsageCollector } from './claude-usage.mjs';
 import { createClaudeLimitSnapshot } from './provider-usage.mjs';
+import { createClaudeAccountUsage } from './claude-account-usage.mjs';
 import { createClaudeLimitObserver, limitFailure } from './provider-limits.mjs';
 import { execFileSync, spawn } from 'node:child_process';
 import { createServer } from 'node:http';
@@ -179,9 +180,10 @@ export function createClaudeCodeBridge({
   bindingWaitMs = 5000,
   editorAuthoring = createEditorAuthoring(),
   inspectPaper = inspectPaperDesktop,
+  readAccountUsage = createClaudeAccountUsage(),
 } = {}) {
   const executions = new Map();
-  // Plan limits as last reported by any Claude turn (the CLI has no call that reads them on demand).
+  // Stream snapshots remain available to observers; the Usage route reads the account on demand.
   const planLimits = createClaudeLimitSnapshot();
   // Local permission gate: Claude's --permission-prompt-tool reaches this loopback server with a per-execution token.
   const gateTokens = new Map();
@@ -488,7 +490,7 @@ export function createClaudeCodeBridge({
     const route = match[1] ?? '';
     try {
       if (request.method === 'GET' && route === 'status') return json(response, 200, await status());
-      if (request.method === 'GET' && route === 'usage') return json(response, 200, planLimits.read());
+      if (request.method === 'GET' && route === 'usage') return json(response, 200, await readAccountUsage({force:url.searchParams.get('refresh')==='1'}));
       if (request.method === 'GET' && route === 'models') return json(response, 200, { models: modelOptions });
       if (request.method === 'GET' && route === 'paper') return json(response, 200, await inspectPaper());
       if (request.method === 'POST' && route === 'sessions') {

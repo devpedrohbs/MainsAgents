@@ -19,6 +19,7 @@ import {createProductionCoordinator} from './production-coordinator.mjs';
 import {createContentSrt} from './content-srt.mjs';
 import {createPublicationStatusRefresh} from './publication-status-refresh.mjs';
 import {createInspirationAnalysis} from './editor-inspiration-analysis.mjs';
+import {createEditingReferences} from './editing-reference-runtime.mjs';
 import {inspectLocalAsset} from './editorial-local-files.mjs';
 import {createDeliveryReceipts} from './delivery-receipts.mjs';
 import {createVerifiedImageIndex,createPaperAssetLedger} from './paper-image-assets.mjs';
@@ -67,7 +68,7 @@ async function readBody(request) {
   return JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
 }
 
-export function createContentWorkflowBridge({ dbPath, getConnector, getPublicationConnector, getCalendarConnector, secureStorage, suggestConnection = () => '',getRuntime,getChatRuntime,getProviderStatus,getAgents,getFlows,getSessions,getCurrentProfile,inspect,timeoutMs,mediaOptions,paperAssetOptions,deletionOptions,hostExclusive=false }) {
+export function createContentWorkflowBridge({ dbPath, getConnector, getPublicationConnector, getCalendarConnector, secureStorage, suggestConnection = () => '',getRuntime,getChatRuntime,getProviderStatus,getAgents,getFlows,getSessions,getCurrentProfile,inspect,timeoutMs,mediaOptions,paperAssetOptions,deletionOptions,editingReferenceOptions,hostExclusive=false }) {
   mkdirSync(dirname(dbPath), { recursive: true });
   const db = new DatabaseSync(dbPath);
   db.exec('PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000; CREATE TABLE IF NOT EXISTS editorial_state (profile_id TEXT PRIMARY KEY, revision INTEGER NOT NULL, state_json TEXT NOT NULL, updated_at TEXT NOT NULL)');
@@ -89,7 +90,8 @@ export function createContentWorkflowBridge({ dbPath, getConnector, getPublicati
   const receipts=createDeliveryReceipts(db,{inspect:inspect??inspectLocalAsset,getCurrentProfile});
   const media=createEditorialMedia(db,{directory:join(dirname(dbPath),'media'),getCurrentProfile,receipts,...mediaOptions});
   const analyses=createInspirationAnalysis(db,{media,getRuntime,getChatRuntime,getProviderStatus,getAgents,getCurrentProfile,inspect:inspect??inspectLocalAsset,...(mediaOptions?.thumbnails?{thumbnails:mediaOptions.thumbnails}:{})});
-  production=createProductionCoordinator(db,{getBriefings:(profile,topicId,options)=>analyses.briefingsFor(profile,topicId,options),getRuntime,getChatRuntime,getProviderStatus,getAgents,getFlows,getSessions,getCurrentProfile,getNotion:getConnector,jobs,media,publications,publishing,directory:join(dirname(dbPath),'production-media'),inspect,receipts,...mediaOptions});
+  const editingReferences=createEditingReferences(db,{directory:join(dirname(dbPath),'editing-references'),getCurrentProfile,getAgents,getChatRuntime,getRuntime,getProviderStatus,...editingReferenceOptions});
+  production=createProductionCoordinator(db,{editingReferences,getBriefings:(profile,topicId,options)=>analyses.briefingsFor(profile,topicId,options),getRuntime,getChatRuntime,getProviderStatus,getAgents,getFlows,getSessions,getCurrentProfile,getNotion:getConnector,jobs,media,publications,publishing,directory:join(dirname(dbPath),'production-media'),inspect,receipts,...mediaOptions});
   // SRT editável separado do MP4 (CapCut): versões, exportação idempotente por hash; nunca renderiza nem toca vídeos.
   const srt=createContentSrt(db,{directory:join(dirname(dbPath),'srt'),inspect:inspect??inspectLocalAsset,media,getCurrentProfile});
   const binding=(threadId,sessionId,provider='codex')=>{
@@ -132,6 +134,20 @@ export function createContentWorkflowBridge({ dbPath, getConnector, getPublicati
     if (!profilePattern.test(profileId)) { send(response, 400, { error: 'Invalid local profile.' }); return true; }
     try {
       if(getCurrentProfile&&getCurrentProfile()!==profileId){send(response,409,{error:'The active profile changed. Reopen the workspace.'});return true;}
+      if(url.pathname.startsWith('/api/content/editing-references')){
+        const scope={profile:profileId,workspaceId:url.searchParams.get('workspaceId')??''};
+        try{
+          if(url.pathname==='/api/content/editing-references'){
+            if(request.method==='GET')send(response,200,await editingReferences.snapshot(scope));
+            else if(request.method==='POST')send(response,200,await editingReferences.command(scope,await readBody(request)));
+            else send(response,405,{error:'Method not allowed'});return true;
+          }
+          if(url.pathname==='/api/content/editing-references/context'&&request.method==='POST'){send(response,200,editingReferences.context(scope,await readBody(request)));return true;}
+          const mediaRoute=url.pathname.match(/^\/api\/content\/editing-references\/media\/(reference|frame|study)\/([^/]+)\/([^/]+)$/);
+          if(mediaRoute&&['GET','HEAD'].includes(request.method)){await editingReferences.stream(scope,mediaRoute[1],decodeURIComponent(mediaRoute[2]),decodeURIComponent(mediaRoute[3]),request,response);return true;}
+          send(response,404,{error:'Reference operation not found'});
+        }catch(error){if(!response.headersSent)send(response,error.status??400,{error:error.message,code:error.code??'reference_operation_failed'});else response.destroy();}return true;
+      }
       if(url.pathname==='/api/content/productions'){if(request.method==='GET'){send(response,200,{productions:production.list(profileId)});return true;}if(request.method==='POST'){send(response,200,{production:production.start(profileId,await readBody(request))});return true;}}
       if(url.pathname==='/api/content/productions/import-card'&&request.method==='POST'){try{send(response,200,{card:await production.readImportCard(profileId,await readBody(request))});}catch(error){send(response,error.status??500,{error:error.message});}return true;}
       if(url.pathname==='/api/content/productions/preflight'&&request.method==='POST'){const input=await readBody(request);send(response,200,{preflight:await production.preflight(profileId,input,{probeMedia:input.probeMedia===true})});return true;}
@@ -275,5 +291,5 @@ export function createContentWorkflowBridge({ dbPath, getConnector, getPublicati
     }
   }
 
-  return { handle, deletion, production,chatEdits,receipts,paperAssets,chatPublishing,sessionBinding,jobs, work, deliveries, publications,publishing,statusRefresh,analyses,calendar,calendarCredentials,media,actions,binding,claudeBinding:remoteSessionId=>binding(remoteSessionId,undefined,'claude'),delegations,agents:()=>getAgents?.(getCurrentProfile?.())??[], srt, close: async () => {srt.close();await statusRefresh.close();await analyses.close();await production.close();actions.close();await calendar.close();await publishing.close();await media.close();await delegations.close();await work.close();await jobs.close();db.close();} };
+  return { handle, deletion, production,editingReferences,chatEdits,receipts,paperAssets,chatPublishing,sessionBinding,jobs, work, deliveries, publications,publishing,statusRefresh,analyses,calendar,calendarCredentials,media,actions,binding,claudeBinding:remoteSessionId=>binding(remoteSessionId,undefined,'claude'),delegations,agents:()=>getAgents?.(getCurrentProfile?.())??[], srt, close: async () => {await editingReferences.close();srt.close();await statusRefresh.close();await analyses.close();await production.close();actions.close();await calendar.close();await publishing.close();await media.close();await delegations.close();await work.close();await jobs.close();db.close();} };
 }

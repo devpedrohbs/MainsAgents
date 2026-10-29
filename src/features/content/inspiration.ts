@@ -34,6 +34,8 @@ export interface InspirationReference {
   notes: string;
   tags: string[];
   asset?: InspirationAssetRef;
+  /** Managed reference video, owned by the editing-reference host; no local path in this field. */
+  managedVideo?: {versionId:string};
   metadataStatus: InspirationMetadataStatus;
   /** Incrementa a cada edição; permite detectar escrita concorrente. */
   revision: number;
@@ -191,7 +193,7 @@ export function updateReference(state: InspirationLibraryState, workspaceId: str
   }
   if (patch.notes !== undefined) next.notes = cleanText(patch.notes, MAX_NOTES, true);
   if (patch.tags !== undefined) next.tags = normalizeTags(patch.tags);
-  if (!next.sourceUrl && !next.asset) throw new InspirationError('source_required');
+  if (!next.sourceUrl && !next.asset && !next.managedVideo) throw new InspirationError('source_required');
   next.revision = current.revision + 1; next.updatedAt = stamp(options.clock);
   return { state: { ...state, references: state.references.map(ref => ref === current ? next : ref) }, reference: next };
 }
@@ -300,9 +302,11 @@ export function parseInspirationState(value: unknown): InspirationLibraryState {
     if (!item || typeof item.id !== 'string' || typeof item.workspaceId !== 'string' || !item.workspaceId) continue;
     try {
       const link = item.sourceUrl ? validateReferenceUrl(item.sourceUrl) : undefined;
-      if (!link && !item.asset?.assetId) continue;
+      const managed=item.managedVideo&&typeof item.managedVideo.versionId==='string'&&item.managedVideo.versionId.length>0&&item.managedVideo.versionId.length<=120?{versionId:item.managedVideo.versionId}:undefined;
+      if (!link && !item.asset?.assetId && !managed) continue;
       references.push({
         ...item, id: item.id, workspaceId: item.workspaceId,
+        managedVideo:managed,
         ...(link ? { sourceUrl: link.url, sourceHost: link.host, platform: link.platform } : { sourceUrl: undefined, sourceHost: undefined, platform: undefined }),
         notes: typeof item.notes === 'string' ? item.notes.slice(0, MAX_NOTES) : '', tags: normalizeTags(item.tags ?? []).slice(0, MAX_TAGS),
         metadataStatus: 'not_collected', revision: Number.isInteger(item.revision) ? item.revision! : 1,

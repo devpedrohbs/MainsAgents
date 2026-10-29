@@ -8,6 +8,9 @@ interface Window {
     selectOutputDirectory?:()=>Promise<string|null>;
     notify?(title:string,body:string):Promise<boolean>;
     canvasBrowser?: boolean;
+    editingReferences?: {
+      importVideos(input:import('../features/references/model').ReferenceScope&{folderId?:string|null;referenceId?:string;expectedRevision?:number}):Promise<import('../features/references/model').ReferenceCommandResult|null>;
+    };
     files?: {
       pathForFile(file:File):string;
       /** Native picker for videos to attach to a chat message (absolute paths; nothing is copied). */

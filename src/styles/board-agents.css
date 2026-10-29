@@ -84,3 +84,12 @@
 @media (max-width:900px){.studio-shell .qb .board{grid-template-columns:repeat(4,minmax(220px,1fr))}}
 .studio-shell .ag .precision-agent-actions .specialist-chat{justify-content:center!important}
 .studio-shell .ag .precision-agent-actions .specialist-chat span{flex:none!important;margin:0!important}
+/* "Remove from board": a quiet corner button, revealed on hover or keyboard focus (always visible on touch). */
+.studio-shell .qb .task-card-wrap{position:relative}
+.studio-shell .qb .task-card-wrap .task-card>:first-child{padding-right:22px}
+.studio-shell .qb .task-card-remove{position:absolute;top:8px;right:8px;display:grid;place-items:center;width:22px;height:22px;padding:0;border:0;border-radius:6px;background:transparent;color:var(--muted,currentColor);cursor:pointer;opacity:0;transition:opacity .15s,background .15s}
+.studio-shell .qb .task-card-remove svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+.studio-shell .qb .task-card-wrap:hover .task-card-remove,.studio-shell .qb .task-card-remove:focus-visible{opacity:1}
+.studio-shell .qb .task-card-remove:hover{background:var(--surface-3,color-mix(in oklab,currentColor 10%,transparent));color:var(--text,currentColor)}
+.studio-shell .qb .task-card-remove:focus-visible{outline:2px solid var(--accent,currentColor);outline-offset:1px}
+@media (hover:none){.studio-shell .qb .task-card-remove{opacity:1}}

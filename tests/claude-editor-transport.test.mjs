@@ -92,7 +92,7 @@ test('Claude editor runs drive the real MCP server: native tool loop, real image
     assert(allowed.includes('mcp__mainsagents_editor__*'));
     assert(!allowed.some((rule) => rule === 'mcp__*' || rule === '*'));
     assert.equal(JSON.parse(args[args.indexOf('--json-schema') + 1]).required.join(), 'status,finalRevision,summary');
-    assert.deepEqual(record.agents['frame-reviewer'].tools, ['mcp__mainsagents_editor__get_context', 'mcp__mainsagents_editor__get_transcript_words', 'mcp__mainsagents_editor__get_frames', 'mcp__mainsagents_editor__contact_sheet', 'mcp__mainsagents_editor__storyboard_stills', 'mcp__mainsagents_editor__export_status']);
+    assert.deepEqual(record.agents['frame-reviewer'].tools, ['mcp__mainsagents_editor__get_motion_study_frames', 'mcp__mainsagents_editor__get_editing_knowledge', 'mcp__mainsagents_editor__get_context', 'mcp__mainsagents_editor__get_transcript_words', 'mcp__mainsagents_editor__get_frames', 'mcp__mainsagents_editor__contact_sheet', 'mcp__mainsagents_editor__storyboard_stills', 'mcp__mainsagents_editor__export_status']);
     assert.equal(record.agents['frame-reviewer'].model, 'haiku');
 
     const prompt = readFileSync(join(workspaceRoot, 'ws-1', 'fake-cli-prompt.txt'), 'utf8');
@@ -101,7 +101,7 @@ test('Claude editor runs drive the real MCP server: native tool loop, real image
     assert.match(prompt, /frame-reviewer/);
     const completed = events.find((event) => event.type === 'message.completed').content;
     const transcript = JSON.parse(completed.slice(completed.indexOf('{')));
-    assert.deepEqual(transcript.listed, ['get_context', 'get_transcript_words', 'get_frames', 'contact_sheet', 'storyboard_stills', 'write_plan', 'render_preview', 'finalize', 'export_status']);
+    assert.deepEqual(transcript.listed, ['get_motion_study_frames', 'submit_reference_analysis', 'get_editing_knowledge', 'motion_study', 'get_context', 'get_transcript_words', 'get_frames', 'contact_sheet', 'storyboard_stills', 'write_plan', 'render_preview', 'finalize', 'export_status']);
     assert.deepEqual(transcript.seen, [['context', true], ['words', 'get_transcript_words', 3, '0.10 0.40 Olá'], ['frames', 2], ['early-final', 'qa_required'], ['sheet', 1], ['final', 'succeeded']]);
 
     const started = events.filter((event) => event.type === 'tool.started');

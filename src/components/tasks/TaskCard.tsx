@@ -5,10 +5,11 @@ import { useAgents } from '../../features/agents/AgentsProvider';
 import { useChat } from '../../features/chat/ChatProvider';
 import { useContentWorkflow } from '../../features/content/ContentWorkflowProvider';
 import { AgentAvatar } from '../agents/AgentAvatar';
+import { Icon } from '../common/Icon';
 
 const busyStates=['thinking','searching','using-tool'];
 
-export function TaskCard({task,onOpen,onDragStart,onDragEnd,isDragging}:{task:Task;onOpen:(task:Task)=>void;onDragStart:(taskId:string)=>void;onDragEnd:()=>void;isDragging:boolean}) {
+export function TaskCard({task,onOpen,onRemove,onDragStart,onDragEnd,isDragging}:{task:Task;onOpen:(task:Task)=>void;onRemove:(taskId:string)=>void;onDragStart:(taskId:string)=>void;onDragEnd:()=>void;isDragging:boolean}) {
   const {getAgentById}=useAgents();
   const {getRunState}=useChat();
   const {state}=useContentWorkflow();
@@ -21,7 +22,9 @@ export function TaskCard({task,onOpen,onDragStart,onDragEnd,isDragging}:{task:Ta
   const line=busy?(pt?'Pensando…':'Thinking…'):[agentName,task.metadata.replace(/[\s·]+$/,'')].filter(Boolean).join(' · ');
   const startDrag=(event:PointerEvent<HTMLElement>)=>{if(event.button===0&&!task.contentId)onDragStart(task.id)};
   const openFromKeyboard=(event:KeyboardEvent<HTMLElement>)=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();onOpen(task)}};
-  return <article className={`task-card ${task.status==='review'?'needs-review':''} ${isDragging?'dragging':''}`} tabIndex={0} role="button" aria-label={`${pt?'Abrir':'Open'} ${task.title}`} aria-grabbed={task.contentId?undefined:isDragging} title={task.contentId?(pt?'O status acompanha as aprovações no Estúdio de conteúdo.':'Editorial status follows approval in Content Studio.'):undefined} onClick={()=>onOpen(task)} onKeyDown={openFromKeyboard} onPointerDown={startDrag} onPointerCancel={onDragEnd}>
+  // The remove button sits next to the card (not inside it): the card itself is already a button.
+  const removeLabel=task.contentId?(pt?`Retirar “${task.title}” do quadro (o conteúdo continua no Estúdio)`:`Remove “${task.title}” from the board (the content stays in the Studio)`):(pt?`Excluir a tarefa “${task.title}”`:`Delete task “${task.title}”`);
+  return <div className="task-card-wrap"><article className={`task-card ${task.status==='review'?'needs-review':''} ${isDragging?'dragging':''}`} tabIndex={0} role="button" aria-label={`${pt?'Abrir':'Open'} ${task.title}`} aria-grabbed={task.contentId?undefined:isDragging} title={task.contentId?(pt?'O status acompanha as aprovações no Estúdio de conteúdo.':'Editorial status follows approval in Content Studio.'):undefined} onClick={()=>onOpen(task)} onKeyDown={openFromKeyboard} onPointerDown={startDrag} onPointerCancel={onDragEnd}>
     {scope&&<span className="task-scope">{scope}</span>}
     <h3>{task.title}</h3>
     <div className="task-agent">
@@ -29,5 +32,6 @@ export function TaskCard({task,onOpen,onDragStart,onDragEnd,isDragging}:{task:Ta
       <span className={busy?'ov-shimmer':''}>{line}</span>
     </div>
     {task.status==='review'&&<span className="task-review-action">{pt?'Revisar':'Review'}</span>}
-  </article>;
+  </article>
+  <button type="button" className="task-card-remove" aria-label={removeLabel} title={removeLabel} onClick={()=>onRemove(task.id)}><Icon name="close"/></button></div>;
 }

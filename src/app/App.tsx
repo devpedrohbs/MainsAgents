@@ -19,6 +19,7 @@ import { AgentSettings } from '../pages/AgentSettings';
 import { Sessions } from '../pages/Sessions';
 import { Scopes } from '../pages/Scopes';
 import { Usage } from '../pages/Usage';
+import { EditingReferences } from '../pages/EditingReferences';
 import { Settings } from '../pages/Settings';
 import { useCanvas } from '../components/canvas/CanvasProvider';
 import { useWorkspaces } from './WorkspaceProvider';
@@ -318,6 +319,23 @@ export function App() {
     setEditingTaskId(null);
     notifyUndo(t('Task deleted'), () => setAllTasks((current) => [task, ...current]));
   };
+  // An editorial card is only hidden (its content stays in the Studio and the sync would recreate a deleted card);
+  // an ordinary task is deleted. Both can be undone from the toast.
+  const removeFromBoard = (taskId: string) => {
+    const task = allTasks.find((item) => item.id === taskId);
+    if (!task) return;
+    const pt = locale === 'pt-BR';
+    if (task.contentId) {
+      setAllTasks((current) => current.map((item) => (item.id === taskId ? { ...item, hiddenFromBoard: true } : item)));
+      notifyUndo(pt ? `“${task.title}” saiu do quadro. O conteúdo continua no Estúdio.` : `“${task.title}” removed from the board. The content stays in the Studio.`, () =>
+        setAllTasks((current) => current.map((item) => (item.id === taskId ? { ...item, hiddenFromBoard: false } : item))),
+      );
+      return;
+    }
+    sessionStorage.removeItem(`mainsagents:task-draft:${task.id}`);
+    setAllTasks((current) => current.filter((item) => item.id !== taskId));
+    notifyUndo(t('Task deleted'), () => setAllTasks((current) => (current.some((item) => item.id === taskId) ? current : [task, ...current])));
+  };
   const newSession = () => setAgentChoice({ kind: 'session' });
   const sendCanvasContext = (nodeIds: string[]) => setAgentChoice({ kind: 'context', nodeIds });
   const addCanvasNode = (kind: Parameters<typeof addNode>[0]) => {
@@ -454,9 +472,10 @@ export function App() {
     ) : page === 'board' ? (
       <Board
         key={currentWorkspaceId}
-        tasks={workspaceTasks}
+        tasks={workspaceTasks.filter((task) => !task.hiddenFromBoard)}
         onOpenTask={openTask}
         onMoveTask={moveTask}
+        onRemoveTask={removeFromBoard}
         onToast={notify}
         onAddTask={newTask}
       />
@@ -499,6 +518,8 @@ export function App() {
       />
     ) : page === 'usage' ? (
       <Usage key={currentWorkspaceId} />
+    ) : page === 'references' ? (
+      <EditingReferences key={currentWorkspaceId} onOpenStudio={(contentId) => contentId ? window.dispatchEvent(new CustomEvent('mainsagents:open-content', { detail: { contentId } })) : (updatePersistentValue('studio-view','studio','studio'), navigate('content'))} />
     ) : page === 'settings' ? (
       <Settings initialSection={settingsSection} />
     ) : (

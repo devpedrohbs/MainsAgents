@@ -5,6 +5,7 @@ const revisionKey = (profile,key) => JSON.stringify([profile,key]);
 contextBridge.exposeInMainWorld('mainsAgentsDesktop', {
   canvasBrowser: true,
   notify: (title,body) => ipcRenderer.invoke('inbox:notify',title,body),
+  editingReferences: {importVideos: input => ipcRenderer.invoke('editing-references:import',input)},
   files: {
     pathForFile: file => webUtils.getPathForFile(file),
     selectVideos: () => ipcRenderer.invoke('files:select-videos'),

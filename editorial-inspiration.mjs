@@ -3,7 +3,7 @@
  * Strict whitelist: references keep a link and/or an existing video asset id of the same workspace, never a file path,
  * and carry no instruction or execution field. Pure and dependency-free (also used by the renderer backup parser).
  */
-const referenceKeys=['id','workspaceId','sourceUrl','sourceHost','platform','title','author','notes','tags','asset','metadataStatus','revision','createdAt','updatedAt','removedAt'];
+const referenceKeys=['id','workspaceId','sourceUrl','sourceHost','platform','title','author','notes','tags','asset','managedVideo','metadataStatus','revision','createdAt','updatedAt','removedAt'];
 const platforms=['instagram','tiktok','youtube','facebook','x','other'];
 const text=(value,max,required=false)=>value===undefined?!required:typeof value==='string'&&value.length<=max&&(!required||value.length>0);
 const time=value=>typeof value==='string'&&value.length<=40&&Number.isFinite(Date.parse(value));
@@ -29,7 +29,8 @@ export function validateInspirationState(state){
    // A removed asset is allowed (shown as unavailable); an asset of another workspace or a non-video is not.
    const asset=assets.find(entry=>entry?.id===item.asset.assetId);if(asset&&(asset.workspaceId!==item.workspaceId||asset.kind!=='video'))return false;
   }
-  if(item.sourceUrl===undefined&&item.asset===undefined)return false;
+  if(item.managedVideo!==undefined&&(!item.managedVideo||Object.keys(item.managedVideo).some(key=>key!=='versionId')||!text(item.managedVideo.versionId,120,true)))return false;
+  if(item.sourceUrl===undefined&&item.asset===undefined&&item.managedVideo===undefined)return false;
  }
  return true;
 }

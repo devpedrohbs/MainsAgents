@@ -1,3 +1,6 @@
+import {realpath,stat,readFile} from 'node:fs/promises';
+import {isAbsolute,relative,extname} from 'node:path';
+import {createHash} from 'node:crypto';
 /** Host-only adapter. It never writes account config or starts inference while reconciling. */
 export function createCodexWorkflowRuntime({client,cwd,request,events,imageFile,imageFromItem}) {
   const omitNulls=value=>Array.isArray(value)?value.filter(item=>item!=null).map(omitNulls):value&&typeof value==='object'?Object.fromEntries(Object.entries(value).filter(([,item])=>item!=null).map(([key,item])=>[key,omitNulls(item)])):value;
@@ -20,6 +23,21 @@ export function createCodexWorkflowRuntime({client,cwd,request,events,imageFile,
   }
   return {
     imageFile,imageFromItem,
+    visualInputLimit:12,
+    /** Only the host can supply this image grant; no path argument is accepted from a model or HTTP caller. */
+    async sendVisual(threadId,content,agent,{frames,root}){
+      if(!isAbsolute(root)||!Array.isArray(frames)||!frames.length||frames.length>12)throw Error('Invalid visual frame grant');
+      const base=await realpath(root),context=[];
+      for(const frame of frames){
+        if(typeof frame.path!=='string'||!isAbsolute(frame.path)||!['.jpg','.jpeg','.png','.webp'].includes(extname(frame.path).toLowerCase()))throw Error('Visual input must be a registered image');
+        const file=await realpath(frame.path),rel=relative(base,file);if(!rel||rel.startsWith('..')||isAbsolute(rel))throw Error('Visual frame escaped its authorized root');
+        const metadata=await stat(file);if(!metadata.isFile()||metadata.size>2*1024*1024)throw Error('Visual frame exceeds its byte budget');
+        const sha=createHash('sha256').update(await readFile(file)).digest('hex');if(sha!==frame.sha256)throw Error('Visual frame changed before delivery');
+        context.push({kind:'image',label:`Reference frame ${frame.id} at ${frame.time}s`,content:file});
+      }
+      await verify(threadId);
+      return request('/api/codex/executions',{threadId,content,context,modelId:agent.modelId,reasoningEffort:'medium',delegation:{sourceAgentId:agent.id,workspaceId:agent.workspaceId,targets:[]}});
+    },
     async createSession(agent){
       const enabled=(agent.skills??[]).filter(name=>!agent.disabledSkills?.includes(name));
       const skills=enabled.map(name=>`${name}: ${agent.skillFiles?.[name]??agent.skillsDirectory??'path not configured'}`).join('\n');

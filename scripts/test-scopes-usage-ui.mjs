@@ -24,11 +24,11 @@ ipcMain.handle('test:read',(_e,key)=>store.read(profile,key));ipcMain.handle('te
 const runtime={createSession:async()=>'cli',resumeSession:async()=>{},readThread:async()=>({turns:[]}),cancel:async()=>{},send:async()=>{throw Error('No CLI run in this scenario')},events:async function*(){}};
 const bridge=createContentWorkflowBridge({dbPath,getCurrentProfile:()=>profile,getAgents:()=>store.read(profile,'agents'),getFlows:()=>store.read(profile,'production-flows'),getSessions:()=>store.read(profile,'sessions'),getRuntime:()=>runtime,inspect,mediaOptions:{inspect},getConnector:()=>({upsert:async()=>{throw Error('No Notion')},readCard:async()=>{throw Error('No Notion')}})});
 const reset=Math.floor(Date.now()/1000)+3*3600;
-const chatRuns=new Map();let serial=0,completedTurns=0;
+const chatRuns=new Map();let serial=0,completedTurns=0,claudeRefreshes=0,claudeSignedOut=false;
 const json=(response,value)=>{response.setHeader('content-type','application/json');response.end(JSON.stringify(value))};
 const emit=(run,event)=>{run.events.push(event);for(const stream of run.streams)stream.write(JSON.stringify(event)+'\n');if(event.type==='execution.completed'){run.done=true;for(const stream of run.streams)stream.end();run.streams.clear();}};
 const server=createServer(async(request,response)=>{const url=new URL(request.url,'http://localhost'),path=url.pathname;
- if(path==='/api/providers/claude/usage')return json(response,{fiveHours:{usedPercent:18,resetsAt:reset},weekly:{usedPercent:34,resetsAt:reset+4*86400},plan:null,observedAt:new Date().toISOString(),fetchedAt:new Date().toISOString()});
+ if(path==='/api/providers/claude/usage'){if(url.searchParams.get('refresh')==='1')claudeRefreshes++;return json(response,claudeSignedOut?{fiveHours:null,weekly:null,error:'login-required',source:'account'}:{fiveHours:{usedPercent:claudeRefreshes?19:18,resetsAt:reset},weekly:{usedPercent:34,resetsAt:reset+4*86400},source:'account',plan:'pro',observedAt:new Date().toISOString(),fetchedAt:new Date().toISOString()});}
  if(path.startsWith('/api/codex/')){let input={};if(request.method==='POST'){let text='';for await(const chunk of request)text+=chunk;input=JSON.parse(text||'{}');}
   if(path.endsWith('/health'))return json(response,{ready:true,status:'connected',accountType:'chatgpt'});if(path.endsWith('/models'))return json(response,{models:[]});if(path.endsWith('/images'))return json(response,{events:[]});
   if(path.endsWith('/usage'))return json(response,{rateLimits:{planType:'plus',primary:{usedPercent:40+2*completedTurns,windowDurationMins:300,resetsAt:reset},secondary:{usedPercent:61,windowDurationMins:10080,resetsAt:reset+2*86400}},fetchedAt:new Date().toISOString()});
@@ -93,7 +93,17 @@ app.whenReady().then(async()=>{try{
  await click('[data-od-id="nav-usage-claude"]');await until(()=>js('Boolean(document.querySelector(".usage-page.usage-claude"))'),'Claude usage');
  assert.match(await text('.usage-headline strong'),/US\$/);
  assert.equal(await js('document.querySelectorAll(".usage-chart button").length'),30);
+ await until(()=>js(`document.querySelector('.usage-limit small')?.textContent.includes('Lido da conta Claude')`),'Claude account source before a Claude conversation');
+ await until(()=>js(`!document.querySelector('.usage-refresh').disabled`),'refresh ready');
+ await click('.usage-refresh');
+ await until(async()=>(await js(`Array.from(document.querySelectorAll('.usage-limit text')).map(el=>el.textContent).join(',')`))==='19%,34%','manual refresh reads new account limits');
+ assert.equal(claudeRefreshes,1);
  await shot('08-usage-claude');await shot('09-usage-claude-light',{dark:false});
+ claudeSignedOut=true;
+ await until(()=>js(`!document.querySelector('.usage-refresh').disabled`),'sign-out refresh ready');await click('.usage-refresh');
+ await until(()=>js(`document.querySelector('.usage-limit small')?.textContent.includes('claude auth login')`),'sign-in instruction on rejected credentials');
+ assert.equal(await js(`document.querySelector('.usage-limit text').textContent.includes('%')`),false,'old account numbers cleared');
+ claudeSignedOut=false;
  await click('[data-od-id="nav-usage-codex"]');await until(()=>js('Boolean(document.querySelector(".usage-page.usage-codex"))'),'Codex usage');
  await until(async()=>(await js(`Array.from(document.querySelectorAll('.usage-limit text')).map(el=>el.textContent).join(',')`))==='42%,61%','Codex limits');
  await js(`Array.from(document.querySelectorAll('.usage-segment button')).find(el=>el.textContent==='Escopo').click()`);

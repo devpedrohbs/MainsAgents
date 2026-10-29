@@ -1,6 +1,22 @@
 # Publicação e recuperação do MainsAgents (Windows)
 
-## Atualização local atual — 0.3.78 (27/10/2026)
+## Atualização local atual — 0.3.80 (28/10/2026)
+
+Instalada sobre a 0.3.79 por NSIS silencioso com retorno 0. Rodada 8: Referências de edição (biblioteca, estudo com player, análise com aprovação explícita, Meu estilo, Kit de motion) e motor HyperFrames 0.8.212 local real, comprovado no host empacotado. FileVersion `0.3.80`, ProductVersion `0.3.80.0`; ASAR instalado igual ao pacote; nove bancos, 143 arquivos locais, 15 pastas de skills e mídias de referências idênticos antes/depois. [Validação, motor e backup](docs/analysis/local-update-0.3.80-2026-10-28.md).
+
+- Instalador: `release/r80-final-20261028/MainsAgents-Setup-0.3.80.exe`, SHA-256 `1347cca571cb069d884ab604dbd3c22a2e01c65ed17e2ca774a261e488abcb6e`.
+- ASAR: SHA-256 `c617e6e2124a8c43f1c1c1415cbe1a9ef5a778259d447843580b4647cdc74c2a`.
+- Suíte completa 871 testes (869 aprovados, 2 renders reais ignorados na suíte e aprovados isoladamente), smokes de UI e sete smokes do pacote aprovados. Sem publicação pública ou commit nesta rodada.
+
+## Atualização local anterior — 0.3.79 (27/10/2026)
+
+Instalada sobre a 0.3.78 por NSIS silencioso com retorno 0. Corrige a leitura do consumo Claude: consulta somente de leitura da conta autenticada pelo Claude Code, sem iniciar modelo; limites de 5 horas e semana, cache, atualização manual, tratamento de login/falha e limpeza ao trocar de conta. FileVersion `0.3.79`, ProductVersion `0.3.79.0`; ASAR instalado igual ao pacote, nove bancos, 142 arquivos locais e 15 pastas de skills idênticos antes/depois. [Validação e backup](docs/analysis/claude-account-usage-2026-10-27.md).
+
+- Instalador: `release/r79-20261027/MainsAgents-Setup-0.3.79.exe`, SHA-256 `1ca4e072bdd744f519e0fade1bc2e4799fc50b4b60a137a9fda2f9823f80536e`.
+- ASAR: SHA-256 `6425af8dfbdad03881c7696a119e6d2e4a0c0dab01af4dfea96e87750168c260`.
+- 40 testes direcionados, typecheck, build completo, interface de consumo e dois testes isolados do pacote aprovados. Sem publicação pública ou commit nesta rodada.
+
+## Atualização local 0.3.78 (27/10/2026)
 
 Instalada nesta máquina sobre a 0.3.77, sem publicação de release: pacote completo do checkout atual, correções de canvas e estado, fluxo visual, chat/modelos/anexos/uso e preservação da edição em três etapas. `package.json` e lockfile sincronizados. NSIS silencioso por usuário, retorno 0; FileVersion `0.3.78`, ProductVersion `0.3.78.0`; ASAR instalado idêntico ao verificado. Os nove bancos, arquivos locais e skills permaneceram logicamente idênticos; app mantido fechado, nenhum trabalho pessoal iniciado. [Relatório, limites e backup](docs/analysis/local-update-0.3.78-2026-10-27.md).
 

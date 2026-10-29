@@ -26,6 +26,16 @@ test('Claude status explains when the CLI is not installed', async () => {
   assert.equal(response.loginCommand, 'claude auth login');
 });
 
+test('Claude usage route reads account without starting a conversation and forwards manual refresh',async()=>{
+ const calls=[];
+ const bridge=createClaudeCodeBridge({resolveCli:()=>{throw Error('must not launch CLI');},readAccountUsage:async options=>{calls.push(options);return {fiveHours:{usedPercent:51,resetsAt:null},weekly:null,source:'account'};}});
+ await withServer(bridge,async base=>{
+  const result=await (await fetch(`${base}/api/providers/claude/usage`)).json();assert.equal(result.fiveHours.usedPercent,51);
+  await fetch(`${base}/api/providers/claude/usage?refresh=1`);
+ });
+ assert.deepEqual(calls,[{force:false},{force:true}]);
+});
+
 test('Claude CLI bridge creates a resumable session and streams CLI output', async () => {
   const root = mkdtempSync(join(tmpdir(), 'mainsagents-claude-test-'));
   const fakeCli = `

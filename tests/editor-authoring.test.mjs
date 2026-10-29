@@ -27,7 +27,7 @@ async function withEditor(options, run) {
 const plan = (title) => ({ scenes: [{ start: 0, end: 3, layers: [{ kind: 'kineticText', text: title }] }] });
 
 test('editor tools expose draft-07 schemas with read-only hints', () => {
-  assert.deepEqual(EDITOR_TOOLS.map((tool) => tool.name), ['get_context', 'get_transcript_words', 'get_frames', 'contact_sheet', 'storyboard_stills', 'write_plan', 'render_preview', 'finalize', 'export_status']);
+  assert.deepEqual(EDITOR_TOOLS.map((tool) => tool.name), ['get_motion_study_frames', 'submit_reference_analysis', 'get_editing_knowledge', 'motion_study', 'get_context', 'get_transcript_words', 'get_frames', 'contact_sheet', 'storyboard_stills', 'write_plan', 'render_preview', 'finalize', 'export_status']);
   for (const tool of EDITOR_TOOLS) assert.equal(tool.inputSchema.type, 'object');
   assert.equal(normalizeEditorLimits().maxRevisions, 2);
   assert.throws(() => normalizeEditorLimits({ maxRevisions: 9 }), /between 0 and 5/);

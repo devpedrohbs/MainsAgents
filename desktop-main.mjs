@@ -190,6 +190,15 @@ ipcMain.handle('skills:select-directory', async (event) => {
   return { directory, skills: findSkills(directory) };
 });
 ipcMain.handle('files:select-videos',async event=>{assertTrustedSender(event);const result=await dialog.showOpenDialog(mainWindow,{title:'Anexar vídeo à conversa',properties:['openFile','multiSelections'],filters:[{name:'Vídeos',extensions:['mp4','mov','m4v','mkv','webm','avi']}]});return result.canceled?[]:result.filePaths.slice(0,5);});
+ipcMain.handle('editing-references:import',async(event,input)=>{
+ assertTrustedSender(event);
+ if(!contentWorkflowBridge||shuttingDown)throw Error('Reference storage is unavailable');
+ const {profile,workspaceId,folderId=null,referenceId,expectedRevision}=input??{};
+ if(profile!==desktopStateStore?.currentProfile()||typeof workspaceId!=='string')throw Error('Active profile changed');
+ const result=await dialog.showOpenDialog(mainWindow,{title:'Adicionar vídeo de referência',properties:referenceId?['openFile']:['openFile','multiSelections'],filters:[{name:'Vídeos',extensions:['mp4','mov','m4v','mkv','webm','avi']}]});
+ if(result.canceled)return null;
+ return contentWorkflowBridge.editingReferences.importVideos({profile,workspaceId},result.filePaths.slice(0,5),{folderId,referenceId,expectedRevision,wait:false});
+});
 ipcMain.handle('file-access:select-directory',async event=>{assertTrustedSender(event);const result=await dialog.showOpenDialog(mainWindow,{title:'Selecionar pasta autorizada para arquivos de saída',properties:['openDirectory','createDirectory']});return result.canceled?null:result.filePaths[0]??null;});
 
 ipcMain.handle('skills:refresh-directory', (event, directory) => {

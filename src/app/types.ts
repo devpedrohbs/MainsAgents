@@ -1,10 +1,10 @@
 import type { AgentId } from '../features/agents/model/Agent';
 
-export type PageId = 'home' | 'content' | 'board' | 'canvas' | 'flow' | 'agents' | 'agent-settings' | 'sessions' | 'scopes' | 'usage' | 'settings';
+export type PageId = 'home' | 'content' | 'references' | 'board' | 'canvas' | 'flow' | 'agents' | 'agent-settings' | 'sessions' | 'scopes' | 'usage' | 'settings';
 export type TaskStatus = 'research' | 'running' | 'review' | 'done';
 export type NodeType = 'note' | 'research' | 'image' | 'contentIdea' | 'hook' | 'script';
 
-export interface Task { id:string; title:string; description:string; agentId:AgentId; workspaceId:string; status:TaskStatus; metadata:string; createdAt:string; topicId?:string; contentId?:string; sessionId?:string; executionId?:string }
+export interface Task { id:string; title:string; description:string; agentId:AgentId; workspaceId:string; status:TaskStatus; metadata:string; createdAt:string; topicId?:string; contentId?:string; sessionId?:string; executionId?:string; hiddenFromBoard?:boolean }
 export interface CanvasNodeModel {
   id:string;
   type:NodeType;

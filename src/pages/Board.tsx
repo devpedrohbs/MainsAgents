@@ -19,12 +19,14 @@ export function Board({
   onMoveTask,
   onToast,
   onAddTask,
+  onRemoveTask,
 }: {
   tasks: Task[];
   onOpenTask: (task: Task) => void;
   onMoveTask: (taskId: string, status: TaskStatus) => void;
   onToast: (message: string) => void;
   onAddTask: (status: TaskStatus) => void;
+  onRemoveTask: (taskId: string) => void;
 }) {
   const { currentWorkspaceId } = useWorkspaces();
   const { agents } = useAgents();
@@ -122,6 +124,7 @@ export function Board({
             isDropTarget={dropTarget === status}
             onOpen={onOpenTask}
             onAdd={onAddTask}
+            onRemove={onRemoveTask}
             onDragStart={(taskId) => {
               setDraggingTaskId(taskId);
               setDropTarget(null);

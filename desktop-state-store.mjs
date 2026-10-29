@@ -74,6 +74,7 @@ export function createDesktopStateStore(directory, version) {
         ({values,editorial:nextEditorial,execution:nextExecution,omitted}=stripDeletedFromRestore(db,profile,{values,editorial:nextEditorial,execution:nextExecution}));
         const current=this.readAllVersioned(profile);
         const execution=executionSnapshot(db,profile);
+        if(execution.editingLibraries?.some(row=>JSON.parse(row.data_json).jobs?.some(job=>['queued','running'].includes(job.status))))throw new Error('Finish or cancel reference analysis/import/render before restoring a backup.');
         if(execution.jobs.some(job=>['queued','running'].includes(job.status)))throw new Error('Wait for active editorial work to finish before restoring a backup.');
         if(execution.work?.some(job=>['queued','running'].includes(job.status)))throw new Error('Cancel or finish persistent work before restoring a backup.');
         if(execution.actions?.some(action=>['pending','approved','running'].includes(action.status)))throw new Error('Finish or deny active tool actions before restoring a backup.');
