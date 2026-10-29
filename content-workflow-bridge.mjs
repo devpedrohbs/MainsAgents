@@ -21,6 +21,8 @@ import {createPublicationStatusRefresh} from './publication-status-refresh.mjs';
 import {createInspirationAnalysis} from './editor-inspiration-analysis.mjs';
 import {createEditingReferences} from './editing-reference-runtime.mjs';
 import {createRadar} from './radar-runtime.mjs';
+import {createProviderWaits} from './provider-limits.mjs';
+import {createClaudeAccountUsage} from './claude-account-usage.mjs';
 import {inspectLocalAsset} from './editorial-local-files.mjs';
 import {createDeliveryReceipts} from './delivery-receipts.mjs';
 import {createVerifiedImageIndex,createPaperAssetLedger} from './paper-image-assets.mjs';
@@ -93,7 +95,8 @@ export function createContentWorkflowBridge({ dbPath, getConnector, getPublicati
   const analyses=createInspirationAnalysis(db,{media,getRuntime,getChatRuntime,getProviderStatus,getAgents,getCurrentProfile,inspect:inspect??inspectLocalAsset,...(mediaOptions?.thumbnails?{thumbnails:mediaOptions.thumbnails}:{})});
   const editingReferences=createEditingReferences(db,{directory:join(dirname(dbPath),'editing-references'),getCurrentProfile,getAgents,getChatRuntime,getRuntime,getProviderStatus,...editingReferenceOptions});
   // Radar editorial: deterministic daily collection of free sources (radar-contract.d.mts); the schedule ticks only in the host.
-  const radar=createRadar(db,{secureStorage,getCurrentProfile,autoTick:hostExclusive,...radarOptions});
+  // Its daily synthesis is one text turn of a saved workspace agent, gated by the shared provider waits and Claude usage.
+  const radar=createRadar(db,{secureStorage,getCurrentProfile,autoTick:hostExclusive,...radarOptions,synthesis:{getAgents,getRuntime,getChatRuntime,getProviderStatus,providerWaits:createProviderWaits(db),readClaudeUsage:createClaudeAccountUsage(),...radarOptions?.synthesis}});
   production=createProductionCoordinator(db,{editingReferences,getBriefings:(profile,topicId,options)=>analyses.briefingsFor(profile,topicId,options),getRuntime,getChatRuntime,getProviderStatus,getAgents,getFlows,getSessions,getCurrentProfile,getNotion:getConnector,jobs,media,publications,publishing,directory:join(dirname(dbPath),'production-media'),inspect,receipts,...mediaOptions});
   // SRT editável separado do MP4 (CapCut): versões, exportação idempotente por hash; nunca renderiza nem toca vídeos.
   const srt=createContentSrt(db,{directory:join(dirname(dbPath),'srt'),inspect:inspect??inspectLocalAsset,media,getCurrentProfile});
@@ -145,7 +148,9 @@ export function createContentWorkflowBridge({ dbPath, getConnector, getPublicati
           if(path==='/collect'&&request.method==='POST'){const input=await readBody(request);send(response,202,radar.collect(scope,{kind:input.kind}));return true;}
           const historyRoute=path.match(/^\/items\/([^/]+)\/history$/);
           if(historyRoute&&request.method==='GET'){send(response,200,radar.history(scope,decodeURIComponent(historyRoute[1])));return true;}
-          if((path==='/synthesize'||/^\/items\/[^/]+\/promote$/.test(path))&&request.method==='POST'){send(response,501,{error:'Disponível na próxima etapa do Radar.',code:'not_implemented'});return true;}
+          if(path==='/synthesize'&&request.method==='POST'){send(response,202,await radar.synthesize(scope));return true;}
+          const promoteRoute=path.match(/^\/items\/([^/]+)\/promote$/);
+          if(promoteRoute&&request.method==='POST'){send(response,200,radar.promote(scope,decodeURIComponent(promoteRoute[1]),await readBody(request)));return true;}
           send(response,404,{error:'Radar operation not found',code:'not_found'});
         }catch(error){send(response,error.status??400,{error:error.message,code:error.code??'radar_operation_failed',...(error.code==='already_running'?{runId:radar.snapshot(scope).running?.id??null}:{})});}return true;
       }

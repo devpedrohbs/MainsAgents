@@ -21,12 +21,26 @@ app.on('window-all-closed', () => {});
 const profile = 'radar-ui', workspaceId = 'radar-space', scope = { profile, workspaceId };
 const channelId = 'UCabcdefghijklmnopqrstuv';
 let clock = Date.parse('2026-10-25T12:00:00Z'), bump = 0, gate, release;
+let agents = [], synthesisGate, releaseSynthesis, providerWait = null, synthesisCalls = 0, synthesisMode = 'ready';
+const fixtureRuntime = {
+  createSession: async () => 'radar-fixture-session',
+  send: async () => { synthesisCalls++; return { executionId: 'radar-fixture-execution' }; },
+  cancel: async () => {},
+  async *events() {
+    if (synthesisGate) await synthesisGate;
+    if (synthesisMode === 'blocked') { yield { type: 'execution.failed', code: 'login_required', message: 'Login expirado no teste.' }; return; }
+    if (synthesisMode === 'failed') { yield { type: 'execution.failed', message: 'Falha de teste na síntese.' }; return; }
+    const item = bridge.radar.snapshot(scope, { kind: 'news' }).items.find(item => item.title === 'Hacker News fixture');
+    yield { type: 'message.completed', content: JSON.stringify({ recommendations: [{ itemId: item.id, observation: 'A notícia atingiu 150 pontos.', hypothesis: { text: 'O tema pode ter despertado interesse.', alternatives: ['Distribuição na página inicial.'] }, idea: 'Explicar a mudança em um tutorial próprio.', limitations: ['Não há dados de alcance.'] }] }) };
+    yield { type: 'execution.completed' };
+  },
+};
 const secureStorage = { isEncryptionAvailable: () => true, encryptString: value => Buffer.from(`fixture:${value}`), decryptString: value => value.toString().slice(8) };
 const store = createDesktopStateStore(out, 'radar-ui');
 store.initialize(profile, { agents: [], workspaces: [{ id: workspaceId, name: 'Radar test', createdAt: new Date(clock).toISOString(), updatedAt: new Date(clock).toISOString() }], sessions: [], tasks: [], 'current-workspace': workspaceId, language: 'pt-BR', 'welcome-dismissed': true, 'focus-mode': false });
 store.selectProfile(profile);
-const bridge = createContentWorkflowBridge({ dbPath: join(out, 'editorial.sqlite'), secureStorage, getCurrentProfile: () => profile, getAgents: () => [], getSessions: () => [], getRuntime: () => null,
-  radarOptions: { autoTick: false, clock: () => clock, fetch: async url => {
+const bridge = createContentWorkflowBridge({ dbPath: join(out, 'editorial.sqlite'), secureStorage, getCurrentProfile: () => profile, getAgents: () => agents, getSessions: () => [], getRuntime: () => null,
+  radarOptions: { autoTick: false, clock: () => clock, synthesis: { getRuntime: () => fixtureRuntime, providerWaits: { get: () => providerWait } }, fetch: async url => {
     if (gate) await gate;
     if (url.includes('feeds/videos.xml')) return new Response(`<feed xmlns:yt="http://www.youtube.com/xml/schemas/2015"><title>Canal fixture</title><entry><yt:videoId>abcdefghijk</yt:videoId><yt:channelId>${channelId}</yt:channelId><title>Vídeo sem contador</title><author><name>Canal fixture</name></author><published>2026-10-20T12:00:00Z</published></entry><entry><yt:videoId>abcdefghijl</yt:videoId><yt:channelId>${channelId}</yt:channelId><title>Vídeo observado</title><author><name>Canal fixture</name></author><published>2026-10-10T12:00:00Z</published><media:statistics views="${100 + bump}"/></entry></feed>`);
     if (url === 'https://example.com/rss') return new Response('<rss><channel><item><title>Notícia fixture</title><link>https://example.com/story</link><pubDate>Sun, 25 Oct 2026 10:00:00 GMT</pubDate></item></channel></rss>');
@@ -35,7 +49,7 @@ const bridge = createContentWorkflowBridge({ dbPath: join(out, 'editorial.sqlite
     throw Error(`Unexpected fixture request: ${new URL(url).hostname}`);
   } },
 });
-let win, unavailable = false, conflict = true;
+let win, unavailable = false, conflict = true, failPromotion = false, synthesizeConflict = null, synthesisOverride = null;
 const trusted = event => { assert.equal(event.sender, win.webContents); assert.equal(event.senderFrame, event.sender.mainFrame); };
 ipcMain.handle('state:getProfile', event => { trusted(event); return profile; });
 ipcMain.on('state:writeSync', (event, owner, key, value, revision) => { try { trusted(event); assert.equal(owner, profile); event.returnValue = { saved: true, ...store.write(owner, key, value, revision) }; } catch (error) { event.returnValue = { saved: false, error: error.message }; } });
@@ -51,6 +65,9 @@ const server = createServer(async (req, res) => {
     assert.equal(url.searchParams.get('profile'), profile);
     assert.equal(url.searchParams.get('workspaceId'), workspaceId);
     if (unavailable) return json(res, { error: 'Not available' }, 404);
+    if (url.pathname.endsWith('/synthesize') && synthesizeConflict) return json(res, { error: 'Conflito fixture', code: synthesizeConflict }, 409);
+    if (url.pathname.endsWith('/promote') && failPromotion) { failPromotion = false; return json(res, { error: 'Falha temporária no vínculo', code: 'fixture_network' }, 503); }
+    if (url.pathname === '/api/content/radar' && synthesisOverride) return json(res, { ...bridge.radar.snapshot(scope, { kind: url.searchParams.get('kind') || undefined }), synthesis: synthesisOverride });
     if (url.pathname.endsWith('/collect') && conflict) { conflict = false; bridge.radar.collect(scope, { reason: 'manual' }); }
   }
   if (await bridge.handle(req, res, url)) return;
@@ -82,6 +99,9 @@ app.whenReady().then(async () => {
   try {
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
     await open();
+    assert.match(await text('.radar-synthesis-settings'), /É preciso ter um agente Claude ou Codex salvo neste workspace/);
+    await click('.radar-synthesis button', 'Gerar síntese agora');
+    await until(async () => (await text('.radar-synthesis')).includes('Escolha e salve um agente'), '409 no_agent explanation');
     assert.equal(await js('document.querySelector(\'[data-od-id="nav-radar"]\')?.getAttribute("aria-current")'), 'page');
     await source('youtube-channel', channelId);
     await source('youtube-search', 'automação');
@@ -125,6 +145,80 @@ app.whenReady().then(async () => {
     await until(() => js('document.querySelectorAll(".radar-items>li").length===1 && document.querySelector(".radar-items").textContent.includes("Hacker News fixture")'), 'highlight server filter');
     await js('document.documentElement.dataset.appearance="light";true');
     await shot('03-news-highlight-light');
+    agents = [{ id: 'radar-agent', name: 'Analista Radar', workspaceId, providerId: 'codex', status: 'idle', role: 'Analista', description: '', instructions: '', tools: [] }];
+    store.write(profile, 'agents', agents);
+    await open();
+    await js('document.querySelector(".radar-settings").open=true');
+    await set('.radar-synthesis-settings select', 'radar-agent');
+    await js('document.querySelector(".radar-synthesis-settings input[type=checkbox]").click()');
+    await click('.radar-settings button', 'Salvar configuração');
+    await until(() => Promise.resolve(bridge.radar.snapshot(scope).config.synthesis.enabled), 'synthesis config saved');
+    await until(async () => (await text('.radar-settings')).includes('Configuração salva.'), 'synthesis save complete');
+    assert.equal(bridge.radar.snapshot(scope).config.synthesis.agentId, 'radar-agent');
+    for (const [code, message] of [['nothing_to_synthesize', 'Colete itens primeiro'], ['waiting_limit', 'liberação do uso da assinatura']]) {
+      synthesizeConflict = code;
+      await click('.radar-synthesis button', 'Gerar síntese agora');
+      await until(async () => (await text('.radar-synthesis')).includes(message), `409 ${code}`);
+    }
+    synthesizeConflict = null;
+    providerWait = { resetsAt: '2026-10-29T12:00:00Z' };
+    await click('.radar-synthesis button', 'Gerar síntese agora');
+    await until(async () => (await text('.radar-synthesis .radar-status')).includes('Aguardando limite'), 'waiting_limit state');
+    assert.match(await text('.radar-synthesis'), /Aguardando até/);
+    assert.equal(synthesisCalls, 0, 'waiting does not send an AI turn');
+    providerWait = null;
+    synthesisGate = new Promise(resolve => { releaseSynthesis = resolve; });
+    await bridge.radar.synthesize(scope); // the renderer has not seen the running snapshot yet
+    await click('.radar-synthesis button', 'Gerar síntese agora');
+    await until(async () => (await text('.radar-synthesis')).includes('Já existe uma síntese em andamento'), '409 already_running');
+    assert.equal(await js('document.querySelector(".radar-synthesis button").disabled'), true);
+    releaseSynthesis(); synthesisGate = null;
+    await until(async () => (await text('.radar-synthesis .radar-status')).includes('Pronta'), 'synthesis polled without a running collection');
+    assert.equal(synthesisCalls, 1);
+    assert.match(await text('.radar-recommendation-evidence'), /150/);
+    assert.match(await text('.radar-recommendation-evidence'), /Coletado em/);
+    assert.match(await text('.radar-recommendation-reading'), /Explicações alternativas/);
+    assert.match(await text('.radar-recommendation-reading'), /Explicar a mudança em um tutorial próprio/);
+    assert.match(await text('.radar-synthesis'), /A IA não assistiu aos vídeos/);
+    // Recommendation belongs to the news tab, while this page still shows YouTube items.
+    const recommendationId = bridge.radar.snapshot(scope).synthesis.recommendations[0].itemId;
+    assert(!(await text('.radar-items')).includes('Hacker News fixture'));
+    failPromotion = true;
+    await click('.radar-recommendations button', 'Virar pauta');
+    await until(async () => (await text('.radar-page')).includes('Não foi possível concluir o vínculo'), 'registration failure after editorial creation');
+    await open(); // persisted receipt must prevent a second topic after remount
+    await until(() => js('Boolean(document.querySelector(".radar-recommendations button:not(:disabled)"))'), 'promotion ready after reopen');
+    await click('.radar-recommendations button', 'Virar pauta');
+    await until(async () => (await text('.radar-recommendations')).includes('Pauta criada'), 'retry records original topic');
+    await click('.radar-recommendations button', 'Salvar na biblioteca');
+    await until(async () => (await text('.radar-recommendations')).includes('Salvo na biblioteca'), 'reference saved');
+    const editorial = await (await fetch(`http://127.0.0.1:${server.address().port}/api/content/state?profile=${profile}`)).json();
+    assert.equal(editorial.state.topics.length, 1);
+    const reference = editorial.state.inspiration.references[0];
+    assert.equal(reference.metadataStatus, 'not_collected');
+    assert.deepEqual(reference.tags, ['radar', 'web']);
+    assert.match(reference.notes, /Pontos: 150/);
+    assert.match(reference.notes, /2026-10-28/);
+    assert.match(reference.notes, /Ideia de pauta/);
+    assert.equal(bridge.radar.history(scope, recommendationId).item.promoted.length, 2);
+    await click('.radar-tabs button', 'Notícias');
+    await until(async () => (await text('.radar-items')).includes('Pauta criada') && (await text('.radar-items')).includes('Salvo na biblioteca'), 'list and synthesis share promotion badges');
+    await js('document.querySelector(".radar-settings").open=false');
+    await shot('06-synthesis-ready-promoted');
+    win.setSize(900, 1050);
+    await js('document.documentElement.dataset.appearance="light";true');
+    await shot('07-synthesis-light-narrow');
+    assert.equal(await js('document.querySelector(".radar-synthesis").scrollWidth <= document.querySelector(".radar-synthesis").clientWidth'), true, 'synthesis fits the narrow layout');
+    for (const [mode, label] of [['blocked', 'Bloqueada'], ['failed', 'Falhou']]) {
+      synthesisMode = mode;
+      await click('.radar-synthesis button', 'Gerar síntese agora');
+      await until(async () => (await text('.radar-synthesis .radar-status')).includes(label), `${mode} synthesis state`);
+    }
+    synthesisOverride = { ...bridge.radar.snapshot(scope).synthesis, status: 'interrupted', message: 'O app fechou durante a síntese.' };
+    await open();
+    await until(async () => (await text('.radar-synthesis')).includes('Interrompida'), 'interrupted synthesis state');
+    assert.match(await text('.radar-synthesis'), /O app fechou durante/);
+    synthesisOverride = null;
     store.write(profile, 'language', 'en-US');
     await open();
     await until(async () => (await text('.radar-head')).includes('Collect now'), 'English UI');
@@ -137,7 +231,7 @@ app.whenReady().then(async () => {
     await until(async () => (await text('.radar-empty')).includes('Radar unavailable'), '404 unavailable');
     await shot('05-unavailable');
     assert.deepEqual(errors, []);
-    console.log(`Radar UI passed (real backend + source fixtures): ${out}`);
+    console.log(`Radar UI passed (real backend + source/AI fixtures; interrupted snapshot fixture): ${out}`);
   } catch (error) { console.error(error); process.exitCode = 1; try { await shot('failure'); } catch {} }
-  finally { release?.(); win?.destroy(); await bridge.close(); await new Promise(resolve => server.close(resolve)); store.close(); app.exit(process.exitCode || 0); }
+  finally { release?.(); releaseSynthesis?.(); win?.destroy(); await bridge.close(); await new Promise(resolve => server.close(resolve)); store.close(); app.exit(process.exitCode || 0); }
 });

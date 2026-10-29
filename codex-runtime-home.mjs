@@ -3,15 +3,16 @@ import { join, resolve, relative, isAbsolute } from 'node:path';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, lstatSync, statSync, realpathSync, linkSync, symlinkSync, unlinkSync, copyFileSync, constants, openSync, readSync, closeSync } from 'node:fs';
 import { shareCodexSecretKey } from './codex-shared-key.mjs';
+import { subscriptionOnlyEnv } from './subscription-env.mjs';
 
 const connectionFiles = ['config.toml', 'auth.json', '.credentials.json'];
 const connectionDirectories = ['secrets', 'mcp-oauth-locks', 'skills', 'rules', 'plugins'];
-/** A standalone CLI must not inherit another Codex app's execution transports. */
+/** A standalone CLI must not inherit another Codex app's execution transports, nor an API key that would bill a paid API. */
 export function standaloneCodexEnvironment(source = process.env) {
-  const env = {...source};
+  const env = subscriptionOnlyEnv(source);
   const fromDesktop = Boolean(source.CODEX_INTERNAL_ORIGINATOR_OVERRIDE || source.CODEX_APP_TOOLS_PIPE_PATH);
   for (const key of Object.keys(env)) {
-    if (key.startsWith('CODEX_') && !['CODEX_HOME', 'CODEX_API_KEY'].includes(key)
+    if (key.startsWith('CODEX_') && !['CODEX_HOME'].includes(key)
       && !(key === 'CODEX_CLI_PATH' && !fromDesktop)) delete env[key];
   }
   return env;

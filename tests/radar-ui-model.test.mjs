@@ -2,6 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { dateText, dayText, historyRows, numberText, safeItemUrl, sourceInput, sourceLabel, statusText, validateConfig, videoFacts, visibleItems } from '../src/features/radar/model.ts';
 import { radarRoute } from '../src/features/radar/api.ts';
+import { synthesisConflictText, synthesisStatusText } from '../src/features/radar/model.ts';
+import { prepareRadarReference, RadarPromotionQueue, referenceNotes } from '../src/features/radar/promotion.ts';
+import { createReference, emptyInspirationState } from '../src/features/content/inspiration.ts';
 
 const metrics = {
   latest: { views: null, collectedAt: '2026-10-28T10:00:00Z' }, baselineCount: 3, baselineMedian: null,
@@ -95,4 +98,98 @@ test('API routes encode item IDs and scope, and external links reject executable
   assert.equal(safeItemUrl('javascript:alert(1)'), undefined);
   assert.equal(safeItemUrl('file:///tmp/private'), undefined);
   assert.equal(safeItemUrl('https://example.com/story'), 'https://example.com/story');
+});
+
+const observed = { ...video, url: 'https://www.youtube.com/watch?v=abcdefghijk', platform: 'youtube', title: 'Um título', author: 'Canal', promoted: [], metrics: { ...metrics, latest: { ...metrics.latest, likes: 0, comments: null, score: null } } };
+const recommendation = {
+  itemId: 'v', evidence: [{ snapshotIds: ['snapshot'], url: observed.url, observedAt: '2026-10-28T10:00:00Z', numbers: { views: null, comments: 0, ratioToChannelMedian: null } }],
+  observation: 'O título sugere um tutorial.', hypothesis: { text: 'O tema pode ter ajudado.', alternatives: ['Distribuição paga.'] }, idea: 'Testar uma abordagem própria.', limitations: ['A IA não assistiu ao vídeo.'],
+};
+
+test('synthesis settings and all statuses/conflict codes explain the next action in both languages', () => {
+  assert.throws(() => validateConfig({ schedule: { enabled: false, time: '08:00' }, sources: [], synthesis: { enabled: true, agentId: null } }, true), /agente/);
+  const input = { schedule: { enabled: false, time: '08:00' }, sources: [], synthesis: { enabled: true, agentId: 'saved-agent' } };
+  assert.equal(validateConfig(input, true).synthesis.agentId, 'saved-agent');
+  for (const pt of [true, false]) {
+    const statuses = ['none', 'running', 'ready', 'waiting_limit', 'blocked', 'failed', 'interrupted'];
+    assert.equal(new Set(statuses.map(status => synthesisStatusText(status, pt))).size, statuses.length);
+    for (const code of ['already_running', 'waiting_limit', 'no_agent', 'nothing_to_synthesize']) assert.ok(synthesisConflictText(code, pt));
+    assert.equal(synthesisConflictText('unexpected', pt), undefined);
+  }
+});
+
+test('link references preserve evidence, collection time, null/zero, baseline limitations and the recommendation idea', () => {
+  const saved = prepareRadarReference(undefined, 'workspace', observed, recommendation, true);
+  assert.equal(saved.reference.metadataStatus, 'not_collected');
+  assert.equal(saved.reference.asset, undefined);
+  assert.deepEqual(saved.reference.tags, ['radar', 'youtube']);
+  const notes = saved.reference.notes;
+  assert.match(notes, /Coletado em.*2026-10-28T10:00:00Z/);
+  assert.match(notes, /Visualizações: indisponível/);
+  assert.match(notes, /Comentários: 0/);
+  assert.match(notes, /Razão: base insuficiente/);
+  assert.doesNotMatch(notes, /99/);
+  for (const line of [...metrics.limitations, ...recommendation.limitations, recommendation.idea, observed.url]) assert.ok(notes.includes(line));
+  assert.match(referenceNotes(observed, undefined, false), /AI did not watch the videos/);
+});
+
+test('a news item saved directly uses history counters without inventing a baseline or reach', () => {
+  const item = { ...observed, kind: 'news', platform: 'web', metrics: null, lastSeenAt: '2026-10-29T12:00:00Z' };
+  const saved = prepareRadarReference(undefined, 'workspace', item, undefined, true, { collectedAt: '2026-10-28T10:00:00Z', score: 150, comments: 0 });
+  assert.match(saved.reference.notes, /Pontos: 150/);
+  assert.match(saved.reference.notes, /Comentários: 0/);
+  assert.match(saved.reference.notes, /2026-10-28T10:00:00Z/);
+  assert.match(saved.reference.notes, /não se aplica a notícias/);
+  assert.match(saved.reference.notes, /sem dados de alcance/);
+  assert.deepEqual(saved.reference.tags, ['radar', 'web']);
+  assert.match(referenceNotes(item, undefined, true), /Pontos: indisponível/);
+});
+
+test('long AI text cannot crowd evidence and limitations out of the reference notes', () => {
+  const long = { ...recommendation, observation: 'o'.repeat(1200), hypothesis: { text: 'h'.repeat(1200), alternatives: ['a'.repeat(400)] }, idea: 'i'.repeat(6000) };
+  const saved = prepareRadarReference(undefined, 'workspace', observed, long, true);
+  assert.ok(saved.reference.notes.length <= 4000);
+  assert.match(saved.reference.notes, /ideia completa na síntese/);
+  for (const limitation of [...metrics.limitations, ...recommendation.limitations]) assert.ok(saved.reference.notes.includes(limitation));
+});
+
+test('saving a previously saved URL reuses its reference and preserves other workspaces, notes and tags', () => {
+  const initial = createReference(emptyInspirationState(), 'other', { sourceUrl: observed.url, notes: 'Other workspace' }).state;
+  const existing = createReference(initial, 'workspace', { sourceUrl: observed.url + '&utm_source=old', notes: 'My note', tags: ['manual'] });
+  const saved = prepareRadarReference(existing.state, 'workspace', observed, recommendation, false);
+  assert.equal(saved.reference.id, existing.reference.id);
+  assert.equal(saved.state.references.length, 2);
+  assert.match(saved.reference.notes, /^My note/);
+  assert.deepEqual(saved.reference.tags, ['manual', 'radar', 'youtube']);
+  const again = prepareRadarReference(saved.state, 'workspace', observed, recommendation, false);
+  assert.equal(again.reference.notes, saved.reference.notes);
+  assert.equal(saved.state.references[0].notes, 'Other workspace');
+});
+
+test('the same item promoted from list and synthesis at once creates and registers once', async () => {
+  const queue = new RadarPromotionQueue({ read: () => null, write: () => {} });
+  let creates = 0, registrations = 0;
+  const actions = { load: async () => observed, create: async () => { creates++; return 'topic'; }, register: async id => { registrations++; return { ...observed, promoted: [{ target: 'topic', id }] }; } };
+  const [first, second] = await Promise.all([queue.promote('v', 'topic', actions), queue.promote('v', 'topic', actions)]);
+  assert.equal(creates, 1); assert.equal(registrations, 1); assert.equal(first, second);
+  await queue.promote('v', 'topic', { ...actions, load: async () => first });
+  assert.equal(creates, 1); assert.equal(registrations, 1, 'existing backend promotion is authoritative');
+});
+
+test('failed promotion registration retries its saved ID even after a renderer remount', async () => {
+  const receipts = new Map();
+  const journal = { read: key => receipts.get(key), write: (key, id) => receipts.set(key, id) };
+  let creates = 0;
+  const actions = { load: async () => observed, create: async () => { creates++; return 'already-saved'; }, register: async () => { throw Error('Network interrupted'); } };
+  await assert.rejects(new RadarPromotionQueue(journal).promote('v', 'reference', actions), /Network/);
+  const result = await new RadarPromotionQueue(journal).promote('v', 'reference', { ...actions, register: async id => ({ ...observed, promoted: [{ target: 'reference', id }] }) });
+  assert.equal(creates, 1); assert.equal(result.promoted[0].id, 'already-saved');
+});
+
+test('different reference promotions serialize their read-modify-write editorial operations', async () => {
+  const queue = new RadarPromotionQueue({ read: () => null, write: () => {} });
+  const calls = [];
+  const actions = id => ({ load: async () => { calls.push(`read:${id}`); return { ...observed, id }; }, create: async () => { calls.push(`create:${id}`); return id; }, register: async () => { calls.push(`save:${id}`); return observed; } });
+  await Promise.all([queue.promote('a', 'reference', actions('a')), queue.promote('b', 'reference', actions('b'))]);
+  assert.deepEqual(calls, ['read:a', 'create:a', 'save:a', 'read:b', 'create:b', 'save:b']);
 });

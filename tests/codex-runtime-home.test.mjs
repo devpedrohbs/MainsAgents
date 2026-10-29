@@ -18,7 +18,7 @@ function fixture(t) {
 test('standalone CLI drops inherited desktop executor settings without changing login or system paths', () => {
  const source={PATH:'tools',APPDATA:'appdata',CODEX_HOME:'shared',CODEX_API_KEY:'test',CODEX_CLI_PATH:'desktop.exe',CODEX_INTERNAL_ORIGINATOR_OVERRIDE:'desktop',CODEX_MCP_NODE_PATH:'locked.exe',CODEX_APP_TOOLS_PIPE_PATH:'foreign-pipe',CODEX_PERMISSION_PROFILE:'foreign',CODEX_THREAD_ID:'foreign-thread'};
  const env=standaloneCodexEnvironment(source);
- assert.deepEqual(env,{PATH:'tools',APPDATA:'appdata',CODEX_HOME:'shared',CODEX_API_KEY:'test'});
+ assert.deepEqual(env,{PATH:'tools',APPDATA:'appdata',CODEX_HOME:'shared'});
  assert.equal(source.CODEX_CLI_PATH,'desktop.exe');
  assert.equal(standaloneCodexEnvironment({CODEX_CLI_PATH:'custom-cli.exe'}).CODEX_CLI_PATH,'custom-cli.exe');
 });

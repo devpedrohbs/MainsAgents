@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { storageProfile } from '../../data/IndexedDbStateStore';
-import { collectRadar, configureRadar, loadRadar, RadarApiError } from './api';
+import { collectRadar, configureRadar, loadRadar, RadarApiError, synthesizeRadar } from './api';
 import type { RadarConfigInput, RadarKind, RadarSnapshot } from './model';
 
 export function useRadar(workspaceId: string, kind: RadarKind, highlights: boolean) {
@@ -10,6 +10,7 @@ export function useRadar(workspaceId: string, kind: RadarKind, highlights: boole
   const [state, setState] = useState<'loading' | 'ready' | 'unavailable'>('loading');
   const [busy, setBusy] = useState(false);
   const [pendingRun, setPendingRun] = useState<string | null>(null);
+  const [pendingSynthesis, setPendingSynthesis] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [queryReady, setQueryReady] = useState(false);
   const sequence = useRef(0);
@@ -28,6 +29,7 @@ export function useRadar(workspaceId: string, kind: RadarKind, highlights: boole
       setSnapshot(previous => cursor && previous ? { ...next, items: [...previous.items, ...next.items.filter(item => !previous.items.some(old => old.id === item.id))] } : next);
       setState('ready'); setQueryReady(true);
       setPendingRun(id => id && (next.running?.id === id || next.runs.some(run => run.id === id && run.status !== 'running')) ? null : id);
+      setPendingSynthesis(id => id && next.synthesis.id === id ? null : id);
     } catch {
       if (alive.current && !signal?.aborted && request === sequence.current && activeScope.current === scope) setState('unavailable');
     }
@@ -42,11 +44,12 @@ export function useRadar(workspaceId: string, kind: RadarKind, highlights: boole
   }, [refresh]);
 
   const running = Boolean(snapshot?.running || pendingRun);
+  const synthesizing = Boolean(snapshot?.synthesis.status === 'running' || pendingSynthesis);
   useEffect(() => {
-    if (!running || loadingMore) return;
+    if ((!running && !synthesizing) || loadingMore) return;
     const timer = window.setInterval(() => void refresh(), 2000);
     return () => window.clearInterval(timer);
-  }, [running, loadingMore, refresh]);
+  }, [running, synthesizing, loadingMore, refresh]);
 
   const perform = async (action: () => Promise<void>) => {
     if (operation.current) return;
@@ -73,5 +76,13 @@ export function useRadar(workspaceId: string, kind: RadarKind, highlights: boole
     setLoadingMore(true);
     try { await refresh(undefined, snapshot.nextCursor); } finally { if (alive.current) setLoadingMore(false); }
   };
-  return { scope, snapshot, state, busy, running, queryReady, loadingMore, refresh, configure, collect, more };
+  const synthesize = () => perform(async () => {
+    try {
+      const result = await synthesizeRadar(scope);
+      if (alive.current && activeScope.current === scope) setPendingSynthesis(result.status === 'running' ? result.synthesisId : null);
+    } finally {
+      if (alive.current && activeScope.current === scope) await currentRefresh.current();
+    }
+  });
+  return { scope, snapshot, state, busy, running, synthesizing, queryReady, loadingMore, refresh, configure, collect, synthesize, more };
 }

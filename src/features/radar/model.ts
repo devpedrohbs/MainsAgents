@@ -1,4 +1,4 @@
-import type { RadarConfigInput, RadarItem, RadarKind, RadarRun, RadarSnapshotRow, RadarSourceInput, SourceStatus } from '../../../radar-contract.d.mts';
+import type { RadarConfigInput, RadarItem, RadarKind, RadarRun, RadarSnapshotRow, RadarSourceInput, RadarSynthesis, SourceStatus } from '../../../radar-contract.d.mts';
 export type * from '../../../radar-contract.d.mts';
 
 export type RadarScope = { profile: string; workspaceId: string };
@@ -66,6 +66,7 @@ export function sourceInput(draft: SourceDraft, pt: boolean): RadarSourceInput {
 }
 export function validateConfig(config: RadarConfigInput, pt: boolean) {
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(config.schedule.time)) throw new Error(pt ? 'Informe um horário válido (HH:MM).' : 'Enter a valid time (HH:MM).');
+  if (config.synthesis?.enabled && !config.synthesis.agentId) throw new Error(pt ? 'Escolha um agente salvo para ativar a síntese diária.' : 'Choose a saved agent to enable daily synthesis.');
   return config;
 }
 export function visibleItems(items: RadarItem[], kind: RadarKind, highlights: boolean) {
@@ -91,4 +92,34 @@ export function historyRows(snapshots: RadarSnapshotRow[], runs: RadarRun[]) {
 }
 export function safeItemUrl(url: string) {
   try { const parsed = new URL(url); return ['https:', 'http:'].includes(parsed.protocol) ? parsed.href : undefined; } catch { return undefined; }
+}
+
+export function synthesisStatusText(status: RadarSynthesis['status'], pt: boolean) {
+  const labels: Record<RadarSynthesis['status'], [string, string]> = {
+    none: ['Ainda não gerada', 'Not generated yet'], running: ['Gerando síntese', 'Generating synthesis'],
+    ready: ['Pronta', 'Ready'], waiting_limit: ['Aguardando limite de uso', 'Waiting for usage limit'],
+    blocked: ['Bloqueada', 'Blocked'], failed: ['Falhou', 'Failed'], interrupted: ['Interrompida', 'Interrupted'],
+  };
+  return labels[status][pt ? 0 : 1];
+}
+
+export function synthesisConflictText(code: string | undefined, pt: boolean) {
+  const messages: Record<string, [string, string]> = {
+    already_running: ['Já existe uma síntese em andamento. Acompanhe o resultado aqui.', 'A synthesis is already running. Follow its progress here.'],
+    waiting_limit: ['A síntese está aguardando a liberação do uso da assinatura. Consulte o status abaixo.', 'Synthesis is waiting for subscription usage to become available. See the status below.'],
+    no_agent: ['Escolha e salve um agente Claude ou Codex na configuração da síntese.', 'Choose and save a Claude or Codex agent in synthesis settings.'],
+    nothing_to_synthesize: ['Ainda não há dados para sintetizar. Colete itens primeiro.', 'There is no data to synthesize yet. Collect items first.'],
+  };
+  return code ? messages[code]?.[pt ? 0 : 1] : undefined;
+}
+
+export function evidenceNumberText(key: string, pt: boolean) {
+  const labels: Record<string, [string, string]> = {
+    views: ['Visualizações', 'Views'], likes: ['Curtidas', 'Likes'], comments: ['Comentários', 'Comments'],
+    score: ['Pontos', 'Points'], baselineCount: ['Vídeos na base', 'Baseline videos'], baselineMedian: ['Mediana da base', 'Baseline median'],
+    ratio: ['Razão sobre a mediana', 'Ratio to median'], logScore: ['Diferença em escala log', 'Log-scale difference'], viewsPerHour: ['Visualizações/h', 'Views/hour'],
+    channelMedianViews: ['Mediana do canal', 'Channel median views'], channelBaselineVideos: ['Vídeos na base do canal', 'Channel baseline videos'],
+    ratioToChannelMedian: ['Razão sobre a mediana', 'Ratio to channel median'], durationSeconds: ['Duração (segundos)', 'Duration (seconds)'],
+  };
+  return labels[key]?.[pt ? 0 : 1] ?? key;
 }

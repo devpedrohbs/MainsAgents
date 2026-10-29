@@ -2,6 +2,7 @@ import { createUsageCollector } from './claude-usage.mjs';
 import { createClaudeLimitSnapshot } from './provider-usage.mjs';
 import { createClaudeAccountUsage } from './claude-account-usage.mjs';
 import { createClaudeLimitObserver, limitFailure } from './provider-limits.mjs';
+import { subscriptionOnlyEnv } from './subscription-env.mjs';
 import { execFileSync, spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import { randomUUID, timingSafeEqual } from 'node:crypto';
@@ -76,7 +77,7 @@ function cliLaunch(resolved, args, options = {}) {
   return spawn(command, [...(resolved.prefixArgs ?? []), ...safeArgs], {
     windowsHide: true,
     cwd: options.cwd,
-    env: { ...process.env, ...(options.env ?? {}) },
+    env: subscriptionOnlyEnv({ ...process.env, ...(options.env ?? {}) }),
     stdio: options.stdio ?? ['ignore', 'pipe', 'pipe'],
     ...(needsShell ? { shell: true } : {}),
   });
@@ -357,7 +358,7 @@ export function createClaudeCodeBridge({
     const skillsDirectory = typeof config.skillsDirectory === 'string' && config.skillsDirectory.trim() ? resolve(config.skillsDirectory.trim()) : '';
     if (!editor && (config.skills?.length ?? 0) > 0 && skillsDirectory && existsSync(skillsDirectory) && statSync(skillsDirectory).isDirectory()) args.push('--add-dir', skillsDirectory);
     const effort = ['low', 'medium', 'high', 'xhigh'].includes(input.reasoningEffort) ? input.reasoningEffort : undefined;
-    const child = spawnImpl(resolved, args, { cwd: directory, stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, ...(effort ? { CLAUDE_CODE_EFFORT_LEVEL: effort } : {}), ...(editor ? { ENABLE_TOOL_SEARCH: 'false', CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH: '1', CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS: '1' } : {}) } });
+    const child = spawnImpl(resolved, args, { cwd: directory, stdio: ['pipe', 'pipe', 'pipe'], env: subscriptionOnlyEnv({ ...process.env, ...(effort ? { CLAUDE_CODE_EFFORT_LEVEL: effort } : {}), ...(editor ? { ENABLE_TOOL_SEARCH: 'false', CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH: '1', CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS: '1' } : {}) }) });
     record.child = child;
     record.stderr = '';
     // Checkpoints and the verified file receipt reach the consumer on this execution's stream.

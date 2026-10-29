@@ -19,14 +19,19 @@ export type RadarSourceInput =
   | { kind: 'news-rss'; url: string; label?: string }               // https feed URL (RSS 2.0 or Atom)
   | { kind: 'hackernews'; minScore?: number };                       // top stories, default minScore 100
 
+/** Daily AI synthesis after the scheduled collection; uses a saved agent of the workspace (its Claude Code or Codex login). */
+export interface RadarSynthesisConfig { enabled: boolean; agentId: string | null }
+
 export interface RadarConfig {
   /** Daily schedule in the computer's local time. */
   schedule: { enabled: boolean; time: string /* "HH:MM" */ };
+  synthesis: RadarSynthesisConfig;
   sources: Array<RadarSourceInput & { id: string; enabled: boolean }>;
 }
 /** PUT /radar/config body. Sources without `id` are created; omitted ids are removed (their history is kept). */
 export interface RadarConfigInput {
   schedule: { enabled: boolean; time: string };
+  synthesis?: RadarSynthesisConfig;   // omitted = keep the saved one (default disabled)
   sources: Array<RadarSourceInput & { id?: string; enabled: boolean }>;
 }
 
@@ -100,22 +105,33 @@ export interface RadarItem {
   sourceIds: string[];
   metrics: VideoMetrics | null;  // null for news
   highlight: boolean;            // youtube: baselineStatus ok && ratio >= 3; news: score >= source minScore
-  promoted: Array<{ target: 'topic' | 'reference'; id: string; at: string }>;
+  promoted: Array<{ target: 'topic' | 'reference'; id: string; at: string }>; // links recorded via POST .../promote
 }
 
-/** Phase 2. Evidence is built by the backend; the AI only writes observation/hypothesis and must cite existing snapshot ids. */
+/**
+ * Evidence is built by the backend from stored snapshots; the AI only writes observation / hypothesis / idea and may only
+ * cite items it was given (unknown itemIds are dropped). The AI sees titles and numbers, never the video itself.
+ */
 export interface RadarRecommendation {
   itemId: string;
   evidence: Array<{ snapshotIds: string[]; url: string; observedAt: string; numbers: Record<string, number | null> }>;
-  observation: string;
-  hypothesis: { text: string; alternatives: string[] };
+  observation: string;                                 // what the data/title shows (no visual claims)
+  hypothesis: { text: string; alternatives: string[] }; // why it may have worked + competing explanations
+  idea: string;                                        // how Pedro could adapt it into his own content (a pauta seed)
   limitations: string[];
 }
 export interface RadarSynthesis {
-  status: 'none' | 'waiting_limit' | 'running' | 'ready' | 'failed';
+  id: string | null;
+  status: 'none' | 'waiting_limit' | 'blocked' | 'running' | 'ready' | 'failed' | 'interrupted';
   providerId: 'claude' | 'codex' | null;
+  agentId: string | null;
+  dayKey: string | null;
   createdAt: string | null;
-  waitingUntil: string | null;   // known reset time, or null when unknown (then it waits for an explicit Resume)
+  finishedAt: string | null;
+  /** waiting_limit: known reset time, or null when unknown (then it waits for the provider Resume in the app). */
+  waitingUntil: string | null;
+  /** pt-BR: why it waits / is blocked / failed (e.g. usage at 92% of the 5 h window, login expired, no agent chosen). */
+  message: string | null;
   recommendations: RadarRecommendation[];
 }
 
@@ -132,7 +148,8 @@ export interface RadarSnapshot {
   runs: RadarRun[];              // latest 20
   running: RadarRun | null;
   nextRunAt: string | null;      // null when the schedule is disabled
-  synthesis: RadarSynthesis;
+  synthesis: RadarSynthesis;      // latest synthesis of this scope
+  agents: Array<{ id: string; name: string; providerId: 'claude' | 'codex' }>; // saved agents of the workspace
 }
 
 /**
@@ -141,8 +158,15 @@ export interface RadarSnapshot {
  *   PUT  /radar/config     RadarConfigInput  -> RadarSnapshot
  *   POST /radar/collect    {kind?: RadarKind} -> {runId, status: 'running'}   (409 {code:'already_running', runId} when busy)
  *   GET  /radar/items/:id/history            -> {item: RadarItem, snapshots: RadarSnapshotRow[]}
- *   POST /radar/synthesize {}                -> 501 until phase 2
- *   POST /radar/items/:id/promote {target:'topic'|'reference', requestId} -> 501 until phase 2
+ *   POST /radar/synthesize {}                -> 202 {synthesisId, status:'running'|'waiting_limit'|'blocked'} (a gate records its row and sends nothing) | 409 {code:'already_running'|'waiting_limit'|'no_agent'|'nothing_to_synthesize'}
+ *   POST /radar/items/:id/promote {target:'topic'|'reference', targetId} -> {item: RadarItem, created: boolean}
+ *        The renderer creates the topic (ContentWorkflowProvider.createTopic) or the link reference (saveInspiration) through
+ *        the editorial state client first, then records the link here; recording the same target twice returns created:false.
+ *        The UI checks item.promoted before creating, so a second click never creates a second topic.
+ *
+ * Retention: snapshots/baselines from the YouTube Data API are deleted after 30 days (YouTube API Services policy on
+ * stored API data); RSS/Hacker News rows are kept up to 365 days. Backups include config, items, snapshots, runs,
+ * syntheses and links, never the API key (encrypted per computer).
  *
  * Backend object exposed by createContentWorkflowBridge(...) as `radar`:
  *   snapshot(scope, query), configure(scope, input), collect(scope, {kind, reason}), history(scope, itemId),

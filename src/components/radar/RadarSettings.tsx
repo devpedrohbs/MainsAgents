@@ -23,7 +23,10 @@ export function RadarSettings({ snapshot, profile, busy, pt, onSave, onRefresh }
     <form onSubmit={event => {
       event.preventDefault(); setMessage('');
       void (async () => {
-        try { await onSave(validateConfig(draft, pt)); setDirty(false); setFailed(false); setMessage(pt ? 'Configuração salva.' : 'Settings saved.'); }
+        try {
+          if (draft.synthesis?.enabled && !snapshot.agents?.some(agent => agent.id === draft.synthesis?.agentId)) throw Error(pt ? 'Escolha um agente disponível neste workspace.' : 'Choose an available agent in this workspace.');
+          await onSave(validateConfig(draft, pt)); setDirty(false); setFailed(false); setMessage(pt ? 'Configuração salva.' : 'Settings saved.');
+        }
         catch (error) { setFailed(true); setMessage(error instanceof Error ? error.message : String(error)); }
       })();
     }}>
@@ -31,6 +34,13 @@ export function RadarSettings({ snapshot, profile, busy, pt, onSave, onRefresh }
         <div className="radar-row"><label className="radar-check"><input type="checkbox" checked={draft.schedule.enabled} onChange={e => update({ ...draft, schedule: { ...draft.schedule, enabled: e.target.checked } })} />{pt ? 'Ativar agendamento' : 'Enable schedule'}</label>
           <label className="radar-field">{pt ? 'Horário local do computador' : 'Computer local time'}<input type="time" required value={draft.schedule.time} onChange={e => update({ ...draft, schedule: { ...draft.schedule, time: e.target.value } })} /></label></div>
         <p className="radar-muted">{pt ? 'Próxima coleta salva' : 'Next saved collection'}: {snapshot.nextRunAt ? dateText(snapshot.nextRunAt, pt) : pt ? 'Agendamento desligado' : 'Schedule off'}. {pt ? 'O app precisa estar aberto; ao iniciar ou retomar, verifica coletas pendentes.' : 'The app must be open; startup and resume check for due collections.'}</p>
+      </fieldset>
+      <fieldset className="radar-synthesis-settings" disabled={busy}><legend>{pt ? 'Síntese diária com IA' : 'Daily AI synthesis'}</legend>
+        <p className="radar-muted">{pt ? 'Usa a assinatura já conectada de Claude ou Codex, com 1 chamada por dia. Espera quando o uso estiver alto e nunca usa API paga. A síntese diária acontece após a coleta agendada.' : 'Uses your connected Claude or Codex subscription, with 1 call per day. Waits when usage is high and never uses a paid API. Daily synthesis follows the scheduled collection.'}</p>
+        <div className="radar-row"><label className="radar-check"><input type="checkbox" checked={draft.synthesis?.enabled ?? false} disabled={!snapshot.agents?.length && !draft.synthesis?.enabled} onChange={e => update({ ...draft, synthesis: { enabled: e.target.checked, agentId: snapshot.agents?.some(agent => agent.id === draft.synthesis?.agentId) ? draft.synthesis?.agentId ?? null : null } })} />{pt ? 'Ativar síntese diária' : 'Enable daily synthesis'}</label>
+          <label className="radar-field">{pt ? 'Agente da síntese' : 'Synthesis agent'}<select value={draft.synthesis?.agentId ?? ''} disabled={!snapshot.agents?.length} onChange={e => update({ ...draft, synthesis: { enabled: draft.synthesis?.enabled ?? false, agentId: e.target.value || null } })}><option value="">{pt ? 'Escolha um agente' : 'Choose an agent'}</option>{(snapshot.agents ?? []).map(agent => <option key={agent.id} value={agent.id}>{agent.name} ({agent.providerId === 'claude' ? 'Claude' : 'Codex'})</option>)}</select></label></div>
+        {!snapshot.agents?.length && <p className="radar-notice">{pt ? 'É preciso ter um agente Claude ou Codex salvo neste workspace. Crie um agente e volte à configuração.' : 'You need a Claude or Codex agent saved in this workspace. Create an agent, then return to settings.'}</p>}
+        {draft.synthesis?.agentId && !snapshot.agents?.some(agent => agent.id === draft.synthesis?.agentId) && <p className="radar-error">{pt ? 'O agente salvo não está mais disponível. Escolha outro agente ou desligue a síntese diária.' : 'The saved agent is no longer available. Choose another agent or turn daily synthesis off.'}</p>}
       </fieldset>
       <fieldset disabled={busy}><legend>{pt ? 'Fontes acompanhadas' : 'Followed sources'}</legend>
         {!draft.sources.length && <p className="radar-muted">{pt ? 'Adicione um canal, tema, feed ou Hacker News para começar.' : 'Add a channel, topic, feed, or Hacker News to begin.'}</p>}
