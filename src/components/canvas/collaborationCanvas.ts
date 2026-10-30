@@ -6,6 +6,7 @@ import type { CanvasFlowNode } from './canvasTypes';
 export interface CollaborationChat { agent:Agent; session:AgentSession }
 export interface CollaborationCanvasInput {
   workspaceId:string;
+  boardId?:string;
   handoffId:string;
   source:CollaborationChat;
   target:CollaborationChat;
@@ -30,7 +31,7 @@ export function addCollaborationChats(nodes:CanvasFlowNode[],edges:Edge[],view:{
   while(overlaps(position,nodes,pair))position={...position,y:Math.max(...nodes.filter(node=>overlaps(position,[node],pair)).map(node=>node.position.y+size(node).height+margin))};
   const makeNode=(chat:CollaborationChat,previous:CanvasFlowNode|undefined,index:number):CanvasFlowNode=>{
     if(previous)return {...previous,data:{...previous.data,chatHandoffId:handoffId}};
-    const baseId=`session-chat-${encodeURIComponent(chat.session.id)}`;
+    const baseId=`${input.boardId?`${input.boardId}:`:''}session-chat-${encodeURIComponent(chat.session.id)}`;
     let id=baseId,suffix=2;
     while(nodes.some(node=>node.id===id))id=`${baseId}-${suffix++}`;
     return {id,type:'chat',position:{x:position.x+(pair?index*(width+gap):0),y:position.y},data:{label:'Chat',meta:chat.session.title,workspaceId,chatAgentId:chat.agent.id,chatSessionId:chat.session.id,agentId:chat.agent.id,agentLabel:chat.agent.name,chatHandoffId:handoffId}};

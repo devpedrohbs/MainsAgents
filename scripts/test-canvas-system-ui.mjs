@@ -40,7 +40,7 @@ const server=createServer(async(request,response)=>{
   if(url.pathname==='/api/content/state')return json(response,{revision:1,state:{schemaVersion:1,topics:[],runs:[],artifacts:[],approvals:[],contents:[],assets:[],publications:[]}});
   if(url.pathname.startsWith('/api/'))return json(response,url.pathname.endsWith('/work')?{jobs:[],mediaJobs:[],worker:{running:false}}:url.pathname.endsWith('/jobs')?{jobs:[]}:url.pathname.endsWith('/models')?{models:[]}:url.pathname.endsWith('/calendar')?{sources:[]}:url.pathname.endsWith('/delegations')?{jobs:[],sessions:[],handoffs:[]}:url.pathname.endsWith('/actions')?{actions:[]}:{ready:false,events:[],version:'fixture'});
   try{
-    const file=resolve(root,'dist',url.pathname==='/'?'app.html':url.pathname.slice(1));assert(file.startsWith(resolve(root,'dist')+sep));
+    const dist=resolve(root,process.env.MAINSAGENTS_UI_DIST??'dist'),file=resolve(dist,url.pathname==='/'?'app.html':url.pathname.slice(1));assert(file.startsWith(dist+sep));
     response.setHeader('content-type',({'.html':'text/html','.css':'text/css','.js':'application/javascript','.png':'image/png','.svg':'image/svg+xml'})[extname(file)]??'application/octet-stream');response.end(readFileSync(file));
   }catch{response.statusCode=404;response.end()}
 });
@@ -52,7 +52,7 @@ async function screenshot(name){writeFileSync(resolve(out,`${name}.png`),await c
 const key=(keyCode,modifiers=[])=>{win.webContents.sendInputEvent({type:'keyDown',keyCode,modifiers});win.webContents.sendInputEvent({type:'keyUp',keyCode,modifiers})};
 const bounds=selector=>js(`(()=>{const el=document.querySelector(${JSON.stringify(selector)});if(!el)throw Error(${JSON.stringify(selector)});const r=el.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height}})()`);
 async function drag(from,to){const mouse=(type,x,y,extra={})=>win.webContents.sendInputEvent({type,x:Math.round(x),y:Math.round(y),...extra});mouse('mouseMove',from.x,from.y);mouse('mouseDown',from.x,from.y,{button:'left',clickCount:1});for(let i=1;i<=8;i++){mouse('mouseMove',from.x+(to.x-from.x)*i/8,from.y+(to.y-from.y)*i/8,{button:'left'});await new Promise(r=>setTimeout(r,20))}mouse('mouseUp',to.x,to.y,{button:'left',clickCount:1})}
-const graph=()=>state['canvas-workspaces'][a];
+const graph=()=>{const workspace=state['canvas-workspaces'][a];return workspace.schemaVersion===2?workspace.boards.find(board=>board.id===workspace.activeBoardId):workspace;};
 const find=id=>graph().nodes.find(node=>node.id===id);
 async function focusNode(id){await js(`document.querySelector('[data-id=${JSON.stringify(id)}]').focus()`)}
 async function duplicate(id){await js(`document.querySelector('[data-id=${JSON.stringify(id)}]').dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:500,clientY:400}))`);await click('.canvas-context-menu button:nth-of-type(3)')}

@@ -9,6 +9,7 @@ export type ReasoningEffort = 'low' | 'medium' | 'high' | 'xhigh';
 
 export interface ChatContextReference {
   nodeId: string;
+  boardId?:string;
   label: string;
   kind: string;
   content?: string;

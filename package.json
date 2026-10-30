@@ -4,7 +4,7 @@
   "author": "devpedrohbs",
   "license": "MIT",
   "private": true,
-  "version": "0.3.81",
+  "version": "0.3.87",
   "type": "module",
   "scripts": {
     "dev": "node dev.mjs",
@@ -65,6 +65,7 @@
       "agent-delegation-runtime.mjs",
       "canvas-runtime-bridge.mjs",
       "claude-code-bridge.mjs",
+      "claude-runtime-defaults.mjs",
       "paper-design.mjs",
       "paper-desktop.mjs",
       "publishing-automation.mjs",

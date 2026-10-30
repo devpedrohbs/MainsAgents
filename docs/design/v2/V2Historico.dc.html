@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>MainsAgents V2 — Histórico</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0b0b0d}
+a{color:#8aa8ff}a:hover{color:#b3c6ff}
+button{font:inherit;cursor:pointer}
+input{font:inherit}
+.v2row:hover{background:#16161a}
+@media (max-width: 900px){.v2-side{display:none !important}}
+</style>
+</helmet>
+<div style="width: 100%; height: 900px; box-sizing: border-box; display: flex; background: #0b0b0d; color: #ececef; font-family: Inter, -apple-system, system-ui, sans-serif; font-size: 13px; line-height: 20px; font-feature-settings: 'cv11' 1, 'ss01' 1; overflow: hidden">
+  <div class="v2-side" style="flex: 0 0 220px">
+    <dc-import name="V2Sidebar" active="history" hint-size="220px,900px"></dc-import>
+  </div>
+
+  <div style="flex: 1 1 auto; min-width: 0; display: flex; padding: 8px 8px 8px 0">
+    <div style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; background: #111113; border: 1px solid #1f1f24; border-radius: 10px; overflow: hidden">
+
+      <header style="flex: 0 0 auto; min-height: 44px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 6px 12px 6px 20px; border-bottom: 1px solid #1f1f24; box-sizing: border-box">
+        <h1 style="margin: 0; font-size: 13px; font-weight: 600">Histórico</h1>
+        <span style="font-size: 12px; color: #85858f">128 sessões · 1 em andamento</span>
+        <div style="flex-grow: 1"></div>
+        <label style="display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px; border: 1px solid #2a2a31; border-radius: 6px; background: #0b0b0d; color: #85858f; width: 260px">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="M20 20l-4-4"></path></svg>
+          <input type="text" placeholder="Buscar em mensagens e títulos" aria-label="Buscar no histórico" style="flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: #ececef; font-size: 12px">
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px">/</span>
+        </label>
+        <button type="button" style="height: 30px; padding: 0 12px; border: 0; border-radius: 6px; background: #ececef; color: #0b0b0d; font-weight: 500">Nova conversa</button>
+      </header>
+
+      <div style="flex: 0 0 auto; display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 16px; border-bottom: 1px solid #1f1f24">
+        <sc-for list="{{agentChips}}" as="a" hint-placeholder-count="6">
+          <button type="button" aria-pressed="{{a.on}}" onClick="{{a.pick}}" style="display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 8px; border: 1px solid {{a.bd}}; border-radius: 6px; background: {{a.bg}}; color: {{a.fg}}; font-size: 12px">
+            <sc-if value="{{a.hasC}}" hint-placeholder-val="{{ true }}"><i aria-hidden="true" style="width: 10px; height: 10px; border-radius: 3px; background: {{a.c}}"></i></sc-if>{{a.label}}
+          </button>
+        </sc-for>
+      </div>
+
+      <div style="flex: 1 1 auto; min-height: 0; display: flex; flex-wrap: wrap; overflow: auto">
+        <section aria-label="Sessões" style="flex: 1 1 440px; max-width: 560px; min-width: 300px; border-right: 1px solid #1f1f24; overflow: auto">
+          <sc-for list="{{groups}}" as="g" hint-placeholder-count="3">
+            <p style="margin: 0; padding: 12px 16px 4px; font-size: 11px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: #85858f">{{g.label}}</p>
+            <sc-for list="{{g.items}}" as="s" hint-placeholder-count="3">
+              <button type="button" class="v2row" onClick="{{s.pick}}" aria-pressed="{{s.on}}" style="width: 100%; display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 6px 16px; border: 0; background: {{s.bg}}; color: #ececef; text-align: left">
+                <span aria-hidden="true" style="flex: 0 0 22px; height: 22px; border-radius: 6px; background: {{s.c}}; color: #0b0b0d; font-size: 9px; font-weight: 700; display: flex; align-items: center; justify-content: center">{{s.i}}</span>
+                <span style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+                  <span style="display: flex; align-items: center; gap: 8px"><b style="font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{s.t}}</b>
+                    <sc-if value="{{s.live}}" hint-placeholder-val="{{ false }}"><span style="flex: 0 0 auto; display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: #8aa8ff"><dc-import name="V2Status" state="rodando" sz="{{ 10 }}" hint-size="10px,10px"></dc-import>em andamento</span></sc-if>
+                  </span>
+                  <span style="font-size: 12px; line-height: 16px; color: #85858f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{s.who}} · {{s.scope}} · {{s.msgs}} mensagens</span>
+                </span>
+                <span style="flex: 0 0 auto; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #85858f">{{s.time}}</span>
+              </button>
+            </sc-for>
+          </sc-for>
+        </section>
+
+        <section aria-label="Prévia da sessão" style="flex: 999 1 420px; min-width: 0; display: flex; flex-direction: column">
+          <div style="flex: 0 0 auto; display: flex; align-items: center; gap: 10px; padding: 12px 20px; border-bottom: 1px solid #1f1f24">
+            <span aria-hidden="true" style="flex: 0 0 28px; height: 28px; border-radius: 7px; background: {{p.c}}; color: #0b0b0d; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center">{{p.i}}</span>
+            <div style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+              <h2 style="margin: 0; font-size: 15px; line-height: 22px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{p.t}}</h2>
+              <span style="font-size: 12px; line-height: 16px; color: #85858f">{{p.who}} · {{p.model}} · {{p.time}}</span>
+            </div>
+            <button type="button" aria-label="Renomear" style="height: 28px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: #a4a4ad; font-size: 12px">Renomear</button>
+            <a href="V2Estudio.dc.html" style="height: 30px; line-height: 30px; padding: 0 12px; border-radius: 6px; background: #ececef; color: #0b0b0d; font-weight: 500; text-decoration: none">Retomar</a>
+          </div>
+          <div style="flex: 1 1 auto; overflow: auto; padding: 18px 24px; display: flex; flex-direction: column; gap: 14px; max-width: 680px">
+            <sc-for list="{{p.msgs}}" as="m" hint-placeholder-count="4">
+              <div style="display: flex; flex-direction: column; gap: 2px">
+                <span style="font-size: 12px; color: #85858f"><b style="color: #ececef; font-weight: 500">{{m.who}}</b> · {{m.t}}</span>
+                <p style="margin: 0; line-height: 21px; color: #c9c9d1">{{m.x}}</p>
+              </div>
+            </sc-for>
+          </div>
+          <div style="flex: 0 0 auto; display: flex; align-items: center; gap: 10px; padding: 10px 20px; border-top: 1px solid #1f1f24; font-size: 12px; color: #85858f">
+            <span>{{p.lock}}</span>
+            <button type="button" style="margin-left: auto; height: 26px; padding: 0 8px; border: 0; border-radius: 5px; background: transparent; color: {{p.delC}}; font-size: 12px">Excluir sessão</button>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { sel: 'h1', agent: 'all' }; }
+  renderVals() {
+    var self = this, st = this.state;
+    var A = { RO: ['#f5b544', 'Roteirista', 'Claude Sonnet 5.5'], ED: ['#2dd4bf', 'Editor de vídeo', 'Claude Sonnet 5.5'], DC: ['#f472b6', 'Designer de capa', 'Codex'], PB: ['#9aa8ff', 'Publicador', 'Codex'], PE: ['#fb923c', 'Pesquisador', 'Claude Haiku 5.5'] };
+    var data = [
+      { id: 'h1', g: 'Hoje', a: 'ED', t: 'Cortes do tutorial de Excel', scope: 'Vídeo do YouTube', n: 14, time: '14:24', live: true,
+        msgs: [['Você', '14:15', 'Corta as pausas longas do começo e deixa a legenda no estilo da última entrega.'], ['Editor de vídeo', '14:16', 'Vou fazer em três passos: cortes, legenda e prévia. Pode ajustar antes de eu começar.'], ['Editor de vídeo', '14:24', 'Encontrei 10 trechos para cortar. O vídeo cai de 12:48 para 10:56.']] },
+      { id: 'h2', g: 'Hoje', a: 'DC', t: 'Capas · 5 erros no Power BI', scope: 'Carrossel e Reels', n: 9, time: '12:31', live: false,
+        msgs: [['Você', '12:05', 'Faz 3 capas no estilo claro, título curto.'], ['Designer de capa', '12:31', 'Prontas. A opção 2 segue mais de perto a referência aprovada.']] },
+      { id: 'h3', g: 'Hoje', a: 'RO', t: 'Busca no Excel: PROCX ou PROCV', scope: 'Carrossel e Reels', n: 6, time: '11:40', live: false,
+        msgs: [['Roteirista', '11:40', 'Quer as duas funções no roteiro? Parte do público ainda usa versões sem PROCX.']] },
+      { id: 'h4', g: 'Ontem', a: 'PB', t: 'Agendamento do LinkedIn', scope: 'Post para LinkedIn', n: 4, time: '17:20', live: false,
+        msgs: [['Publicador', '17:20', 'Sugiro segunda às 09:00, o horário com mais alcance nas últimas 4 semanas.']] },
+      { id: 'h5', g: 'Ontem', a: 'PE', t: 'Radar · coleta das 06:00', scope: 'Pesquisa de pauta', n: 3, time: '06:01', live: false,
+        msgs: [['Pesquisador', '06:01', '4 sinais novos. Dois com nota acima de 80: Copilot no Excel e licença do Power BI.']] },
+      { id: 'h6', g: 'Esta semana', a: 'RO', t: 'Roteiro v2 · automação no Excel', scope: 'Vídeo do YouTube', n: 22, time: 'ter', live: false,
+        msgs: [['Você', 'ter 10:02', 'Encurta a introdução e põe o exemplo de vendas antes.'], ['Roteirista', 'ter 10:05', 'Feito. A introdução caiu para 20 segundos e o exemplo abre o vídeo.']] }
+    ];
+    var shown = data.filter(function (d) { return st.agent === 'all' || d.a === st.agent; });
+    var cur = data.filter(function (d) { return d.id === st.sel; })[0] || data[0];
+    var mk = function (d) {
+      var on = d.id === st.sel;
+      return { t: d.t, i: d.a, c: A[d.a][0], who: A[d.a][1], scope: d.scope, msgs: d.n, time: d.time, live: d.live, on: on ? 'true' : 'false', bg: on ? '#1c1c21' : 'transparent', pick: function () { self.setState({ sel: d.id }); } };
+    };
+    var chips = [['all', 'Todos os agentes', '']].concat(Object.keys(A).map(function (k) { return [k, A[k][1], A[k][0]]; })).map(function (x) {
+      var on = st.agent === x[0];
+      return { label: x[1], c: x[2], hasC: !!x[2], on: on ? 'true' : 'false', bd: on ? '#33333b' : '#2a2a31', bg: on ? '#1c1c21' : 'transparent', fg: on ? '#ececef' : '#a4a4ad', pick: function () { self.setState({ agent: x[0] }); } };
+    });
+    return {
+      agentChips: chips,
+      groups: ['Hoje', 'Ontem', 'Esta semana'].map(function (g) { return { label: g, items: shown.filter(function (d) { return d.g === g; }).map(mk) }; }).filter(function (g) { return g.items.length; }),
+      p: { t: cur.t, i: cur.a, c: A[cur.a][0], who: A[cur.a][1], model: A[cur.a][2], time: cur.g.toLowerCase() + ' · ' + cur.time,
+        msgs: cur.msgs.map(function (m) { return { who: m[0], t: m[1], x: m[2] }; }),
+        lock: cur.live ? 'Sessão em andamento: não pode ser excluída até terminar.' : cur.n + ' mensagens · salva localmente e incluída no backup',
+        delC: cur.live ? '#55555e' : '#ff8a8e' }
+    };
+  }
+}
+</script>
+</body>
+</html>

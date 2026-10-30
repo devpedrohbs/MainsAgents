@@ -5,6 +5,7 @@ import type { Agent } from '../../features/agents/model/Agent';
 import type { AgentSession } from '../../features/chat/model/Chat';
 import type { CanvasNodeKind } from '../canvas/canvasTypes';
 import type { CanvasFlowNode } from '../canvas/canvasTypes';
+import { canvasBoardName } from '../canvas/CanvasBoardsBar';
 import { Icon, type IconName } from '../common/Icon';
 import { useLanguage } from '../../app/LanguageProvider';
 
@@ -14,7 +15,7 @@ interface CommandPaletteProps {
   agents:readonly Agent[];
   tasks:readonly Task[];
   sessions:readonly AgentSession[];
-  nodes:readonly {workspaceId:string;node:CanvasFlowNode}[];
+  nodes:readonly {workspaceId:string;boardId:string;boardName:string;node:CanvasFlowNode}[];
   workspaces:readonly Workspace[];
   currentWorkspaceId:string;
   open:boolean;
@@ -27,7 +28,7 @@ interface CommandPaletteProps {
   onOpenAgent:(agentId:string)=>void;
   onOpenTask:(task:Task)=>void;
   onOpenSession:(agentId:string,sessionId:string)=>void;
-  onOpenNode:(workspaceId:string,nodeId:string)=>void;
+  onOpenNode:(workspaceId:string,nodeId:string,boardId?:string)=>void;
   onSwitchWorkspace:(workspaceId:string)=>void;
 }
 
@@ -64,7 +65,7 @@ export function CommandPalette(props:CommandPaletteProps) {
     const taskItems=tasks.map((task):PaletteItem=>({id:`task-${task.id}`,label:task.title,detail:agents.find((agent)=>agent.id===task.agentId)?.name ?? task.status,icon:'board',group:'Tasks',keywords:`${task.description} ${task.metadata} ${task.status}`,run:finish(()=>onOpenTask(task))}));
     const sessionItems=sessions.map((session):PaletteItem=>({id:`session-${session.id}`,label:session.title,detail:agents.find((agent)=>agent.id===session.agentId)?.name ?? 'Agent session',icon:'history',group:'Sessions',keywords:'conversation chat',run:finish(()=>onOpenSession(session.agentId,session.id))}));
     const messageItems=sessions.flatMap((session)=>session.messages.filter((message)=>message.type==='message').map((message):PaletteItem=>({id:`message-${message.id}`,label:message.content.slice(0,80),detail:session.title,icon:'message',group:'Messages',keywords:message.content,run:finish(()=>onOpenSession(session.agentId,session.id))})));
-    const nodeItems=nodes.map(({workspaceId,node}):PaletteItem=>({id:`node-${node.id}`,label:String(node.data.title??node.data.caption??node.data.hook??node.data.text??node.data.label??node.type),detail:workspaces.find((workspace)=>workspace.id===workspaceId)?.name??'Canvas',icon:'canvas',group:'Canvas',keywords:[node.data.description,node.data.summary,node.data.preview,node.data.url].filter(Boolean).join(' '),run:finish(()=>onOpenNode(workspaceId,node.id))}));
+    const nodeItems=nodes.map(({workspaceId,boardId,boardName,node}):PaletteItem=>({id:`node-${node.id}`,label:String(node.data.title??node.data.caption??node.data.hook??node.data.text??node.data.label??node.type),detail:`${workspaces.find((workspace)=>workspace.id===workspaceId)?.name??'Canvas'} · ${canvasBoardName({id:boardId,name:boardName},locale==='pt-BR')}`,icon:'canvas',group:'Canvas',keywords:[node.data.description,node.data.summary,node.data.preview,node.data.url].filter(Boolean).join(' '),run:finish(()=>onOpenNode(workspaceId,node.id,boardId))}));
     const workspaceItems=workspaces.map((workspace):PaletteItem=>({id:`workspace-${workspace.id}`,label:workspace.name,detail:workspace.id===currentWorkspaceId?'Current workspace':'Switch workspace',icon:'folder',group:'Workspaces',keywords:'workspace',run:finish(()=>onSwitchWorkspace(workspace.id))}));
     return scope==='workspaces'?workspaceItems:scope==='agents'?agentItems:[...actions,...agentItems,...taskItems,...sessionItems,...messageItems,...nodeItems,...workspaceItems];
   },[agents,currentWorkspaceId,locale,nodes,onAddNode,onClose,onNavigate,onNewAgent,onNewSession,onNewTask,onOpenAgent,onOpenNode,onOpenSession,onOpenTask,onSwitchWorkspace,scope,sessions,tasks,workspaces]);

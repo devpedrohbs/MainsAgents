@@ -7,12 +7,14 @@ import {readFileSync,writeFileSync,mkdirSync,statSync} from 'node:fs';
 import {resolve,extname,sep,join} from 'node:path';
 import {DatabaseSync} from 'node:sqlite';
 import assert from 'node:assert/strict';
-import {createDesktopStateStore} from '../desktop-state-store.mjs';
-import {createContentWorkflowBridge} from '../content-workflow-bridge.mjs';
-import {registerContentDeletionIpc} from '../content-deletion-ipc.mjs';
+import {pathToFileURL} from 'node:url';
 import {captureReadyPng} from './ui-capture-ready.mjs';
 
 const root=resolve(import.meta.dirname,'..'),out=resolve(root,'.mainsagents-workspaces/content-deletion-ui',String(Date.now()));mkdirSync(out,{recursive:true});
+const runtimeRoot=process.env.MAINSAGENTS_TEST_ASAR?resolve(process.env.MAINSAGENTS_TEST_ASAR):root;
+const {createDesktopStateStore}=await import(pathToFileURL(resolve(runtimeRoot,'desktop-state-store.mjs')).href);
+const {createContentWorkflowBridge}=await import(pathToFileURL(resolve(runtimeRoot,'content-workflow-bridge.mjs')).href);
+const {registerContentDeletionIpc}=await import(pathToFileURL(resolve(runtimeRoot,'content-deletion-ipc.mjs')).href);
 app.setPath('userData',resolve(out,'electron'));app.on('window-all-closed',()=>{});
 const profile='deletion-ui',ws='space',at='2026-10-15T10:00:00.000Z',dbPath=join(out,'workspace-state.sqlite'),raw=join(out,'gravacao-bruta.mp4');writeFileSync(raw,'RAW');
 const agent=(id,name,role)=>({id,name,role,instructions:'Fixture',description:'Fixture',skills:[],workspaceId:ws,providerId:'codex',tools:['files'],status:'idle',createdAt:at,updatedAt:at});
@@ -34,7 +36,7 @@ store.selectProfile(profile);
 const bridgeOptions={dbPath,getCurrentProfile:()=>store.currentProfile(),getAgents:p=>store.read(p,'agents'),getFlows:p=>store.read(p,'production-flows'),getSessions:p=>store.read(p,'sessions'),getRuntime:()=>null};
 let bridge=createContentWorkflowBridge(bridgeOptions);
 const seed=new DatabaseSync(dbPath);seed.exec('PRAGMA busy_timeout=5000');
-seed.prepare('INSERT INTO editorial_state VALUES(?,?,?,?)').run(profile,1,JSON.stringify({schemaVersion:1,topics:[{id:'topic-content-a',workspaceId:ws,contentId:'content-a',title:'Linkedin',requestId:'r',inputKind:'text',input:'x',priority:'normal',status:'approved',createdAt:at,updatedAt:at}],
+seed.prepare('INSERT INTO editorial_state VALUES(?,?,?,?)').run(profile,1,JSON.stringify({schemaVersion:1,topics:[{id:'topic-content-a',workspaceId:ws,contentId:'content-a',title:'Linkedin',category:'Tech',summary:'Synthetic topic',whyItMatters:'Fixture',angles:['Original angle'],sources:[],factualQuestions:[],requestId:'r',inputKind:'text',input:'x',priority:'normal',status:'approved',createdAt:at,updatedAt:at}],
  contents:[content('content-a','Linkedin'),content('content-b','Linkedin'),content('content-c','Legenda avulsa')],artifacts:[],approvals:[],runs:[],assets:[],publications:[]}),at);
 const putRun=value=>seed.prepare('INSERT INTO production_runs VALUES(?,?,?,?,?,?,?)').run(value.id,profile,ws,value.contentId,1,JSON.stringify(value),at);
 putRun(run('run-a','content-a',['a-run-src','a-run-ed']));putRun(run('run-c','content-c',['c-run-src','c-run-ed']));
@@ -59,7 +61,7 @@ const json=(response,value)=>{response.setHeader('content-type','application/jso
 const server=createServer(async(request,response)=>{const url=new URL(request.url,'http://localhost'),path=url.pathname;
  if(path.startsWith('/api/codex/')){if(path.endsWith('/health'))return json(response,{ready:true,status:'connected',accountType:'chatgpt'});if(path.endsWith('/models'))return json(response,{models:[]});if(path.endsWith('/usage'))return json(response,{rateLimits:null});return json(response,{events:[]});}
  if(await bridge.handle(request,response,url))return;if(path.startsWith('/api/'))return json(response,{});
- try{const dist=resolve(root,process.env.MAINSAGENTS_UI_DIST??'dist'),file=resolve(dist,path==='/'?'app.html':path.slice(1));assert(file.startsWith(dist+sep));response.setHeader('content-type',({'.html':'text/html','.js':'application/javascript','.css':'text/css','.png':'image/png','.svg':'image/svg+xml','.woff2':'font/woff2'})[extname(file)]??'application/octet-stream');response.end(readFileSync(file));}catch{response.statusCode=404;response.end();}});
+ try{const dist=resolve(runtimeRoot,process.env.MAINSAGENTS_UI_DIST??'dist'),file=resolve(dist,path==='/'?'app.html':path.slice(1));assert(file.startsWith(dist+sep));response.setHeader('content-type',({'.html':'text/html','.js':'application/javascript','.css':'text/css','.png':'image/png','.svg':'image/svg+xml','.woff2':'font/woff2'})[extname(file)]??'application/octet-stream');response.end(readFileSync(file));}catch{response.statusCode=404;response.end();}});
 const errors=[],js=code=>win.webContents.executeJavaScript(code);
 async function until(check,label){const end=Date.now()+30000;while(Date.now()<end){if(await check())return;await new Promise(r=>setTimeout(r,40));}throw Error(`Content deletion UI timed out: ${label}`);}
 async function shot(name){writeFileSync(join(out,`${name}.png`),await captureReadyPng(win.webContents));}
@@ -68,7 +70,7 @@ const active=()=>js('(document.activeElement?.getAttribute("aria-label")||docume
 const ids=()=>store.read(profile,'sessions').map(s=>s.id).sort();
 const dialogText=()=>js('document.querySelector(".flow-dialog")?.textContent??""');
 async function open(width=1440,height=1000){
- win=new BrowserWindow({show:false,width,height,webPreferences:{preload:resolve(root,'desktop-preload.cjs'),contextIsolation:true,sandbox:true,offscreen:true,backgroundThrottling:false}});
+ win=new BrowserWindow({show:false,width,height,webPreferences:{preload:resolve(runtimeRoot,'desktop-preload.cjs'),contextIsolation:true,sandbox:true,offscreen:true,backgroundThrottling:false}});
  win.webContents.on('console-message',event=>{if(/Uncaught|Maximum update depth|Cannot update a component|Failed to persist/.test(event.message))errors.push(event.message);});
  await win.loadURL(`http://127.0.0.1:${server.address().port}/app.html`);
  await until(()=>js(`Boolean(document.querySelector('.agent-nav[title="Editor de Conteúdo"]'))`),'app ready');
@@ -173,6 +175,20 @@ app.whenReady().then(()=>server.listen(0,'127.0.0.1',async()=>{
   assert.equal(bridge.production.list(profile).length,0);
   assert.deepEqual(check.prepare('SELECT content_id,status FROM content_tombstones ORDER BY content_id').all().map(row=>`${row.content_id}:${row.status}`),['content-a:deleted','content-c:deleted'],'tombstones survive the restore');
   check.close();
+  // A content deletion keeps the topic; the separate topic button now removes it durably.
+  await js('location.hash="home"');await until(()=>js('Boolean(document.querySelector(".ov-needs"))'),'overview without tutorial');
+  assert(await js('!document.querySelector(".welcome-guide,[data-od-id=overview-start]")'));
+  await js('location.hash="content"');await until(()=>js('Boolean(document.querySelector(".studio-topic-delete"))'),'topic removal button');
+  await js('document.querySelector(".studio-topic-delete").click()');await until(()=>js('Boolean(document.querySelector(".flow-dialog"))'),'topic confirmation');
+  assert.match(await dialogText(),/Excluir pauta/);await key('Escape');assert(await js('Boolean(document.querySelector(".studio-topic-delete"))'),'cancel preserves topic');
+  await js('document.querySelector(".studio-topic-delete").click()');await shot('08-delete-topic');
+  await js('document.querySelector(".content-deletion footer .danger-button").click()');
+  await until(()=>js('!document.querySelector(".flow-dialog")&&!document.querySelector(".studio-topic-delete")'),'topic deleted');
+  assert.deepEqual(ids(),['b-editor','b-source','general'],'independent chats stay');
+  const afterTopic=new DatabaseSync(dbPath);assert.deepEqual(JSON.parse(afterTopic.prepare('SELECT state_json FROM editorial_state WHERE profile_id=?').get(profile).state_json).topics,[]);afterTopic.close();
+  const loaded=new Promise(resolve=>win.webContents.once('did-finish-load',resolve));win.webContents.reloadIgnoringCache();await loaded;
+  await until(()=>js('Boolean(document.querySelector(".editorial-list"))'),'studio reloaded');assert(await js('!document.querySelector(".studio-topic-delete")'),'topic stays deleted after reload');
+  await shot('09-no-topics-after-reload');
   assert.deepEqual(errors,[]);
   console.log(JSON.stringify({ok:true,out}));
   await bridge.close();server.close();app.exit(0);

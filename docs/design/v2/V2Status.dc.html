@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>MainsAgents V2 — Ícone de estado</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<span role="img" aria-label="{{label}}" style="display: inline-flex; width: {{sz}}px; height: {{sz}}px; flex: 0 0 auto; color: #ececef">
+  <sc-if value="{{is.fila}}" hint-placeholder-val="{{ false }}">
+    <svg width="{{sz}}" height="{{sz}}" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="#85858f" stroke-width="1.5" stroke-dasharray="2.4 2.1"></circle></svg>
+  </sc-if>
+  <sc-if value="{{is.rodando}}" hint-placeholder-val="{{ true }}">
+    <svg width="{{sz}}" height="{{sz}}" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="#5b8cff" stroke-width="1.5"></circle><path d="M8 4.6 A3.4 3.4 0 0 1 8 11.4 Z" fill="#5b8cff"></path></svg>
+  </sc-if>
+  <sc-if value="{{is.aguardando}}" hint-placeholder-val="{{ false }}">
+    <svg width="{{sz}}" height="{{sz}}" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.75" fill="#f0b03f"></circle><path d="M8 4.7v4" stroke="#16161a" stroke-width="1.7" stroke-linecap="round"></path><circle cx="8" cy="11.1" r="1" fill="#16161a"></circle></svg>
+  </sc-if>
+  <sc-if value="{{is.pausado}}" hint-placeholder-val="{{ false }}">
+    <svg width="{{sz}}" height="{{sz}}" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="#a78bfa" stroke-width="1.5"></circle><path d="M6.6 5.8v4.4M9.4 5.8v4.4" stroke="#a78bfa" stroke-width="1.5" stroke-linecap="round"></path></svg>
+  </sc-if>
+  <sc-if value="{{is.feito}}" hint-placeholder-val="{{ false }}">
+    <svg width="{{sz}}" height="{{sz}}" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.75" fill="#3ecf8e"></circle><path d="M5.2 8.2l1.9 1.9 3.7-3.9" fill="none" stroke="#0b0b0d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+  </sc-if>
+  <sc-if value="{{is.falhou}}" hint-placeholder-val="{{ false }}">
+    <svg width="{{sz}}" height="{{sz}}" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.75" fill="#f2555a"></circle><path d="M5.8 5.8l4.4 4.4M10.2 5.8l-4.4 4.4" stroke="#0b0b0d" stroke-width="1.6" stroke-linecap="round"></path></svg>
+  </sc-if>
+</span>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"state":{"editor":"enum","options":["fila","rodando","aguardando","pausado","feito","falhou"],"default":"rodando"},"sz":{"editor":"int","default":14,"min":10,"max":32},"$preview":{"width":40,"height":40}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var s = this.props.state ?? 'rodando';
+    var labels = { fila: 'Na fila', rodando: 'Executando', aguardando: 'Aguardando você', pausado: 'Pausado', feito: 'Concluído', falhou: 'Falhou' };
+    var is = {};
+    Object.keys(labels).forEach(function (k) { is[k] = k === s; });
+    return { is: is, label: labels[s] || 'Estado', sz: this.props.sz ?? 14 };
+  }
+}
+</script>
+</body>
+</html>

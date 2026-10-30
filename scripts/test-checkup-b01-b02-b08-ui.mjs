@@ -87,6 +87,14 @@ const noEffects = () => {assert.deepEqual(writes,[],'No API mutation, AI call, p
 const shot = async name => {writeFileSync(join(out,`${name}.png`),await captureReadyPng(win.webContents));captures.push(name);};
 // Home "Em produção": one row per item, tagged with the pipeline column the projection placed it in.
 const column = id => js(`(()=>{const rows=[...document.querySelectorAll('.ov-prod-row[data-column=${id}]')];return {count:rows.length,titles:rows.map(row=>row.querySelector('.ov-prod-title').textContent)}})()`);
+// V2: production controls open from the run detail on #runs (list → row → "Abrir controles"/"Resolver agora").
+async function runControls(id){
+  await js(`location.hash='runs'`);
+  await until(()=>js(`Boolean(document.querySelector('[data-od-id="runs-page"],[data-od-id="run-detail"]'))`),'runs');
+  if(await js(`document.querySelector('[data-od-id="run-detail"]')?.dataset.runId!==${JSON.stringify(id)}&&Boolean(document.querySelector('[data-od-id="run-detail"]'))`))await click('[data-od-id="run-detail"] .v2-crumbs a');
+  if(!(await js(`Boolean(document.querySelector('[data-od-id="run-detail"]'))`)))await click(`[data-od-id="execution-${id}"]`);
+  await click('[data-od-id="run-controls"]');
+}
 async function open(hash) {
   win = new BrowserWindow({show:false,width:1440,height:1100,webPreferences:{preload:resolve(root,'tests/fixtures/assets-ui-preload.cjs'),contextIsolation:true,sandbox:true,offscreen:true,backgroundThrottling:false}});
   win.webContents.session.webRequest.onBeforeRequest((details,callback)=>{const url = new URL(details.url);if (['http:','https:'].includes(url.protocol) && url.hostname !== '127.0.0.1') {external.push(details.url);callback({cancel:true});} else callback({});});
@@ -111,10 +119,11 @@ app.whenReady().then(async()=>{
     assert.deepEqual((await column('recording')).titles.sort(),['CONTENT manual','CONTENT rec'],'manual content keeps its stored stage; foreign-workspace run is ignored');
     assert(await js(`[...document.querySelectorAll('.ov-prod-row .ov-bars')].every(bar=>bar.children.length===8)`),'every row shows the 8 stages');
     await shot('home-pipeline-light');noEffects();
-    // ---- B02: welcome step + central readiness checklist ----
-    assert(await js(`document.querySelector('.welcome-guide')!==null`));
-    await click('.welcome-head .soft-button[aria-expanded]');
-    await clickText('.welcome-step .soft-button','Abrir verificação');
+    // ---- B02: manual diagnostics remain accessible without an introduction ----
+    assert(await js(`document.querySelector('.welcome-guide')===null`));
+    await js('location.hash="settings"');
+    await until(()=>js('Boolean(document.querySelector(".settings-nav"))'),'settings');
+    await click('.settings-nav button[aria-controls="settings-providers"]');
     await until(()=>js(`Boolean(document.querySelector('.readiness-checklist'))`),'readiness in settings');
     assert(await js(`document.querySelector('.readiness-summary').textContent.includes('Nada verificado')`),'nothing is ready before the manual check');
     assert.equal(await js(`document.querySelectorAll('.readiness-checklist li[data-state=ready]').length`),0);
@@ -133,9 +142,7 @@ app.whenReady().then(async()=>{
     await shot('readiness-light');noEffects();
     await js('document.documentElement.dataset.appearance="dark"');await shot('readiness-dark');await js('document.documentElement.dataset.appearance="light"');
     // ---- B08: reading mode from the real production dialog ----
-    await open('home');
-    await until(()=>js(`Boolean(document.querySelector('[data-od-id="execution-rec"] .soft-button'))`),'execution row');
-    await click('[data-od-id="execution-rec"] .soft-button');
+    await open('home');await runControls('rec');
     await until(()=>js(`Boolean(document.querySelector('.recording-package'))`),'recording package');
     const importLabel = await js(`document.querySelector('.recording-package-import').textContent`);
     assert(importLabel.includes('Importar vídeo gravado'),'external capture/import stays');
@@ -188,7 +195,7 @@ app.whenReady().then(async()=>{
     noEffects();
     // no outline → no scenes and an honest message
     await click('.flow-dialog header button');
-    await click('[data-od-id="execution-plain"] .soft-button');
+    await runControls('plain');
     await until(()=>js(`Boolean(document.querySelector('.recording-package'))`),'plain package');
     assert((await js(`document.querySelector('.production-budget').innerText`)).includes('Indisponível: nenhuma chamada informou uso'));
     await clickText('.recording-package button','Abrir modo de leitura');
@@ -198,7 +205,7 @@ app.whenReady().then(async()=>{
     await shot('reading-mode-no-scenes');
     await key('Escape');await until(()=>js(`!document.querySelector('.teleprompter')`));
     await click('.flow-dialog header button');
-    await click('[data-od-id="execution-rec"] .soft-button');
+    await runControls('rec');
     await until(()=>js(`Boolean(document.querySelector('.recording-package'))`));
     noEffects();
     // reduced motion: no automatic scrolling at all
@@ -228,7 +235,7 @@ app.whenReady().then(async()=>{
     await js('window.mainsAgentsSaveNow()');win.destroy();state.write(profile,'language','en-US');await open('home');
     await until(()=>js(`Boolean(document.querySelector('.ov-prod-row[data-column=package]'))`));
     assert((await js(`document.querySelector('.ov-prod-row[data-column=package] .ov-prod-stage').textContent`)).startsWith('Covers and package'));
-    await click('[data-od-id="execution-rec"] .soft-button');
+    await runControls('rec');
     await clickText('.recording-package button','Open reading mode');
     await until(()=>js(`document.querySelector('.teleprompter-status').textContent.startsWith('Paused')`),'English status');
     noEffects();assert.deepEqual(errors,[]);

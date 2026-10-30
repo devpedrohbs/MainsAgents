@@ -13,7 +13,6 @@ import { Home } from '../pages/Home';
 import { ContentStudio } from '../pages/ContentStudio';
 import { Board } from '../pages/Board';
 import { Canvas } from '../pages/Canvas';
-import { Flow } from '../pages/Flow';
 import { Agents } from '../pages/Agents';
 import { AgentSettings } from '../pages/AgentSettings';
 import { Sessions } from '../pages/Sessions';
@@ -22,6 +21,11 @@ import { Usage } from '../pages/Usage';
 import { EditingReferences } from '../pages/EditingReferences';
 import { Radar } from '../pages/Radar';
 import { Settings } from '../pages/Settings';
+import { Inbox } from '../pages/Inbox';
+import { Runs } from '../pages/Runs';
+import { Pipelines } from '../pages/Pipelines';
+import { inboxDismissKey, inboxItems, visibleInbox, type InboxDismissals } from '../features/inbox/inbox';
+import { selectRun } from '../features/inbox/runSelection';
 import { useCanvas } from '../components/canvas/CanvasProvider';
 import { useWorkspaces } from './WorkspaceProvider';
 import { useChat } from '../features/chat/ChatProvider';
@@ -29,7 +33,6 @@ import { contentLink, contentScopeKey, scopeContentId } from '../features/chat/c
 import { usePersistentState, updatePersistentValue } from '../data/localPersistence';
 import { useLanguage } from './LanguageProvider';
 import { TaskEditorDialog, type TaskDraft } from '../components/tasks/TaskEditorDialog';
-import { WelcomeGuide } from '../components/onboarding/WelcomeGuide';
 import { agentTemplates, localizeTemplate } from '../features/agents/agentTemplates';
 import { useContentWorkflow } from '../features/content/ContentWorkflowProvider';
 import { editorialInbox, type EditorialInboxItem } from '../features/content/editorialInbox';
@@ -48,7 +51,9 @@ export function App() {
   const { currentWorkspaceId, workspaces, setCurrentWorkspaceId } = useWorkspaces();
   const {runs: productionRuns} = useProduction();
   const [executionId, setExecutionId] = useState<string | null>(null);
-  useEffect(() => setExecutionId(null), [currentWorkspaceId]);
+  // Global entry for a new production (it used to start from the Flow area); same dialog as the chat's Production button.
+  const [newProductionOpen, setNewProductionOpen] = useState(false);
+  useEffect(() => { setExecutionId(null); setNewProductionOpen(false); }, [currentWorkspaceId]);
   const currentExecution = executionOverview(productionRuns, currentWorkspaceId, locale === 'pt-BR').find(item => item.id === executionId);
   const openExecution = (item: ExecutionOverviewItem, chat = false) => {
     const current = executionOverview(productionRuns, currentWorkspaceId, locale === 'pt-BR').find(candidate => candidate.id === item.id);
@@ -86,7 +91,6 @@ export function App() {
   const [activeAgentId, setActiveAgentId] = useState<AgentId>(agents[0]?.id ?? '');
   const [editorAgentId, setEditorAgentId] = useState<AgentId | 'new' | null>(null);
   const [agentTemplateId, setAgentTemplateId] = useState<string | null>(null);
-  const [welcomeDismissed, setWelcomeDismissed] = usePersistentState<boolean>('welcome-dismissed', false);
   const [taskDialogStatus, setTaskDialogStatus] = useState<TaskStatus | null>(null);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [selectedContentId, setSelectedContentId] = useState<string | null>(null);
@@ -382,14 +386,6 @@ export function App() {
     return () => window.removeEventListener('mainsagents:persistence-error', report);
   }, []);
   useEffect(() => {
-    const reopen = () => {
-      setWelcomeDismissed(false);
-      navigate('home');
-    };
-    window.addEventListener('mainsagents:show-welcome', reopen);
-    return () => window.removeEventListener('mainsagents:show-welcome', reopen);
-  }, [navigate, setWelcomeDismissed]);
-  useEffect(() => {
     if (!editorialReady || !tasksHydrated) return;
     setAllTasks((current) => {
       let changed = false;
@@ -458,8 +454,34 @@ export function App() {
     setAllTasks,
     tasksHydrated,
   ]);
+  const [inboxDismissed, setInboxDismissed] = usePersistentState<InboxDismissals>(`inbox-dismissed:${currentWorkspaceId}`, {});
+  const inbox = visibleInbox(inboxItems({
+    state: editorialState, jobs: editorialJobs, workspaceId: currentWorkspaceId, chatInbox, tasks: workspaceTasks, sessions, getAgentById, pt: locale === 'pt-BR',
+    onOpenEditorial: openEditorialItem, onOpenChat: (item) => { openSession(item.agentId, item.sessionId); selectAgent(item.agentId); }, onOpenTask: openTask,
+  }), inboxDismissed);
+  const dismissInbox = (key: string, entry: InboxDismissals[string]) => setInboxDismissed((current) => {
+    // Keep the map small: entries for items that no longer exist are dropped on every change.
+    const live = new Set(inbox.map(inboxDismissKey));
+    const next = Object.fromEntries(Object.entries(current).filter(([id, value]) => live.has(id) || (value.snoozedUntil && Date.parse(value.snoozedUntil) > Date.now())));
+    return { ...next, [key]: entry };
+  });
+  const workspaceExecutions = executionOverview(productionRuns, currentWorkspaceId, locale === 'pt-BR');
+  const activeRuns = workspaceExecutions.filter((item) => item.state === 'active' || item.state === 'waiting').length;
+  const waitingAgentIds = new Set(inbox.flatMap((item) => item.agent ? [item.agent.id] : []));
+  const openRun = (runId: string) => { selectRun(currentWorkspaceId, runId); navigate('runs'); };
   const content =
-    page === 'content' ? (
+    page === 'inbox' ? (
+      <Inbox
+        items={inbox}
+        onArchive={(item) => { dismissInbox(inboxDismissKey(item), { archivedAt: new Date().toISOString() }); notify(locale === 'pt-BR' ? 'Arquivado. Volta se houver novidade.' : 'Archived. It returns if something changes.'); }}
+        onSnooze={(item) => { const until = new Date(); until.setHours(until.getHours() + 3); dismissInbox(inboxDismissKey(item), { snoozedUntil: until.toISOString() }); notify(locale === 'pt-BR' ? 'Adiado por 3 horas.' : 'Snoozed for 3 hours.'); }}
+        onOpenRun={openRun}
+      />
+    ) : page === 'runs' ? (
+      <Runs key={currentWorkspaceId} onOpenControls={(item) => openExecution(item)} onOpenChat={(item) => openExecution(item, true)} onNewProduction={() => setNewProductionOpen(true)} onToast={notify} />
+    ) : page === 'pipelines' ? (
+      <Pipelines key={currentWorkspaceId} onNewProduction={() => setNewProductionOpen(true)} onNavigate={navigate} />
+    ) : page === 'content' ? (
       <ContentStudio
         onCreateAgent={startAgentCreation}
         key={currentWorkspaceId}
@@ -482,8 +504,6 @@ export function App() {
       />
     ) : page === 'canvas' ? (
       <Canvas onToast={notify} onAskAgent={sendCanvasContext} onSendToAgent={sendCanvasContext} />
-    ) : page === 'flow' ? (
-      <Flow onOpenCanvas={() => navigate('canvas')} onSelectAgent={selectAgent} onOpenStudio={()=>{updatePersistentValue('studio-view','studio','studio');navigate('content')}} />
     ) : page === 'agents' ? (
       <Agents
         key={currentWorkspaceId}
@@ -527,41 +547,19 @@ export function App() {
       <Settings initialSection={settingsSection} />
     ) : (
       <>
-        {!welcomeDismissed && (
-          <WelcomeGuide
-            hasAgent={agents.length > 0}
-            onTemplate={(id) => {
-              setAgentTemplateId(id);
-              setEditorAgentId('new');
-            }}
-            onBlank={startAgentCreation}
-            onSession={newSession}
-            onCanvas={() => navigate('canvas')}
-            onCodexSettings={() => {
-              setSettingsSection('providers');
-              navigate('settings');
-            }}
-            onDismiss={() => setWelcomeDismissed(true)}
-          />
-        )}
         <Home
-          tasks={workspaceTasks}
-          onOpenTask={openTask}
+          inbox={inbox}
           onCreateAgent={startAgentCreation}
-          onCreateTask={() => newTask()}
+          onNewProduction={() => setNewProductionOpen(true)}
           onSelectAgent={(id) => selectAgent(id)}
           onNavigate={navigate}
-          onOpenEditorial={openEditorialItem}
-          chatInbox={chatInbox}
-          onOpenChatInbox={item=>{openSession(item.agentId,item.sessionId);selectAgent(item.agentId);}}
-          showEmptyPrompt={welcomeDismissed}
-          onOpenExecution={item => openExecution(item)}
-          onOpenExecutionChat={item => openExecution(item, true)}
+          onOpenRun={openRun}
         />
       </>
     );
   return (
     <>
+      {newProductionOpen && <ProductionDialog workspaceId={currentWorkspaceId} onClose={() => setNewProductionOpen(false)} onSelectAgent={id => selectAgent(id)}/>}
       {currentExecution?.detail && <ProductionDialog key={currentExecution.id} workspaceId={currentExecution.detail.workspaceId} flowId={currentExecution.detail.flowId} sessionId={currentExecution.detail.sessionId} onClose={() => setExecutionId(null)} onSelectAgent={id => selectAgent(id)}/>}
       <AppShell
         onProviderSettings={() => {
@@ -585,6 +583,9 @@ export function App() {
         onCreate={() => setCreateOpen(true)}
         onToast={notify}
         focusMode={focusMode}
+        inboxCount={inbox.length}
+        activeRuns={activeRuns}
+        waitingAgentIds={waitingAgentIds}
       >
         {content}
       </AppShell>
@@ -622,9 +623,9 @@ export function App() {
               navigate('sessions');
             });
         }}
-        onOpenNode={(workspaceId, nodeId) =>
+        onOpenNode={(workspaceId, nodeId, boardId) =>
           inWorkspace(workspaceId, () => {
-            selectNode(workspaceId, nodeId);
+            selectNode(workspaceId, nodeId, boardId);
             navigate('canvas');
           })
         }
@@ -643,6 +644,7 @@ export function App() {
           onSession={newSession}
           onNote={() => addCanvasNode('note')}
           onContent={() => navigate('content')}
+          onProduction={() => setNewProductionOpen(true)}
         />
       )}
       {agentChoice && (

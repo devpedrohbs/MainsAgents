@@ -91,23 +91,26 @@ export function ensureContentFenceTriggers(db){
  fencedTable('content_source_pairs','fence_source_pairs',[contentFenceSql('NEW.content_id','NEW.profile_id')],row=>`${row}.profile_id=NEW.profile_id AND ${row}.content_id=NEW.content_id`,()=>'0');
  fencedTable('content_srt_documents','fence_srt_documents',[contentFenceSql('NEW.content_id','NEW.profile_id')],row=>`${row}.profile_id=NEW.profile_id AND ${row}.id=NEW.id`,row=>`json_extract(${row}.data_json,'$.job.status')='running'`);
  fencedTable('editorial_media_jobs','fence_media_jobs',[contentFenceSql("json_extract(NEW.data_json,'$.contentId')",'NEW.profile_id')],byId,queued);
- fencedTable('workflow_work','fence_workflow_work',[contentFenceSql("json_extract(NEW.data_json,'$.contentId')",'NEW.profile_id')],byId,queued);
+ fencedTable('workflow_work','fence_workflow_work',[contentFenceSql("json_extract(NEW.data_json,'$.contentId')",'NEW.profile_id'),fenceSql('topic',"json_extract(NEW.data_json,'$.topicId')",'NEW.profile_id')],byId,queued);
  fencedTable('editorial_jobs','fence_editorial_jobs',[contentFenceSql('NEW.content_id','NEW.profile_id')],byId,queued);
  guard('delivery_receipts','fence_delivery_receipts',`${contentFenceSql("json_extract(NEW.data_json,'$.contentId')",'NEW.profile_id')}='deleted' OR ${fenceSql('session',"json_extract(NEW.data_json,'$.sessionId')",'NEW.profile_id')}='deleted' OR ${fenceSql('run',"json_extract(NEW.data_json,'$.source.id')",'NEW.profile_id')}='deleted'`);
  if(tableExists(db,'editorial_state')){
   const refers=(path,field)=>`EXISTS(SELECT 1 FROM json_each(NEW.state_json,'$.${path}') j JOIN content_tombstones t ON t.profile_id=NEW.profile_id AND t.status='deleted' AND t.content_id=json_extract(j.value,'$.${field}'))`;
   const condition=`EXISTS(SELECT 1 FROM content_tombstones WHERE profile_id=NEW.profile_id AND status='deleted') AND (${refers('contents','id')} OR ${refers('artifacts','contentId')} OR ${refers('approvals','contentId')} OR ${refers('runs','contentId')} OR ${refers('assets','contentId')} OR ${refers('publications','contentId')})`;
   for(const event of ['INSERT','UPDATE'])db.exec(`DROP TRIGGER IF EXISTS fence_editorial_state_${event.toLowerCase()}; CREATE TRIGGER fence_editorial_state_${event.toLowerCase()} BEFORE ${event} ON editorial_state FOR EACH ROW WHEN ${condition} BEGIN SELECT RAISE(ABORT,'This content was deleted locally; its records cannot be recreated.'); END;`);
+  const topicRefers=(path,field)=>`EXISTS(SELECT 1 FROM json_each(NEW.state_json,'$.${path}') j JOIN content_tombstone_ids i ON i.profile_id=NEW.profile_id AND i.kind='topic' AND i.content_id='' AND i.id=json_extract(j.value,'$.${field}'))`;
+  const topicCondition=`EXISTS(SELECT 1 FROM content_tombstone_ids WHERE profile_id=NEW.profile_id AND kind='topic') AND (${[['topics','id'],['contents','topicId'],['artifacts','topicId'],['approvals','topicId'],['runs','topicId']].map(([path,field])=>topicRefers(path,field)).join(' OR ')})`;
+  for(const event of ['INSERT','UPDATE'])db.exec(`DROP TRIGGER IF EXISTS fence_editorial_topics_${event.toLowerCase()}; CREATE TRIGGER fence_editorial_topics_${event.toLowerCase()} BEFORE ${event} ON editorial_state FOR EACH ROW WHEN ${topicCondition} BEGIN SELECT RAISE(ABORT,'This topic was deleted locally; its records cannot be recreated.'); END;`);
  }
 }
 
 /** IDs that are gone for good in a profile (deleted contents and their linked ids, plus individually deleted chats). */
 export function deletedIds(db,profile){
- if(!tableExists(db,'content_tombstones'))return {contents:new Set(),sessions:new Set(),runs:new Set(),artifacts:new Set()};
+ if(!tableExists(db,'content_tombstones'))return {contents:new Set(),sessions:new Set(),runs:new Set(),artifacts:new Set(),topics:new Set()};
  const contents=new Set(db.prepare("SELECT content_id FROM content_tombstones WHERE profile_id=? AND status='deleted'").all(profile).map(row=>row.content_id));
  const rows=db.prepare("SELECT i.kind,i.id FROM content_tombstone_ids i LEFT JOIN content_tombstones t ON t.profile_id=i.profile_id AND t.content_id=i.content_id WHERE i.profile_id=? AND (i.content_id='' OR t.status='deleted')").all(profile);
  const of=kind=>new Set(rows.filter(row=>row.kind===kind).map(row=>row.id));
- return {contents,sessions:of('session'),runs:of('run'),artifacts:of('artifact')};
+ return {contents,sessions:of('session'),runs:of('run'),artifacts:of('artifact'),topics:of('topic')};
 }
 /**
  * A backup made before a local deletion still holds that content. Restoring it keeps everything else and leaves out only
@@ -117,7 +120,7 @@ export function deletedIds(db,profile){
 export function stripDeletedFromRestore(db,profile,{values={},editorial,execution}={}){
  const ids=deletedIds(db,profile);
  const omitted={contents:0,sessions:0};
- if(!ids.contents.size&&!ids.sessions.size)return {values,editorial,execution,omitted};
+ if(!ids.contents.size&&!ids.sessions.size&&!ids.topics.size)return {values,editorial,execution,omitted};
  const cleanValues=Object.fromEntries(Object.entries(values).map(([key,value])=>[key,linkedStateKeys.includes(key)?sanitizeLinkedValue(key,value,ids):value]));
  if(Array.isArray(values.sessions)&&Array.isArray(cleanValues.sessions))omitted.sessions=values.sessions.length-cleanValues.sessions.length;
  const cleanEditorial=stripDeletedEditorial(editorial,ids);
@@ -134,7 +137,7 @@ export function stripDeletedFromRestore(db,profile,{values={},editorial,executio
    delegationSessions:keep(state.delegationSessions,row=>goneSession(row.id)||goneContent(data(row).contentId)),
    mediaJobs:keep(state.mediaJobs,row=>goneContent(data(row).contentId)),
    productions:keep(state.productions,row=>goneContent(row.content_id)||ids.runs.has(row.id)),
-   work:keep(state.work,row=>goneContent(data(row).contentId))}};
+   work:keep(state.work,row=>goneContent(data(row).contentId)||ids.topics.has(data(row).topicId))}};
  }
  return {values:cleanValues,editorial:cleanEditorial,execution:cleanExecution,omitted};
 }
@@ -387,5 +390,35 @@ export function createContentDeletion(db,{getCurrentProfile,getAgents,production
   return {deleted:true,sessionId,state:stateChanges};
  }
 
- return {preview,delete:remove,removeSession,deletedIds:profile=>deletedIds(db,profile),collect};
+ /** Delete one backlog topic, never implicitly deleting its content or stopping active research. */
+ function removeTopic(profile,input={}){
+  profileCheck(profile);
+  const {topicId,workspaceId,revision}=input;
+  const say=(pt,en)=>input.language==='en-US'?en:pt;
+  if(!idText(topicId)||!idText(workspaceId)||!Number.isSafeInteger(revision)||revision<0)throw failure(400,say('Pedido de exclusão de pauta inválido.','Invalid topic deletion request.'));
+  db.exec('BEGIN IMMEDIATE');
+  try{
+   const current=editorial(profile);
+   if(!current||current.revision!==revision)throw failure(409,say('As pautas mudaram. Atualize a lista e tente novamente.','Topics changed. Refresh the list and try again.'));
+   const topic=current.state.topics.find(item=>item.id===topicId);
+   if(!topic){
+    if(deletedIds(db,profile).topics.has(topicId)){db.exec('COMMIT');return current;}
+    throw failure(404,say('Esta pauta não existe mais.','This topic no longer exists.'));
+   }
+   if(topic.workspaceId!==workspaceId)throw failure(404,say('Esta pauta não pertence a este espaço de trabalho.','This topic does not belong to this workspace.'));
+   if(current.state.contents.some(item=>item.topicId===topicId||item.id===topic.contentId)||all('production_runs','SELECT data_json FROM production_runs WHERE profile_id=?',profile).some(row=>json(row.data_json)?.topicId===topicId))throw failure(409,say('Esta pauta possui um conteúdo vinculado. Exclua o conteúdo antes de excluir a pauta.','This topic has linked content. Delete the content before deleting the topic.'),{code:'linked-content'});
+   const workRows=all('workflow_work','SELECT id,status,data_json FROM workflow_work WHERE profile_id=?',profile).filter(row=>json(row.data_json)?.topicId===topicId);
+   if(current.state.runs.some(item=>item.topicId===topicId&&item.state==='running')||workRows.some(row=>['queued','running'].includes(row.status)))throw failure(409,say('Há uma pesquisa em andamento nesta pauta. Aguarde ou cancele o trabalho antes de excluir.','Research is running for this topic. Wait or cancel the work before deleting.'),{code:'busy'});
+   db.prepare("INSERT OR IGNORE INTO content_tombstone_ids VALUES(?,'topic',?,'')").run(profile,topicId);
+   const state=stripDeletedEditorial(current.state,{topics:new Set([topicId])}),next=current.revision+1;
+   db.prepare('UPDATE editorial_state SET revision=?,state_json=?,updated_at=? WHERE profile_id=? AND revision=?').run(next,JSON.stringify(state),now(),profile,revision);
+   for(const row of workRows){if(has('workflow_events'))db.prepare('DELETE FROM workflow_events WHERE job_id=?').run(row.id);db.prepare('DELETE FROM workflow_work WHERE profile_id=? AND id=?').run(profile,row.id);}
+   if(has('state'))for(const key of ['sessions','studio-drafts']){
+    const {raw,value}=stateValue(profile,key);if(raw===undefined)continue;
+    const cleaned=sanitizeLinkedValue(key,value,{topics:new Set([topicId])});if(cleaned!==value)db.prepare('UPDATE state SET value=? WHERE profile=? AND key=?').run(JSON.stringify(cleaned),profile,key);
+   }
+   db.exec('COMMIT');return {revision:next,state};
+  }catch(error){db.exec('ROLLBACK');throw error;}
+ }
+ return {preview,delete:remove,removeSession,removeTopic,deletedIds:profile=>deletedIds(db,profile),collect};
 }

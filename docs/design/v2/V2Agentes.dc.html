@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>MainsAgents V2 — Agentes</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0b0b0d}
+a{color:#8aa8ff}a:hover{color:#b3c6ff}
+button{font:inherit;cursor:pointer}
+input{font:inherit}
+.v2row:hover{background:#16161a}
+@media (max-width: 900px){.v2-side{display:none !important}}
+</style>
+</helmet>
+<div style="width: 100%; height: 900px; box-sizing: border-box; display: flex; background: #0b0b0d; color: #ececef; font-family: Inter, -apple-system, system-ui, sans-serif; font-size: 13px; line-height: 20px; font-feature-settings: 'cv11' 1, 'ss01' 1; overflow: hidden">
+  <div class="v2-side" style="flex: 0 0 220px">
+    <dc-import name="V2Sidebar" active="agents" hint-size="220px,900px"></dc-import>
+  </div>
+
+  <div style="flex: 1 1 auto; min-width: 0; display: flex; padding: 8px 8px 8px 0">
+    <div style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; background: #111113; border: 1px solid #1f1f24; border-radius: 10px; overflow: hidden">
+
+      <header style="flex: 0 0 auto; min-height: 44px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 6px 12px 6px 20px; border-bottom: 1px solid #1f1f24; box-sizing: border-box">
+        <h1 style="margin: 0; font-size: 13px; font-weight: 600">Agentes</h1>
+        <span style="font-size: 12px; color: #85858f">5 no workspace · 3 trabalhando</span>
+        <div style="flex-grow: 1"></div>
+        <div role="group" aria-label="Visualização" style="display: flex; padding: 2px; border: 1px solid #2a2a31; border-radius: 7px; background: #0b0b0d">
+          <button type="button" aria-pressed="true" style="height: 24px; padding: 0 10px; border: 0; border-radius: 5px; background: #1c1c21; color: #ececef; font-size: 12px">Tabela</button>
+          <button type="button" aria-pressed="false" style="height: 24px; padding: 0 10px; border: 0; border-radius: 5px; background: transparent; color: #a4a4ad; font-size: 12px">Cartões</button>
+        </div>
+        <button type="button" style="display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px; border: 0; border-radius: 6px; background: #ececef; color: #0b0b0d; font-weight: 500">Novo agente <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #55555e">C A</span></button>
+      </header>
+
+      <div style="flex: 0 0 auto; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px 16px; border-bottom: 1px solid #1f1f24">
+        <label style="display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 8px; border: 1px solid #2a2a31; border-radius: 6px; background: #0b0b0d; color: #85858f; width: 220px">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="M20 20l-4-4"></path></svg>
+          <input type="text" placeholder="Filtrar agentes" aria-label="Filtrar agentes" style="flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: #ececef; font-size: 12px">
+        </label>
+        <button type="button" style="height: 26px; padding: 0 8px; border: 1px dashed #33333b; border-radius: 6px; background: transparent; color: #a4a4ad; font-size: 12px">+ Provedor</button>
+        <button type="button" style="height: 26px; padding: 0 8px; border: 1px dashed #33333b; border-radius: 6px; background: transparent; color: #a4a4ad; font-size: 12px">+ Estado</button>
+        <span style="margin-left: auto; font-size: 12px; color: #85858f">Agrupar por <b style="color: #ececef; font-weight: 500">estado</b> · últimos 7 dias</span>
+      </div>
+
+      <div style="flex: 1 1 auto; min-height: 0; display: flex; flex-wrap: wrap; overflow: auto">
+
+        <!-- Table -->
+        <section aria-label="Lista de agentes" style="flex: 999 1 560px; min-width: 0; overflow-x: auto">
+          <div style="min-width: 760px">
+            <div style="display: flex; align-items: center; gap: 12px; height: 32px; padding: 0 16px; font-size: 12px; color: #85858f; border-bottom: 1px solid #1f1f24">
+              <span style="flex: 1 1 200px">Agente</span><span style="flex: 0 0 150px">Agora</span><span style="flex: 0 0 140px">Modelo</span><span style="flex: 0 0 110px">Aprovação</span><span style="flex: 0 0 54px; text-align: right">Exec.</span><span style="flex: 0 0 60px; text-align: right">Sucesso</span><span style="flex: 0 0 70px; text-align: right">Custo</span>
+            </div>
+            <sc-for list="{{groups}}" as="g" hint-placeholder-count="2">
+              <div style="display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 16px; background: #0e0e10; border-bottom: 1px solid #1f1f24; font-size: 12px">
+                <dc-import name="V2Status" state="{{g.st}}" sz="{{ 12 }}" hint-size="12px,12px"></dc-import>
+                <b style="font-weight: 500">{{g.label}}</b><span style="color: #85858f">{{g.count}}</span>
+              </div>
+              <sc-for list="{{g.rows}}" as="r" hint-placeholder-count="3">
+                <button type="button" class="v2row" onClick="{{r.pick}}" aria-pressed="{{r.on}}" style="width: 100%; display: flex; align-items: center; gap: 12px; height: 48px; padding: 0 16px; border: 0; border-bottom: 1px solid #1f1f24; background: {{r.bg}}; color: #ececef; text-align: left">
+                  <span style="flex: 1 1 200px; min-width: 0; display: flex; align-items: center; gap: 10px">
+                    <span aria-hidden="true" style="flex: 0 0 26px; height: 26px; border-radius: 7px; background: {{r.c}}; color: #0b0b0d; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center">{{r.i}}</span>
+                    <span style="display: flex; flex-direction: column; min-width: 0"><b style="font-weight: 500; white-space: nowrap">{{r.n}}</b><span style="font-size: 12px; line-height: 16px; color: #85858f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{r.role}}</span></span>
+                  </span>
+                  <span style="flex: 0 0 150px; display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 12px; color: {{r.nowC}}">
+                    <dc-import name="V2Status" state="{{r.st}}" sz="{{ 12 }}" hint-size="12px,12px"></dc-import>
+                    <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{r.now}}</span>
+                  </span>
+                  <span style="flex: 0 0 140px; font-size: 12px; color: #a4a4ad; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{r.model}}</span>
+                  <span style="flex: 0 0 110px"><span style="display: inline-flex; align-items: center; height: 20px; padding: 0 6px; border: 1px solid #2a2a31; border-radius: 4px; font-size: 11px; color: #a4a4ad">{{r.policyLabel}}</span></span>
+                  <span style="flex: 0 0 54px; text-align: right; font-family: 'JetBrains Mono', monospace; font-size: 12px">{{r.runs}}</span>
+                  <span style="flex: 0 0 60px; text-align: right; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: {{r.okC}}">{{r.ok}}</span>
+                  <span style="flex: 0 0 70px; text-align: right; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #a4a4ad">{{r.cost}}</span>
+                </button>
+              </sc-for>
+            </sc-for>
+          </div>
+        </section>
+
+        <!-- Inspector -->
+        <aside aria-label="Detalhes do agente" style="flex: 1 1 340px; max-width: 380px; min-width: 300px; border-left: 1px solid #1f1f24; display: flex; flex-direction: column; gap: 18px; padding: 16px; box-sizing: border-box; overflow: auto">
+          <div style="display: flex; align-items: center; gap: 12px">
+            <span aria-hidden="true" style="flex: 0 0 40px; height: 40px; border-radius: 10px; background: {{a.c}}; color: #0b0b0d; font-size: 14px; font-weight: 700; display: flex; align-items: center; justify-content: center">{{a.i}}</span>
+            <div style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+              <h2 style="margin: 0; font-size: 15px; line-height: 22px; font-weight: 600">{{a.n}}</h2>
+              <span style="font-size: 12px; line-height: 16px; color: #85858f">{{a.role}}</span>
+            </div>
+          </div>
+          <div style="display: flex; gap: 8px">
+            <a href="V2Estudio.dc.html" style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; height: 32px; border-radius: 6px; background: #ececef; color: #0b0b0d; font-weight: 500; text-decoration: none">Conversar</a>
+            <button type="button" style="flex: 1; height: 32px; border: 1px solid #2a2a31; border-radius: 6px; background: #16161a; color: #ececef">Editar agente</button>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: #1f1f24; border: 1px solid #1f1f24; border-radius: 8px; overflow: hidden">
+            <div style="background: #111113; padding: 10px; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 11px; color: #85858f">Execuções</span><b style="font-size: 18px; line-height: 24px; font-weight: 600">{{a.runs}}</b>
+              <svg width="100%" height="18" viewBox="0 0 100 18" preserveAspectRatio="none" aria-hidden="true"><polyline points="{{a.spark}}" fill="none" stroke="{{a.c}}" stroke-width="1.5" vector-effect="non-scaling-stroke"></polyline></svg>
+            </div>
+            <div style="background: #111113; padding: 10px; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 11px; color: #85858f">Sucesso</span><b style="font-size: 18px; line-height: 24px; font-weight: 600; color: {{a.okC}}">{{a.ok}}</b><span style="font-size: 11px; color: #85858f">{{a.fails}}</span></div>
+            <div style="background: #111113; padding: 10px; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 11px; color: #85858f">Tempo médio</span><b style="font-size: 18px; line-height: 24px; font-weight: 600">{{a.avg}}</b><span style="font-size: 11px; color: #85858f">por passo</span></div>
+          </div>
+
+          <section aria-labelledby="ag-pol" style="display: flex; flex-direction: column; gap: 8px">
+            <h3 id="ag-pol" style="margin: 0; font-size: 13px; font-weight: 600">Quando pedir sua aprovação</h3>
+            <div role="radiogroup" aria-labelledby="ag-pol" style="display: flex; flex-direction: column; gap: 4px">
+              <sc-for list="{{policies}}" as="p" hint-placeholder-count="3">
+                <button type="button" role="radio" aria-checked="{{p.on}}" onClick="{{p.pick}}" style="display: flex; align-items: flex-start; gap: 10px; padding: 10px; border: 1px solid {{p.bd}}; border-radius: 8px; background: {{p.bg}}; color: #ececef; text-align: left">
+                  <span aria-hidden="true" style="flex: 0 0 14px; height: 14px; margin-top: 3px; box-sizing: border-box; border-radius: 50%; border: {{p.ring}}"></span>
+                  <span style="display: flex; flex-direction: column"><b style="font-weight: 500">{{p.label}}</b><span style="font-size: 12px; line-height: 16px; color: #85858f">{{p.desc}}</span></span>
+                </button>
+              </sc-for>
+            </div>
+          </section>
+
+          <section aria-labelledby="ag-tools" style="display: flex; flex-direction: column; gap: 6px">
+            <h3 id="ag-tools" style="margin: 0; font-size: 13px; font-weight: 600">Ferramentas</h3>
+            <sc-for list="{{a.tools}}" as="t" hint-placeholder-count="3">
+              <div style="display: flex; align-items: center; gap: 10px; min-height: 32px; border-bottom: 1px solid #1a1a1f">
+                <span style="flex: 1; font-family: 'JetBrains Mono', monospace; font-size: 12px">{{t.name}}</span>
+                <span style="font-size: 12px; color: {{t.c}}">{{t.mode}}</span>
+              </div>
+            </sc-for>
+          </section>
+
+          <section aria-labelledby="ag-skills" style="display: flex; flex-direction: column; gap: 8px">
+            <h3 id="ag-skills" style="margin: 0; font-size: 13px; font-weight: 600">Skills</h3>
+            <div style="display: flex; flex-wrap: wrap; gap: 6px">
+              <sc-for list="{{a.skills}}" as="s" hint-placeholder-count="3"><span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 2px 6px; border: 1px solid #2a2a31; border-radius: 4px; color: #a4a4ad">/{{s}}</span></sc-for>
+            </div>
+          </section>
+
+          <section aria-labelledby="ag-last" style="display: flex; flex-direction: column; gap: 4px">
+            <h3 id="ag-last" style="margin: 0 0 4px; font-size: 13px; font-weight: 600">Últimas execuções</h3>
+            <sc-for list="{{a.last}}" as="l" hint-placeholder-count="3">
+              <a href="V2Execucao.dc.html" class="v2row" style="display: flex; align-items: center; gap: 10px; min-height: 32px; padding: 0 6px; border-radius: 6px; text-decoration: none; color: #ececef; font-size: 12px">
+                <dc-import name="V2Status" state="{{l.st}}" sz="{{ 12 }}" hint-size="12px,12px"></dc-import>
+                <span style="font-family: 'JetBrains Mono', monospace; color: #85858f">{{l.id}}</span>
+                <span style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{l.t}}</span>
+                <span style="font-family: 'JetBrains Mono', monospace; color: #85858f">{{l.d}}</span>
+              </a>
+            </sc-for>
+          </section>
+        </aside>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { sel: 'ed', policy: { ro: 'external', ed: 'external', dc: 'external', pb: 'all', pe: 'auto' } };
+  }
+  renderVals() {
+    var self = this, st = this.state;
+    var policyLabels = { auto: 'Sozinho', external: 'Ações externas', all: 'Sempre' };
+    var free = '#85858f', ask = '#f0b03f';
+    var list = [
+      { id: 'ro', i: 'RO', n: 'Roteirista', role: 'Pauta e roteiro', c: '#f5b544', st: 'rodando', now: 'Ranqueando sinais · RUN-285', model: 'Claude Sonnet 5.5', runs: 18, okN: 94, cost: 'US$ 6,10', avg: '2m 40s', fails: '1 falha',
+        s: [2, 3, 2, 4, 3, 2, 2], tools: [['notion.pages', 'livre', free], ['web.search', 'livre', free], ['notion.publish', 'pede aprovação', ask]], skills: ['roteiro-curto', 'pauta-radar', 'tom-de-voz'],
+        last: [['rodando', 'RUN-285', 'Pauta da semana a partir do Radar', '3m'], ['feito', 'RUN-284', 'Ler roteiro aprovado', '24s'], ['feito', 'RUN-279', 'Reels · atalhos do VS Code', '3m 02s']] },
+      { id: 'ed', i: 'ED', n: 'Editor de vídeo', role: 'Cortes, legenda e render', c: '#2dd4bf', st: 'aguardando', now: 'Espera você · cortes', model: 'Claude Sonnet 5.5 + ffmpeg', runs: 11, okN: 91, cost: 'US$ 4,35', avg: '4m 12s', fails: '1 falha',
+        s: [1, 2, 1, 2, 2, 1, 2], tools: [['ffmpeg', 'livre', free], ['whisper', 'livre', free], ['render.export', 'pede aprovação', ask], ['arquivo.substituir', 'pede aprovação', ask]], skills: ['cortes-pausas', 'legenda-preset', 'hyperframes'],
+        last: [['aguardando', 'RUN-284', 'Propor cortes', '8m'], ['feito', 'RUN-283', 'Reels · atalhos do VS Code', '26m'], ['feito', 'RUN-277', 'Tutorial · PROCX no Excel', '19m']] },
+      { id: 'dc', i: 'DC', n: 'Designer de capa', role: 'Capas e carrosséis', c: '#f472b6', st: 'rodando', now: 'Gerando 3 capas · RUN-284', model: 'Codex · imagem', runs: 14, okN: 100, cost: 'US$ 9,80', avg: '3m 50s', fails: 'nenhuma falha',
+        s: [2, 2, 3, 1, 2, 2, 2], tools: [['image.generate', 'livre', free], ['paper.carrossel', 'livre', free]], skills: ['capa-clara', 'carrossel-5'],
+        last: [['rodando', 'RUN-284', 'Gerar 3 capas', '7m'], ['feito', 'RUN-281', 'Carrossel · 5 erros no Power BI', '12m'], ['feito', 'RUN-279', 'Capa · atalhos do VS Code', '4m']] },
+      { id: 'pb', i: 'PB', n: 'Publicador', role: 'Agenda e redes', c: '#9aa8ff', st: 'falhou', now: 'Upload falhou · YouTube', model: 'Codex', runs: 9, okN: 78, cost: 'US$ 0,90', avg: '1m 05s', fails: '2 falhas',
+        s: [1, 1, 2, 1, 1, 2, 1], tools: [['calendário', 'livre', free], ['youtube.upload', 'pede aprovação', ask], ['linkedin.post', 'pede aprovação', ask]], skills: ['agenda-semana', 'descricao-youtube'],
+        last: [['falhou', 'RUN-280', 'YouTube · fórmulas dinâmicas', '41m'], ['feito', 'RUN-276', 'LinkedIn · automação de relatórios', '2m'], ['feito', 'RUN-272', 'Instagram · carrossel Power BI', '1m']] },
+      { id: 'pe', i: 'PE', n: 'Pesquisador', role: 'Radar: YouTube e notícias', c: '#fb923c', st: 'feito', now: 'Coleta às 06:00 feita', model: 'Claude Haiku 5.5', runs: 7, okN: 100, cost: 'US$ 0,40', avg: '58s', fails: 'nenhuma falha',
+        s: [1, 1, 1, 1, 1, 1, 1], tools: [['youtube.search', 'livre', free], ['news.fetch', 'livre', free]], skills: ['radar-sinais'],
+        last: [['feito', 'RUN-282', 'Coleta diária do Radar', '58s'], ['feito', 'RUN-275', 'Coleta diária do Radar', '1m 02s'], ['feito', 'RUN-268', 'Coleta diária do Radar', '55s']] }
+    ];
+    var pts = function (arr) {
+      var max = Math.max.apply(null, arr), min = Math.min.apply(null, arr), span = (max - min) || 1;
+      return arr.map(function (v, i) { return (i * 100 / (arr.length - 1)).toFixed(1) + ',' + (15 - (v - min) / span * 12).toFixed(1); }).join(' ');
+    };
+    var row = function (a) {
+      var on = st.sel === a.id;
+      return {
+        i: a.i, n: a.n, role: a.role, c: a.c, st: a.st, now: a.now, model: a.model, runs: a.runs, ok: a.okN + '%', okC: a.okN < 85 ? '#f0b03f' : '#ececef', cost: a.cost,
+        nowC: a.st === 'aguardando' ? '#f0b03f' : a.st === 'falhou' ? '#ff8a8e' : '#a4a4ad',
+        policyLabel: policyLabels[st.policy[a.id]], on: on ? 'true' : 'false', bg: on ? '#1c1c21' : 'transparent',
+        pick: function () { self.setState({ sel: a.id }); }
+      };
+    };
+    var busy = list.filter(function (a) { return a.st !== 'feito'; });
+    var idle = list.filter(function (a) { return a.st === 'feito'; });
+    var cur = list.filter(function (a) { return a.id === st.sel; })[0] || list[1];
+    var pol = st.policy[cur.id];
+    var policies = [
+      ['auto', 'Trabalhar sozinho', 'Nunca para. Bom para coleta e rascunhos.'],
+      ['external', 'Antes de ações externas', 'Para antes de publicar, exportar ou substituir arquivos.'],
+      ['all', 'A cada passo', 'Você confirma tudo. Mais lento, mais controle.']
+    ].map(function (p) {
+      var on = pol === p[0];
+      return { label: p[1], desc: p[2], on: on ? 'true' : 'false', bd: on ? '#33333b' : '#1f1f24', bg: on ? '#1c1c21' : 'transparent', ring: on ? '4px solid #ececef' : '1.5px solid #55555e',
+        pick: function () { var next = Object.assign({}, st.policy); next[cur.id] = p[0]; self.setState({ policy: next }); } };
+    });
+    return {
+      groups: [
+        { label: 'Trabalhando ou com pendência', count: busy.length, st: 'rodando', rows: busy.map(row) },
+        { label: 'Disponíveis', count: idle.length, st: 'feito', rows: idle.map(row) }
+      ],
+      a: {
+        i: cur.i, n: cur.n, role: cur.role, c: cur.c, runs: cur.runs, ok: cur.okN + '%', okC: cur.okN < 85 ? '#f0b03f' : '#ececef', fails: cur.fails, avg: cur.avg, spark: pts(cur.s),
+        tools: cur.tools.map(function (t) { return { name: t[0], mode: t[1], c: t[2] }; }), skills: cur.skills,
+        last: cur.last.map(function (l) { return { st: l[0], id: l[1], t: l[2], d: l[3] }; })
+      },
+      policies: policies
+    };
+  }
+}
+</script>
+</body>
+</html>

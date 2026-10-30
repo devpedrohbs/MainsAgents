@@ -11,6 +11,7 @@ import {
 } from '../data/backup';
 import { usePersistentState } from '../data/localPersistence';
 import { SelectMenu } from '../components/common/SelectMenu';
+import { StatusIcon } from '../components/common/StatusIcon';
 import {backupFileReferences} from '../data/backupFormat';
 import {RuntimeDiagnostics} from '../components/chat/RuntimeDiagnostics';
 
@@ -338,8 +339,8 @@ export function Settings({ initialSection = 'interface' }: { initialSection?: Se
   };
 
   return (
-    <div className="page settings-page">
-      <div className="page-head">
+    <div className="page settings-page v2-team v2-page">
+      <div className="page-head v2-header">
         <div>
           <p className="eyebrow">{currentWorkspace.name} / {t('Settings')}</p>
           <h1>{locale === 'pt-BR' ? 'Seu espaço, do seu jeito' : 'Your space, your way'}</h1>
@@ -547,25 +548,12 @@ export function Settings({ initialSection = 'interface' }: { initialSection?: Se
                 onClick={() => setReducedMotion(!reducedMotion)}
               />
             </div>
-            <div className="setting-row">
-              <div className="setting-copy">
-                <b>{t('Welcome guide')}</b>
-                <p>{t('Reopen the first-use steps and agent templates.')}</p>
-              </div>
-              <button
-                className="soft-button"
-                type="button"
-                onClick={() => window.dispatchEvent(new Event('mainsagents:show-welcome'))}
-              >
-                {t('Open guide')}
-              </button>
-            </div>
           </div>
           <div id="settings-providers" className="settings-group" hidden={section !== 'providers'}>
             {section==='providers'&&<RuntimeDiagnostics/>}
             <div className="setting-row">
               <div className="setting-copy">
-                <b>{t('Codex CLI connection')}</b>
+                <b className="v2-provider-label"><StatusIcon state={codexStatus==='connected'?'done':codexStatus==='login-required'?'waiting':codexStatus==='unavailable'?'failed':'running'}/>{t('Codex CLI connection')}</b>
                 <p>
                   {t(
                     codexStatus === 'connected'
@@ -619,7 +607,7 @@ export function Settings({ initialSection = 'interface' }: { initialSection?: Se
             )}
             <div className="setting-row">
               <div className="setting-copy">
-                <b>{t('Claude Code CLI connection')}</b>
+                <b className="v2-provider-label"><StatusIcon state={claudeStatus==='connected'?'done':claudeStatus==='checking'?'running':claudeStatus==='login-required'?'waiting':'failed'}/>{t('Claude Code CLI connection')}</b>
                 <p>
                   {t(
                     claudeStatus === 'connected'

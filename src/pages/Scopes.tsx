@@ -8,6 +8,7 @@ import { useProduction } from '../features/production/ProductionProvider';
 import { contentLink, contentScopeKey, contentSpaces, scopeSessions, type ContentSpace } from '../features/chat/contentScopes';
 import type { Agent } from '../features/agents/model/Agent';
 import type { AgentSession } from '../features/chat/model/Chat';
+import { StatusIcon } from '../components/common/StatusIcon';
 import { Icon } from '../components/common/Icon';
 import { AgentAvatar } from '../components/agents/AgentAvatar';
 import { FlowDialog } from '../components/common/FlowDialog';
@@ -113,15 +114,33 @@ export function Scopes({ onOpenChat, onOpenStudio, onToast, onCreateAgent }: { o
       onDeleted={({ title, chats }) => { setDeleting(null); setOpenId(null); selectScope(currentWorkspaceId, 'general'); onToast(pt ? `Escopo “${title}” e ${chatsLabel(chats, pt)} excluídos deste computador` : `Scope “${title}” and ${chatsLabel(chats, pt)} deleted from this computer`); }} />}
   </>;
 
+  const directory = (<div className="scope-grid v2-list">
+      {shown.map((space) => { const busy = working(space), goal = goalOf(space); return <button type="button" key={space.scope} className={`scope-card v2-row${openId === space.content.id ? ' selected' : ''}`} aria-pressed={openId === space.content.id} onClick={() => setOpenId(space.content.id)}>
+        <div className="scope-card-head"><StatusIcon state={busy ? 'running' : space.archived ? 'paused' : 'queued'}/><span className="scope-mark" aria-hidden="true">{initials(space.title)}</span><div><b>{space.title}</b><small>{relative(space.lastActivity, locale)}</small></div><span className={`scope-state ${space.archived ? 'archived' : ''}`}>{space.stage}</span></div>
+        <p>{goal ?? (pt ? 'Sem objetivo definido.' : 'No goal set.')}</p>
+        <div className="scope-card-foot">
+          <span className="scope-faces" aria-hidden="true">{space.agents.slice(0, 5).map((item) => { const agent = agentOf(item.agentId); return agent ? <AgentAvatar key={agent.id} name={agent.name} image={agent.avatarImage} mascot={agent.avatarMascot} role={agent.role} /> : null; })}</span>
+          <small>{agentsLabel(space.agents.length, pt)} · {chatsLabel(space.chats, pt)}</small>
+          {busy > 0 && <span className="scope-status busy"><StatusIcon state="running"/>{pt ? `${busy} trabalhando` : `${busy} working`}</span>}
+        </div>
+      </button>; })}
+      <button type="button" className="scope-card scope-card-new" onClick={() => workspaceAgents.length ? setCreating(true) : onCreateAgent()}>
+        <span className="scope-plus" aria-hidden="true"><Icon name="plus" /></span><b>{pt ? 'Novo escopo' : 'New scope'}</b>
+        <small>{workspaceAgents.length ? (pt ? 'Escolha os agentes e o que eles vão fazer juntos.' : 'Choose the agents and what they will do together.') : (pt ? 'Crie um agente primeiro.' : 'Create an agent first.')}</small>
+      </button>
+    </div>);
+
   if (current) {
     const chats = scopeChats(current);
     const members = current.agents.map((item) => ({ agent: agentOf(item.agentId), chats: chats.filter((session) => session.agentId === item.agentId) })).filter((item): item is { agent: Agent; chats: AgentSession[] } => !!item.agent);
     const outside = workspaceAgents.filter((agent) => !members.some((member) => member.agent.id === agent.id));
     const activity = chats.slice(0, 6);
     const addAgent = (id: string) => { const agent = agentOf(id); if (!agent) return; const session = createSession(agent.id, current.title, agent.providerId ?? 'codex', agent.modelId, contentLink(current.content), false); onToast(pt ? `${agent.name} entrou em “${current.title}”` : `${agent.name} joined “${current.title}”`); onOpenChat(agent.id, session.id); };
-    return <div className="page scope-page" data-od-id="scope-page">
-      <nav className="scope-trail" aria-label={pt ? 'Trilha' : 'Breadcrumb'}><a href="#scopes" onClick={(event) => { event.preventDefault(); setOpenId(null); }}>{pt ? 'Escopos' : 'Scopes'}</a><span aria-hidden="true">/</span><strong>{current.title}</strong></nav>
+    return <div className="page scope-page v2-team v2-page" data-od-id="scope-page">
+      <nav className="scope-trail v2-header" aria-label={pt ? 'Trilha' : 'Breadcrumb'}><a href="#scopes" onClick={(event) => { event.preventDefault(); setOpenId(null); }}>{pt ? 'Escopos' : 'Scopes'}</a><span aria-hidden="true">/</span><strong>{current.title}</strong></nav>
       <div className="scope-layout">
+        <section className="scope-directory" aria-label={pt ? 'Lista de escopos' : 'Scope list'}>{directory}</section>
+        <div className="scope-detail v2-inspector">
         <main className="scope-main">
           <header className="scope-head">
             <span className="scope-mark" aria-hidden="true">{initials(current.title)}</span>
@@ -136,7 +155,7 @@ export function Scopes({ onOpenChat, onOpenStudio, onToast, onCreateAgent }: { o
               const latest = own[0], busy = own.some((session) => busyStates.includes(getRunState(session.id))), reply = lastReply(latest);
               return <article key={agent.id} className="scope-agent">
                 <div className="scope-agent-head"><AgentAvatar name={agent.name} image={agent.avatarImage} mascot={agent.avatarMascot} role={agent.role} /><div><b>{agent.name}</b><small>{agent.role || '—'} · {(agent.providerId ?? 'codex') === 'claude' ? 'Claude' : 'Codex'}</small></div>
-                  <span className={`scope-status ${busy ? 'busy' : ''}`}><i aria-hidden="true" />{busy ? (pt ? 'Trabalhando' : 'Working') : (pt ? 'Pronto' : 'Ready')}</span></div>
+                  <span className={`scope-status ${busy ? 'busy' : ''}`}><StatusIcon state={busy?'running':'queued'}/>{busy ? (pt ? 'Trabalhando' : 'Working') : (pt ? 'Pronto' : 'Ready')}</span></div>
                 <p className={reply ? '' : 'scope-muted'}>{reply ?? (pt ? 'Ainda sem respostas neste escopo.' : 'No replies in this scope yet.')}</p>
                 <div className="scope-agent-foot"><small>{chatsLabel(own.length, pt)}{latest ? ` · ${relative(latest.updatedAt, locale)}` : ''}</small>
                   {latest && <button type="button" className="primary-button" onClick={() => onOpenChat(agent.id, latest.id)}>{pt ? 'Abrir chat' : 'Open chat'}</button>}</div>
@@ -151,7 +170,7 @@ export function Scopes({ onOpenChat, onOpenStudio, onToast, onCreateAgent }: { o
               <span><b>{agent.name}</b><small>{on ? (pt ? 'Pode consultar outros agentes' : 'Can consult other agents') : (pt ? 'Trabalha sozinho' : 'Works alone')}</small></span></label>; })}</div>
           </section>}
         </main>
-        <aside className="scope-aside" aria-label={pt ? 'Detalhes do escopo' : 'Scope details'}>
+        <aside className="scope-aside v2-inspector" aria-label={pt ? 'Detalhes do escopo' : 'Scope details'}>
           <section><h2>{pt ? 'Conteúdo no Estúdio' : 'Content in Studio'}</h2>
             <button type="button" className="scope-link-card" onClick={() => onOpenStudio(current.content.id)}><b>{current.title}</b><small>{current.stage}</small></button></section>
           <section><h2>{pt ? 'Atividade' : 'Activity'}</h2>
@@ -160,14 +179,15 @@ export function Scopes({ onOpenChat, onOpenStudio, onToast, onCreateAgent }: { o
             <p>{pt ? `Remove o conteúdo e ${chatsLabel(current.chats, pt)} deste computador. Os agentes continuam na sua equipe.` : `Removes the content and ${chatsLabel(current.chats, pt)} from this computer. The agents stay on your team.`}</p>
             <button type="button" className="danger-button" onClick={() => setDeleting({ contentId: current.content.id, title: current.title })}>{pt ? 'Apagar escopo…' : 'Delete scope…'}</button></section>
         </aside>
+        </div>
       </div>
       {dialogs}
     </div>;
   }
 
   const counts: Record<Filter, number> = { active: spaces.filter((space) => !space.archived).length, archived: spaces.filter((space) => space.archived).length, all: spaces.length };
-  return <div className="page scopes-page" data-od-id="scopes-page">
-    <div className="page-head">
+  return <div className="page scopes-page v2-team v2-page" data-od-id="scopes-page">
+    <div className="page-head v2-header">
       <div><p className="eyebrow">{currentWorkspace.name} / {pt ? 'Escopos' : 'Scopes'}</p><h1>{pt ? 'Escopos' : 'Scopes'}</h1>
         <p>{pt ? 'Cada escopo reúne os agentes de um trabalho. As conversas ficam separadas por escopo, então dois conteúdos rodam juntos sem misturar contexto.' : 'Each scope gathers the agents of one piece of work. Chats stay separate per scope, so two contents run side by side without mixing context.'}</p></div>
       <div className="scopes-head-actions">
@@ -175,24 +195,10 @@ export function Scopes({ onOpenChat, onOpenStudio, onToast, onCreateAgent }: { o
       <button className="primary-button" data-od-id="create-scope" onClick={() => workspaceAgents.length ? setCreating(true) : onCreateAgent()}><Icon name="plus" />{pt ? 'Novo escopo' : 'New scope'}</button>
       </div>
     </div>
-    <div className="scope-filter" role="group" aria-label={pt ? 'Filtrar escopos' : 'Filter scopes'}>
-      {(['active', 'archived', 'all'] as const).map((id) => <button key={id} type="button" aria-pressed={filter === id} onClick={() => setFilter(id)}>{id === 'active' ? (pt ? 'Ativos' : 'Active') : id === 'archived' ? (pt ? 'Arquivados' : 'Archived') : (pt ? 'Todos' : 'All')} <span>{counts[id]}</span></button>)}
+    <div className="scope-filter v2-segmented" role="group" aria-label={pt ? 'Filtrar escopos' : 'Filter scopes'}>
+      {(['active', 'archived', 'all'] as const).map((id) => <button key={id} type="button" aria-pressed={filter === id} onClick={() => setFilter(id)}>{id === 'active' ? (pt ? 'Ativos' : 'Active') : id === 'archived' ? (pt ? 'Arquivados' : 'Archived') : (pt ? 'Todos' : 'All')} <span className="v2-mono">{counts[id]}</span></button>)}
     </div>
-    <div className="scope-grid">
-      {shown.map((space) => { const busy = working(space), goal = goalOf(space); return <button type="button" key={space.scope} className="scope-card" onClick={() => setOpenId(space.content.id)}>
-        <div className="scope-card-head"><span className="scope-mark" aria-hidden="true">{initials(space.title)}</span><div><b>{space.title}</b><small>{relative(space.lastActivity, locale)}</small></div><span className={`scope-state ${space.archived ? 'archived' : ''}`}>{space.stage}</span></div>
-        <p>{goal ?? (pt ? 'Sem objetivo definido.' : 'No goal set.')}</p>
-        <div className="scope-card-foot">
-          <span className="scope-faces" aria-hidden="true">{space.agents.slice(0, 5).map((item) => { const agent = agentOf(item.agentId); return agent ? <AgentAvatar key={agent.id} name={agent.name} image={agent.avatarImage} mascot={agent.avatarMascot} role={agent.role} /> : null; })}</span>
-          <small>{agentsLabel(space.agents.length, pt)} · {chatsLabel(space.chats, pt)}</small>
-          {busy > 0 && <span className="scope-status busy"><i aria-hidden="true" />{pt ? `${busy} trabalhando` : `${busy} working`}</span>}
-        </div>
-      </button>; })}
-      <button type="button" className="scope-card scope-card-new" onClick={() => workspaceAgents.length ? setCreating(true) : onCreateAgent()}>
-        <span className="scope-plus" aria-hidden="true"><Icon name="plus" /></span><b>{pt ? 'Novo escopo' : 'New scope'}</b>
-        <small>{workspaceAgents.length ? (pt ? 'Escolha os agentes e o que eles vão fazer juntos.' : 'Choose the agents and what they will do together.') : (pt ? 'Crie um agente primeiro.' : 'Create an agent first.')}</small>
-      </button>
-    </div>
+    {directory}
     {dialogs}
   </div>;
 }

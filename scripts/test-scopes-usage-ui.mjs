@@ -122,10 +122,9 @@ app.whenReady().then(async()=>{try{
  // 4b. Studio keeps the new-topic form in the list column; Flow has the floating tool bar and the box sheet.
  await js(`document.querySelector('[data-od-id="nav-content"]').click()`);await until(()=>js('Boolean(document.querySelector(".editorial-rail .editorial-intake"))'),'studio intake in the list column');
  await shot('13-studio');
- await js(`document.querySelector('[data-od-id="nav-flow"]').click()`);await until(()=>js('Boolean(document.querySelector(".flow-toolbar"))'),'flow tool bar');
- await js(`document.querySelector('.flow-toolbar button[aria-pressed="false"]').click()`);await until(()=>js('document.querySelector(".flow-toolbar button[aria-pressed=true]")?.getAttribute("aria-label")==="Selecionar"'),'select tool');
- await js(`document.querySelector('.react-flow__node').click()`);await until(()=>js('Boolean(document.querySelector(".production-flow-detail"))'),'box settings sheet');
- await shot('14-flow');
+ // Flow page was retired (#flow → Canvas); V2 shows the production flow on Pipelines.
+ await js(`document.querySelector('[data-od-id="nav-pipelines"]').click()`);await until(()=>js('Boolean(document.querySelector("[data-od-id=pipelines-page]"))'),'pipelines page');
+ await shot('14-pipelines');
  // 5. Narrow window: no horizontal page scroll on either page.
  win.setSize(760,900);await new Promise(resolve=>setTimeout(resolve,400));
  assert.equal(await js('document.documentElement.scrollWidth<=innerWidth+1'),true,'usage fits a narrow window');

@@ -1,4 +1,4 @@
-// Orientation round (Overview guide, resume, sidebar groups, Scopes header). Production renderer; isolated fixtures, no personal storage, CLI or external writes.
+// Overview without onboarding, resume, sidebar groups, Scopes header. Isolated fixtures; no personal storage, CLI or external writes.
 // Run after `npm run build`: npx electron scripts/test-ux-flow-ui.mjs   (UX_DIST=<dir> serves another build folder)
 import {app,BrowserWindow,ipcMain} from 'electron';
 import {createServer} from 'node:http';
@@ -9,8 +9,8 @@ import {captureReadyPng} from './ui-capture-ready.mjs';
 const root=resolve(import.meta.dirname,'..'),dist=resolve(process.env.UX_DIST||resolve(root,'dist')),out=resolve(root,'.mainsagents-workspaces/ux-flow-ui-test');
 mkdirSync(out,{recursive:true});app.setPath('userData',resolve(out,`profile-${Date.now()}`));
 const at=new Date().toISOString(),earlier=new Date(Date.now()-3600_000).toISOString(),space='my-workspace',other='empty-workspace';
-// Phase A: a brand new workspace, no agents and no content. A second, empty workspace checks that hiding the guide is per workspace.
-const state={workspaces:[{id:space,name:'Content',createdAt:at,updatedAt:at},{id:other,name:'Outro espaço',createdAt:at,updatedAt:at}],'current-workspace':space,agents:[],sessions:[],'active-sessions':{},language:'pt-BR','welcome-dismissed':true,'focus-mode':false};
+// Phase A: two empty workspaces; a legacy welcome flag must not restore an introduction.
+const state={workspaces:[{id:space,name:'Content',createdAt:at,updatedAt:at},{id:other,name:'Outro espaço',createdAt:at,updatedAt:at}],'current-workspace':space,agents:[],sessions:[],'active-sessions':{},language:'pt-BR','welcome-dismissed':false,'focus-mode':false};
 let revision=1,editorial={schemaVersion:1,topics:[],runs:[],artifacts:[],approvals:[],contents:[],assets:[],publications:[]};
 ipcMain.handle('test:read',(_event,key)=>state[key]);ipcMain.handle('test:write',(_event,key,value)=>{state[key]=value});ipcMain.handle('test:all',()=>state);
 const json=(response,payload)=>{response.setHeader('content-type','application/json');response.end(JSON.stringify(payload))};
@@ -33,7 +33,7 @@ async function screenshot(name){writeFileSync(resolve(out,`${name}.png`),await c
 async function home(){await js('location.hash="home"');await until(()=>js('Boolean(document.querySelector(".ov-needs"))'),'overview')}
 async function reload(){const loaded=new Promise(resolve=>win.webContents.once('did-finish-load',resolve));win.webContents.reloadIgnoringCache();await loaded;await home()}
 async function switchWorkspace(name){await click('.workspace-switcher');await until(()=>js('Boolean(document.querySelector(".workspace-option"))'),'workspace menu');await js(`Array.from(document.querySelectorAll('.workspace-option')).find(el=>el.textContent.includes(${JSON.stringify(name)})).click()`);await until(()=>js(`document.querySelector('.workspace-switcher').textContent.includes(${JSON.stringify(name)})`),`workspace ${name}`);await home()}
-const currentStep=()=>js('document.querySelector(".ov-start-steps li.current")?.dataset.step');
+const noGuide=()=>js('!document.querySelector(".welcome-guide,[data-od-id=overview-start],[data-od-id=overview-start-show]")');
 const noOverflow=()=>js('document.documentElement.scrollWidth<=innerWidth+1');
 const sizes=async name=>{for(const width of [880,360]){win.setSize(width,800);await new Promise(resolve=>setTimeout(resolve,120));assert(await noOverflow(),`${name}: overflow at ${width}px`);await screenshot(`${name}-${width}`)}win.setSize(1440,900);await new Promise(resolve=>setTimeout(resolve,120))};
 app.whenReady().then(async()=>{try{
@@ -43,20 +43,18 @@ app.whenReady().then(async()=>{try{
  await win.loadURL(`http://127.0.0.1:${server.address().port}/app.html#home`);await home();
 
  // Sidebar: groups named by intent (no repeated "Workspace"), ordered as the work flows, tooltips say what each area is for.
- assert.deepEqual(await js('Array.from(document.querySelectorAll(".sidebar .nav-label")).slice(0,2).map(el=>el.textContent)'),['Trabalho','Equipe']);
- assert.deepEqual(await js('Array.from(document.querySelectorAll("[aria-labelledby=nav-group-work] .nav-item")).map(el=>el.dataset.odId)'),['nav-home','nav-content','nav-calendar','nav-board','nav-flow','nav-canvas']);
- assert.deepEqual(await js('Array.from(document.querySelectorAll("[aria-labelledby=nav-group-team] .nav-item")).map(el=>el.dataset.odId)'),['nav-agents','nav-scopes','nav-sessions']);
+ assert.deepEqual(await js('Array.from(document.querySelectorAll(".sidebar .nav-label")).map(el=>el.textContent)'),['Conteúdo','Workspace','Equipe']);
+ assert.deepEqual(await js('Array.from(document.querySelectorAll(".sidebar .nav-item[data-od-id^=nav-]")).map(el=>el.dataset.odId)').then(ids=>ids.slice(0,12)),['nav-inbox','nav-home','nav-runs','nav-content','nav-radar','nav-references','nav-calendar','nav-board','nav-canvas','nav-pipelines','nav-scopes','nav-sessions']);
+ assert(await js('Boolean(document.querySelector("[aria-labelledby=nav-group-team] [data-od-id=nav-agents]"))'));
  assert.match(await js('document.querySelector("[data-od-id=nav-content]").title'),/^Estúdio: /);
  assert.equal(await js('document.querySelector("[data-od-id=nav-content]").getAttribute("aria-label")'),'Estúdio');
 
- // A. New workspace: the guide opens on step 1, first on the page, and owns the only primary action.
- await until(()=>js('Boolean(document.querySelector("[data-od-id=overview-start]"))'),'start guide');
- assert.equal(await currentStep(),'team');
- assert.equal(await js('document.querySelectorAll(".ov-start-steps .primary-button").length'),1);
- assert(await js('document.querySelector("[data-od-id=overview-create]").classList.contains("soft-button")'));
- assert(await js('document.querySelector(".ov-start").compareDocumentPosition(document.querySelector(".ov-needs"))&Node.DOCUMENT_POSITION_FOLLOWING'),'guide before needs when nothing waits');
- await js('document.querySelector("[data-od-id=overview-start-team]").focus()');
- assert.equal(await js('document.activeElement.dataset.odId'),'overview-start-team');
+ // A. New workspaces open directly on the overview, including old backups that request the welcome guide.
+ assert(await noGuide());
+ assert(await js('document.querySelector("[data-od-id=overview-create]").classList.contains("primary-button")'));
+ await js('window.dispatchEvent(new Event("mainsagents:show-welcome"))');assert(await noGuide());
+ await js('document.querySelector("[data-od-id=overview-create]").focus()');
+ assert.equal(await js('document.activeElement.dataset.odId'),'overview-create');
  await screenshot('new-dark');await sizes('new');
 
  // Scopes: visible "+" on the new-scope card and history as a secondary header button.
@@ -71,8 +69,7 @@ app.whenReady().then(async()=>{try{
  state.agents=[{id:'writer',name:'Roteirista de exemplo',role:'Roteiro',description:'Agente fictício',instructions:'Fixture only',tools:[],skills:[],workspaceId:space,providerId:'codex',status:'idle',createdAt:at,updatedAt:at}];
  editorial={...editorial,topics:[topic('topic-editing','Pauta em edição','approved','editing'),topic('topic-done','Pauta publicada','approved','done')],contents:[content('editing','Vídeo em edição de exemplo','editing',earlier),content('done','Vídeo publicado de exemplo','ready',at)]};revision++;
  await reload();
- await until(async()=>await currentStep()==='schedule','schedule step current');
- assert.equal(await js('document.querySelectorAll(".ov-start-steps li.done").length'),2);
+ assert(await noGuide());
  assert.equal(await js('document.querySelectorAll(".ov-needs .ov-need").length'),0,'fixture B must have nothing waiting');
  await until(()=>js('Boolean(document.querySelector("[data-od-id=overview-resume]"))'),'resume row');
  const resumeText=await js('document.querySelector("[data-od-id=overview-resume]").textContent');
@@ -80,42 +77,36 @@ app.whenReady().then(async()=>{try{
  await screenshot('populated-dark');
  await js('document.documentElement.dataset.appearance="light"');await screenshot('populated-light');await sizes('populated');await js('document.documentElement.dataset.appearance="dark"');
 
- // Studio vs Calendar: step 3 opens the Calendar; "Continue" then opens the Studio view, not the Calendar left open.
- await click('[data-od-id=overview-start-schedule]');
- await until(()=>js('document.querySelector("[data-od-id=nav-calendar]")?.getAttribute("aria-current")==="page"'),'calendar from guide');
+ // Studio vs Calendar: sidebar opens Calendar; Continue opens Studio, not the Calendar left open.
+ await click('[data-od-id=nav-calendar]');
+ await until(()=>js('document.querySelector("[data-od-id=nav-calendar]")?.getAttribute("aria-current")==="page"'),'calendar from sidebar');
  await home();await click('[data-od-id=overview-resume]');
  await until(()=>js('document.querySelector("[data-od-id=nav-content]")?.getAttribute("aria-current")==="page"&&!document.querySelector(".publishing-grid")'),'studio from resume');
  await home();
 
- // Hide the guide here; the other, empty workspace still shows its own guide; back here it stays hidden but findable.
- await click('.ov-start .ov-card-head .text-link');
- await until(()=>js('!document.querySelector("[data-od-id=overview-start]")'),'guide hidden');
+ // Switching workspaces never restores an introduction.
  assert(await js('document.querySelector("[data-od-id=overview-create]").classList.contains("primary-button")'));
  await switchWorkspace('Outro espaço');
- await until(()=>js('Boolean(document.querySelector("[data-od-id=overview-start]"))'),'guide in the other workspace');
- assert.equal(await currentStep(),'team');
+ assert(await noGuide());
  await switchWorkspace('Content');
- assert(await js('!document.querySelector("[data-od-id=overview-start]")'),'still hidden in the first workspace');
- await click('[data-od-id=overview-start-show]');
- await until(()=>js('Boolean(document.querySelector("[data-od-id=overview-start]"))'),'guide shown again');
+ assert(await noGuide());
 
- // C. A real pending item (an idea waiting for research) comes first: the guide moves below it and gives up the primary action.
+ // C. Real pending work stays visible without a guide taking over its place.
  editorial={...editorial,topics:[...editorial.topics,topic('topic-draft','Pauta aguardando pesquisa','draft')]};revision++;
  await reload();
  await until(()=>js('document.querySelectorAll(".ov-needs .ov-need").length>0'),'pending item');
- assert(await js('document.querySelector(".ov-needs").compareDocumentPosition(document.querySelector(".ov-start"))&Node.DOCUMENT_POSITION_FOLLOWING'),'guide after needs');
- assert(await js('document.querySelector("[data-od-id=overview-start-schedule]").classList.contains("soft-button")'));
+ assert(await noGuide());
  assert(await js('document.querySelector("[data-od-id=overview-create]").classList.contains("primary-button")'));
  assert(await js('!document.querySelector("[data-od-id=overview-resume]")'),'no resume while something waits');
  await screenshot('pending-dark');
 
  // English.
  state.language='en-US';await reload();
- await until(()=>js('document.querySelector("#start-heading")?.textContent.startsWith("Where to start")'),'english guide');
- assert.deepEqual(await js('Array.from(document.querySelectorAll(".sidebar .nav-label")).slice(0,2).map(el=>el.textContent)'),['Work','Team']);
+ assert(await noGuide());
+ assert.deepEqual(await js('Array.from(document.querySelectorAll(".sidebar .nav-label")).map(el=>el.textContent)'),['Content','Workspace','Team']);
  await screenshot('pending-en');
 
- assert.deepEqual(errors,[]);console.log('UX_FLOW_UI_OK: sidebar groups/order/hints, guide new/populated/pending order, single primary action, resume skips finished work, Studio vs Calendar entry, hide per workspace, Scopes header and "+", light/dark, PT/EN, 360/880/1440px.');
+ assert.deepEqual(errors,[]);console.log('UX_FLOW_UI_OK: sidebar groups/order/hints, no introduction in any workspace, primary action, resume skips finished work, Studio vs Calendar entry, Scopes header and "+", light/dark, PT/EN, 360/880/1440px.');
  win.destroy();server.close();app.exit(0);
  }catch(error){console.error(error);console.error(errors);if(win&&!win.isDestroyed()){await screenshot('failure').catch(()=>{});win.destroy()}server.close();app.exit(1)}
 });

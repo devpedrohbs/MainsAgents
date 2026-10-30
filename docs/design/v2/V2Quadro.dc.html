@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>MainsAgents V2 — Quadro</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0b0b0d}
+a{color:#8aa8ff}a:hover{color:#b3c6ff}
+button{font:inherit;cursor:pointer}
+.v2card:hover{border-color:#3a3a44}
+@media (max-width: 900px){.v2-side{display:none !important}}
+</style>
+</helmet>
+<div style="width: 100%; height: 900px; box-sizing: border-box; display: flex; background: #0b0b0d; color: #ececef; font-family: Inter, -apple-system, system-ui, sans-serif; font-size: 13px; line-height: 20px; font-feature-settings: 'cv11' 1, 'ss01' 1; overflow: hidden">
+  <div class="v2-side" style="flex: 0 0 220px">
+    <dc-import name="V2Sidebar" active="board" hint-size="220px,900px"></dc-import>
+  </div>
+
+  <div style="flex: 1 1 auto; min-width: 0; display: flex; padding: 8px 8px 8px 0">
+    <div style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; background: #111113; border: 1px solid #1f1f24; border-radius: 10px; overflow: hidden">
+
+      <header style="flex: 0 0 auto; min-height: 44px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 6px 12px 6px 20px; border-bottom: 1px solid #1f1f24; box-sizing: border-box">
+        <h1 style="margin: 0; font-size: 13px; font-weight: 600">Quadro</h1>
+        <span style="font-size: 12px; color: #85858f">14 conteúdos · 3 esperam você</span>
+        <div style="flex-grow: 1"></div>
+        <span style="display: inline-flex; align-items: center; height: 26px; padding: 0 8px; border: 1px solid #2a2a31; border-radius: 6px; font-size: 12px; color: #a4a4ad">Agrupar: <b style="color: #ececef; font-weight: 500; margin-left: 4px">etapa</b></span>
+        <span style="display: inline-flex; align-items: center; height: 26px; padding: 0 8px; border: 1px dashed #33333b; border-radius: 6px; font-size: 12px; color: #a4a4ad">+ Filtro</span>
+        <div role="group" aria-label="Visualização" style="display: flex; padding: 2px; border: 1px solid #2a2a31; border-radius: 7px; background: #0b0b0d">
+          <button type="button" aria-pressed="true" style="height: 24px; padding: 0 10px; border: 0; border-radius: 5px; background: #1c1c21; color: #ececef; font-size: 12px">Quadro</button>
+          <button type="button" aria-pressed="false" style="height: 24px; padding: 0 10px; border: 0; border-radius: 5px; background: transparent; color: #a4a4ad; font-size: 12px">Lista</button>
+        </div>
+        <button type="button" style="display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px; border: 0; border-radius: 6px; background: #ececef; color: #0b0b0d; font-weight: 500">Nova tarefa <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #55555e">C</span></button>
+      </header>
+
+      <div style="flex: 1 1 auto; min-height: 0; display: flex">
+        <div style="flex: 1 1 auto; min-width: 0; overflow: auto; padding: 12px">
+          <div style="display: flex; gap: 10px; min-height: 100%; align-items: stretch">
+            <sc-for list="{{cols}}" as="c" hint-placeholder-count="6">
+              <section aria-label="{{c.name}}" style="flex: 0 0 248px; display: flex; flex-direction: column; gap: 8px; padding: 8px; border-radius: 8px; background: #0e0e10">
+                <div style="display: flex; align-items: center; gap: 8px; height: 26px; padding: 0 4px">
+                  <dc-import name="V2Status" state="{{c.st}}" sz="{{ 12 }}" hint-size="12px,12px"></dc-import>
+                  <b style="font-weight: 500">{{c.name}}</b>
+                  <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #85858f">{{c.n}}</span>
+                  <button type="button" aria-label="Adicionar em {{c.name}}" style="margin-left: auto; width: 22px; height: 22px; border: 0; border-radius: 4px; background: transparent; color: #85858f; padding: 0">+</button>
+                </div>
+                <sc-for list="{{c.cards}}" as="k" hint-placeholder-count="3">
+                  <button type="button" class="v2card" onClick="{{k.pick}}" aria-pressed="{{k.on}}" style="display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px solid {{k.bd}}; border-radius: 8px; background: #16161a; color: #ececef; text-align: left; box-shadow: {{k.ring}}">
+                    <span style="display: flex; align-items: center; gap: 6px; width: 100%">
+                      <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #85858f">{{k.id}}</span>
+                      <span style="margin-left: auto; display: flex"><span aria-hidden="true" style="width: 18px; height: 18px; border-radius: 5px; background: {{k.c}}; color: #0b0b0d; font-size: 8px; font-weight: 700; display: flex; align-items: center; justify-content: center">{{k.i}}</span></span>
+                    </span>
+                    <span style="display: flex; gap: 8px; width: 100%">
+                      <dc-import name="V2Status" state="{{k.st}}" sz="{{ 13 }}" hint-size="13px,13px"></dc-import>
+                      <span style="flex: 1; line-height: 18px">{{k.t}}</span>
+                    </span>
+                    <sc-if value="{{k.hasNote}}" hint-placeholder-val="{{ false }}"><span style="font-size: 12px; line-height: 16px; color: {{k.noteC}}">{{k.note}}</span></sc-if>
+                    <span style="display: flex; flex-wrap: wrap; align-items: center; gap: 4px; width: 100%">
+                      <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; line-height: 18px; padding: 0 5px; border: 1px solid #2a2a31; border-radius: 4px; color: #a4a4ad">{{k.ch}}</span>
+                      <span style="display: inline-flex; align-items: center; gap: 4px; font-size: 11px; line-height: 18px; padding: 0 5px; border: 1px solid #2a2a31; border-radius: 4px; color: #a4a4ad"><i aria-hidden="true" style="width: 5px; height: 5px; border-radius: 50%; background: {{k.topicC}}"></i>{{k.topic}}</span>
+                      <span style="margin-left: auto; font-size: 11px; color: {{k.dueC}}">{{k.due}}</span>
+                    </span>
+                  </button>
+                </sc-for>
+              </section>
+            </sc-for>
+          </div>
+        </div>
+
+        <sc-if value="{{peek.show}}" hint-placeholder-val="{{ true }}">
+          <aside aria-label="Detalhe da tarefa" style="flex: 0 0 340px; border-left: 1px solid #1f1f24; display: flex; flex-direction: column; gap: 14px; padding: 16px; box-sizing: border-box; overflow: auto">
+            <div style="display: flex; align-items: center; gap: 8px">
+              <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #85858f">{{peek.id}}</span>
+              <button type="button" onClick="{{peek.close}}" aria-label="Fechar detalhe" style="margin-left: auto; width: 26px; height: 26px; border: 0; border-radius: 5px; background: transparent; color: #a4a4ad; padding: 0">×</button>
+            </div>
+            <h2 style="margin: 0; font-size: 17px; line-height: 24px; font-weight: 600; letter-spacing: -0.01em">{{peek.t}}</h2>
+            <dl style="margin: 0; display: grid; grid-template-columns: 96px 1fr; gap: 8px 12px; font-size: 12px">
+              <dt style="color: #85858f">Etapa</dt><dd style="margin: 0; display: flex; align-items: center; gap: 6px"><dc-import name="V2Status" state="{{peek.st}}" sz="{{ 12 }}" hint-size="12px,12px"></dc-import>{{peek.col}}</dd>
+              <dt style="color: #85858f">Responsável</dt><dd style="margin: 0; display: flex; align-items: center; gap: 6px"><i aria-hidden="true" style="width: 14px; height: 14px; border-radius: 4px; background: {{peek.c}}"></i>{{peek.who}}</dd>
+              <dt style="color: #85858f">Canal</dt><dd style="margin: 0">{{peek.chName}}</dd>
+              <dt style="color: #85858f">Publicação</dt><dd style="margin: 0">{{peek.due}}</dd>
+              <dt style="color: #85858f">Execução</dt><dd style="margin: 0"><a href="V2Execucao.dc.html" style="text-decoration: none; font-family: 'JetBrains Mono', monospace">{{peek.run}}</a></dd>
+            </dl>
+            <p style="margin: 0; font-size: 13px; line-height: 21px; color: #c9c9d1">{{peek.desc}}</p>
+            <div style="display: flex; flex-direction: column; gap: 8px; margin-top: auto">
+              <a href="V2Estudio.dc.html" style="display: flex; align-items: center; justify-content: center; height: 32px; border-radius: 6px; background: #ececef; color: #0b0b0d; font-weight: 500; text-decoration: none">Abrir no Estúdio</a>
+              <button type="button" style="height: 32px; border: 1px solid #2a2a31; border-radius: 6px; background: #16161a; color: #ececef">Abrir chat do agente</button>
+            </div>
+          </aside>
+        </sc-if>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { sel: 'T-142', peek: true }; }
+  renderVals() {
+    var self = this, st = this.state;
+    var A = { RO: ['#f5b544', 'Roteirista'], ED: ['#2dd4bf', 'Editor de vídeo'], DC: ['#f472b6', 'Designer de capa'], PB: ['#9aa8ff', 'Publicador'], PE: ['#fb923c', 'Pesquisador'] };
+    var TC = { Excel: '#3ecf8e', 'Power BI': '#f0b03f', IA: '#a78bfa', Produtividade: '#5b8cff' };
+    var CH = { YT: 'YouTube', IG: 'Instagram', IN: 'LinkedIn' };
+    var cols = [
+      { name: 'Ideias', st: 'fila', cards: [
+        ['T-151', 'Copilot × fórmula na mão', 'fila', 'PE', 'YT', 'IA', 'sem data', '', ''],
+        ['T-150', 'Power BI gratuito: o que muda', 'fila', 'PE', 'IG', 'Power BI', 'sem data', '', ''],
+        ['T-149', 'Python no Excel: primeiro script', 'fila', 'PE', 'YT', 'Excel', 'sem data', '', '']] },
+      { name: 'Roteiro', st: 'rodando', cards: [
+        ['T-147', 'Pauta da semana a partir do Radar', 'rodando', 'RO', 'YT', 'Excel', 'nov', 'Ranqueando 12 sinais', 'run'],
+        ['T-145', 'Reels · busca no Excel', 'aguardando', 'RO', 'IG', 'Excel', 'nov', 'Pergunta: PROCX ou PROCV?', 'wait']] },
+      { name: 'Produção', st: 'rodando', cards: [
+        ['T-142', 'Tutorial de automação no Excel', 'aguardando', 'ED', 'YT', 'Excel', 'sex 30', 'Cortes esperam você', 'wait'],
+        ['T-141', 'Carrossel · 5 erros no Power BI', 'aguardando', 'DC', 'IG', 'Power BI', 'sáb 31', 'Escolher capa', 'wait'],
+        ['T-139', 'Reels · atalhos do VS Code', 'rodando', 'ED', 'IG', 'Produtividade', 'hoje 19:00', 'Render 9:16 · 64%', 'run']] },
+      { name: 'Revisão', st: 'aguardando', cards: [
+        ['T-137', 'LinkedIn · automação de relatórios', 'aguardando', 'PB', 'IN', 'Excel', 'seg 02', 'Confirmar agendamento', 'wait']] },
+      { name: 'Agendado', st: 'feito', cards: [
+        ['T-135', 'YouTube · fórmulas dinâmicas', 'falhou', 'PB', 'YT', 'Excel', 'atrasado', 'Upload falhou · reconectar', 'fail']] },
+      { name: 'Publicado', st: 'feito', cards: [
+        ['T-133', 'Painel de vendas', 'feito', 'PB', 'IN', 'Power BI', '27 out', '', ''],
+        ['T-131', 'Carrossel · Power Query', 'feito', 'PB', 'IG', 'Excel', '23 out', '', '']] }
+    ];
+    var all = {};
+    var outCols = cols.map(function (c) {
+      return { name: c.name, st: c.st, n: c.cards.length, cards: c.cards.map(function (k) {
+        var on = st.peek && st.sel === k[0];
+        var o = { id: k[0], t: k[1], st: k[2], i: k[3], c: A[k[3]][0], who: A[k[3]][1], ch: k[4], chName: CH[k[4]], topic: k[5], topicC: TC[k[5]], due: k[6], note: k[7], hasNote: !!k[7], col: c.name,
+          noteC: k[8] === 'wait' ? '#f0b03f' : k[8] === 'fail' ? '#ff8a8e' : '#85858f', dueC: k[6] === 'atrasado' ? '#ff8a8e' : k[6].indexOf('hoje') === 0 ? '#ececef' : '#85858f',
+          on: on ? 'true' : 'false', bd: on ? '#5b8cff' : '#1f1f24', ring: on ? '0 0 0 3px rgba(91,140,255,0.18)' : 'none',
+          pick: function () { self.setState({ sel: k[0], peek: true }); } };
+        all[k[0]] = o; return o;
+      }) };
+    });
+    var cur = all[st.sel] || all['T-142'];
+    var runs = { 'T-142': 'RUN-284', 'T-141': 'RUN-281', 'T-139': 'RUN-283', 'T-137': 'RUN-276', 'T-135': 'RUN-280', 'T-147': 'RUN-285', 'T-145': 'RUN-279' };
+    return {
+      cols: outCols,
+      peek: Object.assign({}, cur, { show: st.peek, run: runs[cur.id] || 'ainda não começou', desc: cur.note ? cur.note + '. Abra no Estúdio para ver o passo a passo e responder ao agente.' : 'Sem execução ativa. Ao mover para Roteiro, o pipeline Produção semanal começa.',
+        close: function () { self.setState({ peek: false }); } })
+    };
+  }
+}
+</script>
+</body>
+</html>

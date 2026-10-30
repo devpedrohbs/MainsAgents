@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>MainsAgents V2 — Mission Control</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0b0b0d}
+a{color:#8aa8ff}a:hover{color:#b3c6ff}
+button{font:inherit;cursor:pointer}
+.v2row{transition:background .12s}
+.v2row:hover{background:#16161a}
+@media (max-width: 900px){.v2-side{display:none !important}}
+</style>
+</helmet>
+<div style="width: 100%; height: 900px; box-sizing: border-box; display: flex; background: #0b0b0d; color: #ececef; font-family: Inter, -apple-system, system-ui, sans-serif; font-size: 13px; line-height: 20px; font-feature-settings: 'cv11' 1, 'ss01' 1; overflow: hidden">
+  <div class="v2-side" style="flex: 0 0 220px">
+    <dc-import name="V2Sidebar" active="home" hint-size="220px,900px"></dc-import>
+  </div>
+
+  <div style="flex: 1 1 auto; min-width: 0; display: flex; padding: 8px 8px 8px 0">
+    <div style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; background: #111113; border: 1px solid #1f1f24; border-radius: 10px; overflow: hidden">
+
+      <header style="flex: 0 0 auto; min-height: 44px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 6px 12px 6px 20px; border-bottom: 1px solid #1f1f24; box-sizing: border-box">
+        <h1 style="margin: 0; font-size: 13px; font-weight: 600">Mission Control</h1>
+        <span style="font-size: 12px; color: #85858f">Quinta, 29 de outubro</span>
+        <div style="flex-grow: 1"></div>
+        <div role="group" aria-label="Período" style="display: flex; padding: 2px; border: 1px solid #2a2a31; border-radius: 7px; background: #0b0b0d">
+          <button type="button" aria-pressed="{{r.todayOn}}" onClick="{{r.today}}" style="height: 24px; padding: 0 10px; border: 0; border-radius: 5px; background: {{r.todayBg}}; color: {{r.todayFg}}; font-size: 12px">Hoje</button>
+          <button type="button" aria-pressed="{{r.weekOn}}" onClick="{{r.week}}" style="height: 24px; padding: 0 10px; border: 0; border-radius: 5px; background: {{r.weekBg}}; color: {{r.weekFg}}; font-size: 12px">7 dias</button>
+        </div>
+        <a href="V2Pipeline.dc.html" style="display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px; border-radius: 6px; background: #ececef; color: #0b0b0d; font-weight: 500; text-decoration: none">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+          Nova execução
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #55555e">N</span>
+        </a>
+      </header>
+
+      <div style="flex: 1 1 auto; min-height: 0; overflow: auto; padding: 20px 24px 28px; display: flex; flex-wrap: wrap; gap: 24px; align-content: flex-start">
+
+        <!-- Main column -->
+        <div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 24px">
+
+          <!-- KPIs -->
+          <section aria-label="Resumo" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 1px; background: #1f1f24; border: 1px solid #1f1f24; border-radius: 8px; overflow: hidden">
+            <sc-for list="{{kpis}}" as="k" hint-placeholder-count="4">
+              <div style="background: #111113; padding: 14px 16px 12px; display: flex; flex-direction: column; gap: 6px">
+                <span style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #a4a4ad"><i aria-hidden="true" style="width: 6px; height: 6px; border-radius: 50%; background: {{k.c}}"></i>{{k.label}}</span>
+                <span style="display: flex; align-items: baseline; gap: 8px"><b style="font-size: 24px; line-height: 30px; font-weight: 600; letter-spacing: -0.01em; font-variant-numeric: tabular-nums">{{k.v}}</b><span style="font-size: 12px; color: {{k.dc}}">{{k.d}}</span></span>
+                <svg width="100%" height="26" viewBox="0 0 100 26" preserveAspectRatio="none" aria-hidden="true"><polyline points="{{k.pts}}" fill="none" stroke="{{k.c}}" stroke-width="1.5" vector-effect="non-scaling-stroke" stroke-linejoin="round"></polyline></svg>
+              </div>
+            </sc-for>
+          </section>
+
+          <!-- Needs you -->
+          <section aria-labelledby="mc-need" style="display: flex; flex-direction: column; gap: 8px">
+            <div style="display: flex; align-items: center; gap: 8px">
+              <h2 id="mc-need" style="margin: 0; font-size: 13px; font-weight: 600">Precisa de você</h2>
+              <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; height: 18px; line-height: 18px; padding: 0 6px; border-radius: 4px; background: #2a2416; color: #f0b03f">4</span>
+              <span style="font-size: 12px; color: #85858f">ordenado pelo que trava mais trabalho</span>
+              <a href="#" style="margin-left: auto; font-size: 12px; text-decoration: none">Abrir caixa de entrada <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #85858f">G I</span></a>
+            </div>
+            <div style="border: 1px solid #1f1f24; border-radius: 8px; overflow: hidden">
+              <sc-for list="{{need}}" as="n" hint-placeholder-count="4">
+                <a href="V2Execucao.dc.html" class="v2row" style="display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 12px 0 14px; border-top: {{n.bt}}; text-decoration: none; color: #ececef">
+                  <dc-import name="V2Status" state="aguardando" hint-size="14px,14px"></dc-import>
+                  <span style="flex: 0 0 150px; color: #f0b03f; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{n.kind}}</span>
+                  <span style="flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{n.title}}</span>
+                  <span aria-hidden="true" style="flex: 0 0 18px; height: 18px; border-radius: 5px; background: {{n.c}}; color: #0b0b0d; font-size: 9px; font-weight: 700; display: flex; align-items: center; justify-content: center">{{n.i}}</span>
+                  <span style="flex: 0 0 64px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #85858f">{{n.run}}</span>
+                  <span style="flex: 0 0 56px; text-align: right; font-size: 12px; color: {{n.wc}}">{{n.wait}}</span>
+                  <span style="flex: 0 0 auto; height: 26px; line-height: 26px; padding: 0 10px; border: 1px solid #2a2a31; border-radius: 6px; background: #16161a; font-size: 12px">Revisar</span>
+                </a>
+              </sc-for>
+            </div>
+          </section>
+
+          <!-- Active runs -->
+          <section aria-labelledby="mc-runs" style="display: flex; flex-direction: column; gap: 8px">
+            <div style="display: flex; align-items: center; gap: 8px">
+              <h2 id="mc-runs" style="margin: 0; font-size: 13px; font-weight: 600">Execuções</h2>
+              <span style="font-size: 12px; color: #85858f">3 ativas · 1 com falha</span>
+              <a href="V2Execucao.dc.html" style="margin-left: auto; font-size: 12px; text-decoration: none">Ver todas <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #85858f">G E</span></a>
+            </div>
+            <div style="border: 1px solid #1f1f24; border-radius: 8px; overflow-x: auto">
+              <div style="min-width: 640px">
+                <div style="display: flex; align-items: center; gap: 12px; height: 30px; padding: 0 14px; font-size: 12px; color: #85858f; border-bottom: 1px solid #1f1f24">
+                  <span style="flex: 0 0 14px"></span><span style="flex: 0 0 64px">ID</span><span style="flex: 1 1 auto">Conteúdo</span><span style="flex: 0 0 170px">Etapa atual</span><span style="flex: 0 0 96px">Progresso</span><span style="flex: 0 0 52px">Equipe</span><span style="flex: 0 0 52px; text-align: right">Tempo</span>
+                </div>
+                <sc-for list="{{runs}}" as="u" hint-placeholder-count="4">
+                  <a href="V2Execucao.dc.html" class="v2row" style="display: flex; align-items: center; gap: 12px; height: 44px; padding: 0 14px; border-top: {{u.bt}}; text-decoration: none; color: #ececef">
+                    <dc-import name="V2Status" state="{{u.st}}" hint-size="14px,14px"></dc-import>
+                    <span style="flex: 0 0 64px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #85858f">{{u.id}}</span>
+                    <span style="flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{u.title}}</span>
+                    <span style="flex: 0 0 170px; font-size: 12px; color: {{u.stepC}}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{u.step}}</span>
+                    <span style="flex: 0 0 96px; display: flex; gap: 2px" aria-label="{{u.progLabel}}">
+                      <sc-for list="{{u.segs}}" as="s" hint-placeholder-count="6"><i style="flex: 1; height: 4px; border-radius: 2px; background: {{s.c}}"></i></sc-for>
+                    </span>
+                    <span style="flex: 0 0 52px; display: flex">
+                      <sc-for list="{{u.team}}" as="t" hint-placeholder-count="2"><span aria-hidden="true" style="width: 18px; height: 18px; box-sizing: border-box; border-radius: 5px; border: 2px solid #111113; margin-right: -5px; background: {{t.c}}"></span></sc-for>
+                    </span>
+                    <span style="flex: 0 0 52px; text-align: right; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #85858f">{{u.t}}</span>
+                  </a>
+                </sc-for>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <!-- Right column -->
+        <aside aria-label="Equipe e agenda" style="flex: 1 1 300px; max-width: 360px; min-width: 0; display: flex; flex-direction: column; gap: 24px">
+          <section aria-labelledby="mc-team" style="display: flex; flex-direction: column; gap: 8px">
+            <h2 id="mc-team" style="margin: 0; font-size: 13px; font-weight: 600">Equipe agora</h2>
+            <div style="border: 1px solid #1f1f24; border-radius: 8px; padding: 4px">
+              <sc-for list="{{team}}" as="g" hint-placeholder-count="4">
+                <a href="V2Agentes.dc.html" class="v2row" style="display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 10px; border-radius: 6px; text-decoration: none; color: #ececef">
+                  <span aria-hidden="true" style="flex: 0 0 24px; height: 24px; border-radius: 6px; background: {{g.c}}; color: #0b0b0d; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center">{{g.i}}</span>
+                  <span style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+                    <b style="font-weight: 500">{{g.n}}</b>
+                    <span style="font-size: 12px; line-height: 16px; color: #85858f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{g.doing}}</span>
+                  </span>
+                  <dc-import name="V2Status" state="{{g.st}}" hint-size="14px,14px"></dc-import>
+                </a>
+              </sc-for>
+            </div>
+          </section>
+
+          <section aria-labelledby="mc-next" style="display: flex; flex-direction: column; gap: 8px">
+            <div style="display: flex; align-items: center"><h2 id="mc-next" style="margin: 0; font-size: 13px; font-weight: 600">Próximas publicações</h2><a href="#" style="margin-left: auto; font-size: 12px; text-decoration: none">Calendário</a></div>
+            <div style="display: flex; flex-direction: column; border: 1px solid #1f1f24; border-radius: 8px">
+              <sc-for list="{{next}}" as="p" hint-placeholder-count="3">
+                <div style="display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-top: {{p.bt}}">
+                  <span style="flex: 0 0 44px; display: flex; flex-direction: column; align-items: center; padding: 4px 0; border-radius: 6px; background: #16161a"><span style="font-size: 11px; line-height: 14px; color: #85858f; text-transform: uppercase">{{p.dw}}</span><b style="font-weight: 600; font-variant-numeric: tabular-nums">{{p.d}}</b></span>
+                  <span style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+                    <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{p.title}}</span>
+                    <span style="font-size: 12px; line-height: 16px; color: #85858f">{{p.meta}}</span>
+                  </span>
+                  <dc-import name="V2Status" state="{{p.st}}" hint-size="14px,14px"></dc-import>
+                </div>
+              </sc-for>
+            </div>
+          </section>
+
+          <section aria-labelledby="mc-feed" style="display: flex; flex-direction: column; gap: 8px">
+            <h2 id="mc-feed" style="margin: 0; font-size: 13px; font-weight: 600">Atividade</h2>
+            <ol style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column">
+              <sc-for list="{{feed}}" as="f" hint-placeholder-count="4">
+                <li style="display: flex; gap: 10px; padding: 6px 0">
+                  <span style="flex: 0 0 38px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #85858f">{{f.t}}</span>
+                  <span style="font-size: 12px; line-height: 18px; color: #a4a4ad"><b style="color: #ececef; font-weight: 500">{{f.who}}</b> {{f.what}}</span>
+                </li>
+              </sc-for>
+            </ol>
+          </section>
+        </aside>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { range: 'today' }; }
+  renderVals() {
+    var self = this;
+    var week = this.state.range === 'week';
+    var pts = function (arr) {
+      var max = Math.max.apply(null, arr), min = Math.min.apply(null, arr), span = (max - min) || 1;
+      return arr.map(function (v, i) { return (i * 100 / (arr.length - 1)).toFixed(1) + ',' + (23 - (v - min) / span * 20).toFixed(1); }).join(' ');
+    };
+    var kpis = week ? [
+      { label: 'Execuções concluídas', v: '41', d: '+9 vs semana anterior', dc: '#3ecf8e', c: '#3ecf8e', s: [3, 5, 4, 7, 6, 8, 8] },
+      { label: 'Tempo parado esperando você', v: '6h 10m', d: '−2h', dc: '#3ecf8e', c: '#f0b03f', s: [9, 8, 7, 7, 6, 5, 6] },
+      { label: 'Entregas publicadas', v: '12', d: '+3', dc: '#3ecf8e', c: '#5b8cff', s: [1, 2, 1, 2, 2, 2, 2] },
+      { label: 'Custo de modelos', v: 'US$ 31,40', d: '+8%', dc: '#a4a4ad', c: '#a4a4ad', s: [4, 5, 3, 6, 4, 5, 5] }
+    ] : [
+      { label: 'Em execução', v: '3', d: '1 travada em você', dc: '#f0b03f', c: '#5b8cff', s: [1, 2, 2, 3, 2, 3, 3] },
+      { label: 'Esperando você', v: '4', d: 'mais antiga: ontem', dc: '#a4a4ad', c: '#f0b03f', s: [2, 3, 3, 2, 4, 3, 4] },
+      { label: 'Concluídas hoje', v: '7', d: '+2 vs ontem', dc: '#3ecf8e', c: '#3ecf8e', s: [0, 1, 2, 3, 4, 6, 7] },
+      { label: 'Custo hoje', v: 'US$ 4,82', d: '212k tokens', dc: '#a4a4ad', c: '#a4a4ad', s: [1, 1, 2, 3, 3, 4, 5] }
+    ];
+    var segs = function (done, cur, total, curC) {
+      var out = [];
+      for (var i = 0; i < total; i++) out.push({ c: i < done ? '#3ecf8e' : i === done && cur ? curC : '#2a2a31' });
+      return out;
+    };
+    var rows = [
+      { st: 'aguardando', id: 'RUN-284', title: 'Tutorial de automação no Excel', step: 'Propor cortes · espera você', stepC: '#f0b03f', segs: segs(3, true, 8, '#f0b03f'), progLabel: '3 de 8 etapas', team: [{ c: '#f5b544' }, { c: '#2dd4bf' }, { c: '#f472b6' }], t: '12m' },
+      { st: 'rodando', id: 'RUN-285', title: 'Pauta da semana a partir do Radar', step: 'Ranquear 12 sinais', stepC: '#a4a4ad', segs: segs(1, true, 5, '#5b8cff'), progLabel: '1 de 5 etapas', team: [{ c: '#f5b544' }], t: '3m' },
+      { st: 'rodando', id: 'RUN-283', title: 'Reels · atalhos do VS Code', step: 'Render 9:16 · 64%', stepC: '#a4a4ad', segs: segs(5, true, 7, '#5b8cff'), progLabel: '5 de 7 etapas', team: [{ c: '#2dd4bf' }, { c: '#f472b6' }], t: '26m' },
+      { st: 'falhou', id: 'RUN-280', title: 'YouTube · fórmulas dinâmicas', step: 'Upload: sessão expirou', stepC: '#ff8a8e', segs: segs(6, true, 7, '#f2555a'), progLabel: '6 de 7 etapas, falhou', team: [{ c: '#9aa8ff' }], t: '41m' }
+    ];
+    rows.forEach(function (r, i) { r.bt = i ? '1px solid #1f1f24' : '0'; });
+    var need = [
+      { kind: 'Aprovar cortes', title: 'Tutorial de automação no Excel', i: 'ED', c: '#2dd4bf', run: 'RUN-284', wait: '8 min', wc: '#a4a4ad' },
+      { kind: 'Escolher capa', title: 'Carrossel · 5 erros no Power BI', i: 'DC', c: '#f472b6', run: 'RUN-281', wait: '2 h', wc: '#a4a4ad' },
+      { kind: 'Revisar roteiro', title: 'Reels · atalhos do VS Code', i: 'RO', c: '#f5b544', run: 'RUN-279', wait: '3 h', wc: '#a4a4ad' },
+      { kind: 'Confirmar agendamento', title: 'LinkedIn · automação de relatórios', i: 'PB', c: '#9aa8ff', run: 'RUN-276', wait: 'ontem', wc: '#f0b03f' }
+    ];
+    need.forEach(function (n, i) { n.bt = i ? '1px solid #1f1f24' : '0'; });
+    var next = [
+      { dw: 'sex', d: '30', title: 'Tutorial de automação no Excel', meta: 'YouTube · 18:00', st: 'aguardando' },
+      { dw: 'sáb', d: '31', title: 'Carrossel · 5 erros no Power BI', meta: 'Instagram · 12:00', st: 'aguardando' },
+      { dw: 'seg', d: '02', title: 'LinkedIn · automação de relatórios', meta: 'LinkedIn · 09:00', st: 'aguardando' }
+    ];
+    next.forEach(function (n, i) { n.bt = i ? '1px solid #1f1f24' : '0'; });
+    return {
+      r: {
+        todayOn: week ? 'false' : 'true', weekOn: week ? 'true' : 'false',
+        todayBg: week ? 'transparent' : '#1c1c21', weekBg: week ? '#1c1c21' : 'transparent',
+        todayFg: week ? '#a4a4ad' : '#ececef', weekFg: week ? '#ececef' : '#a4a4ad',
+        today: function () { self.setState({ range: 'today' }); },
+        week: function () { self.setState({ range: 'week' }); }
+      },
+      kpis: kpis.map(function (k) { return Object.assign({ pts: pts(k.s) }, k); }),
+      need: need,
+      runs: rows,
+      team: [
+        { i: 'RO', n: 'Roteirista', c: '#f5b544', doing: 'Ranqueando sinais do Radar · RUN-285', st: 'rodando' },
+        { i: 'ED', n: 'Editor de vídeo', c: '#2dd4bf', doing: 'Parado: cortes esperam sua aprovação', st: 'aguardando' },
+        { i: 'DC', n: 'Designer de capa', c: '#f472b6', doing: 'Gerando 3 capas · RUN-284', st: 'rodando' },
+        { i: 'PB', n: 'Publicador', c: '#9aa8ff', doing: 'Upload falhou · reconectar YouTube', st: 'falhou' }
+      ],
+      next: next,
+      feed: [
+        { t: '14:32', who: 'Designer de capa', what: 'começou 3 opções de capa para RUN-284' },
+        { t: '14:24', who: 'Editor de vídeo', what: 'propôs 9 cortes e pausou para aprovação' },
+        { t: '14:20', who: 'Você', what: 'aprovou o roteiro v2 do tutorial de Excel' },
+        { t: '13:58', who: 'Radar', what: 'trouxe 4 sinais novos de YouTube e notícias' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

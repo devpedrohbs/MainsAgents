@@ -10,6 +10,20 @@ import { ProviderGlyph } from '../components/layout/Sidebar';
 import { inPeriod, usageByDay, usageGroups, usageLedgerKey, usageTotals, type UsageEntry, type UsageProvider } from '../features/usage/usageLedger';
 import { useProviderUsage, usageProviderKey } from '../features/usage/useProviderUsage';
 import type { UsageWindow } from '../features/chat/codexUsage';
+import { useProduction } from '../features/production/ProductionProvider';
+import type { ProductionRun } from '../features/production/model';
+import { runLabel } from '../features/inbox/inbox';
+import { selectRun } from '../features/inbox/runSelection';
+
+/** Tokens each production run reported to this provider within the period (only reported usage; nothing is estimated). */
+function topRuns(runs: readonly ProductionRun[], workspaceId: string, provider: UsageProvider, since: number) {
+  return runs.filter((run) => run.workspaceId === workspaceId).map((run) => {
+    const calls = (run.budget?.calls ?? []).filter((call) => call.usage?.provider === provider && Date.parse(call.at) >= since);
+    const tokens = calls.reduce((sum, call) => sum + ['input', 'output', 'cacheRead', 'cacheCreation'].reduce((part, key) => part + ((call.usage?.tokens as Record<string, number> | undefined)?.[key] ?? 0), 0), 0);
+    const cost = calls.reduce((sum, call) => sum + (call.usage?.reportedCostUsd ?? 0), 0);
+    return { run, calls: calls.length, tokens, cost };
+  }).filter((row) => row.calls > 0).sort((a, b) => b.tokens - a.tokens).slice(0, 5);
+}
 
 type Group = 'agent' | 'scope' | 'model';
 const RING = 2 * Math.PI * 50;
@@ -24,7 +38,7 @@ function LimitRing({ label, window, pt, locale, note }: { label: string; window:
     <svg viewBox="0 0 120 120" role="img" aria-label={percent == null ? `${label}: ${pt ? 'sem dados' : 'no data'}` : `${label}: ${percent}% ${pt ? 'usado' : 'used'}`}>
       <circle cx="60" cy="60" r="50" className="track" />
       {percent != null && <circle cx="60" cy="60" r="50" className="value" strokeDasharray={`${(RING * percent / 100).toFixed(1)} ${RING.toFixed(1)}`} transform="rotate(-90 60 60)" />}
-      <text x="60" y="67" textAnchor="middle">{percent == null ? '—' : `${percent}%`}</text>
+      <text className="v2-mono" x="60" y="67" textAnchor="middle">{percent == null ? '—' : `${percent}%`}</text>
     </svg>
     <div><span className="usage-eyebrow">{label}</span><strong>{percent == null ? (pt ? 'Sem dados ainda' : 'No data yet') : resetText}</strong><small>{note}</small></div>
   </article>;
@@ -42,6 +56,7 @@ export function Usage() {
   const [provider, setProvider] = usePersistentState<UsageProvider>(usageProviderKey, 'codex');
   const [ledger] = usePersistentState<UsageEntry[]>(usageLedgerKey, noEntries);
   const [days, setDays] = useState<7 | 30>(30);
+  const { runs: productionRuns } = useProduction();
   const [agentFilter, setAgentFilter] = useState('all');
   const [group, setGroup] = useState<Group>('agent');
   const [hover, setHover] = useState<number | null>(null);
@@ -83,16 +98,18 @@ export function Usage() {
   ];
   const groupLabels: Record<Group, string> = { agent: pt ? 'Agente' : 'Agent', scope: pt ? 'Escopo' : 'Scope', model: pt ? 'Modelo' : 'Model' };
 
-  return <div className={`page usage-page usage-${provider}`} data-od-id="usage-page">
-    <div className="usage-toolbar">
-      <div className="usage-segment" role="group" aria-label={pt ? 'Provedor' : 'Provider'}>
+  const heavy = topRuns(productionRuns, currentWorkspaceId, provider, Date.now() - days * 86_400_000);
+  return <div className={`page usage-page v2-team v2-page usage-${provider}`} data-od-id="usage-page">
+    <div className="usage-toolbar v2-header">
+      <h1>{pt ? 'Uso' : 'Usage'}</h1>
+      <div className="usage-segment v2-segmented" role="group" aria-label={pt ? 'Provedor' : 'Provider'}>
         {(['claude', 'codex'] as const).map((id) => <button key={id} type="button" aria-pressed={provider === id} className={`usage-provider-${id}`} onClick={() => { setProvider(id); setHover(null); }}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><ProviderGlyph provider={id} /></svg>{id === 'claude' ? 'Claude' : 'Codex'}
         </button>)}
       </div>
       <SelectMenu className="filter-select" ariaLabel={pt ? 'Filtrar por agente' : 'Filter by agent'} value={agentFilter} onChange={setAgentFilter}
         options={[{ value: 'all', label: pt ? 'Todos os agentes' : 'All agents' }, ...workspaceAgents.map((agent) => ({ value: agent.id, label: agent.name }))]} />
-      <div className="usage-segment" role="group" aria-label={pt ? 'Período' : 'Period'}>
+      <div className="usage-segment v2-segmented" role="group" aria-label={pt ? 'Período' : 'Period'}>
         {([7, 30] as const).map((n) => <button key={n} type="button" aria-pressed={days === n} onClick={() => { setDays(n); setHover(null); }}>{pt ? `${n} dias` : `${n} days`}</button>)}
       </div>
       <button type="button" className="soft-button usage-refresh" disabled={limits.loading} onClick={() => setRefresh((n) => n + 1)}>{limits.loading ? (pt ? 'Atualizando…' : 'Refreshing…') : (pt ? 'Atualizar' : 'Refresh')}</button>
@@ -101,7 +118,7 @@ export function Usage() {
     <section className="usage-hero" aria-label={pt ? 'Resumo do período' : 'Period summary'}>
       <div className="usage-headline">
         <span className="usage-eyebrow">{claude ? (pt ? `Custo estimado · ${days} dias` : `Estimated cost · ${days} days`) : (pt ? `Tokens · ${days} dias` : `Tokens · ${days} days`)}</span>
-        <strong>{claude ? (totals.cost !== undefined ? money(totals.cost, locale) : '—') : compact(totals.total, locale)}</strong>
+        <strong className="v2-mono">{claude ? (totals.cost !== undefined ? money(totals.cost, locale) : '—') : compact(totals.total, locale)}</strong>
         <small>{totals.turns} {pt ? (totals.turns === 1 ? 'resposta' : 'respostas') : (totals.turns === 1 ? 'reply' : 'replies')} · {claude ? (pt ? 'estimativa do Claude Code, não é a fatura' : 'Claude Code estimate, not your bill') : (pt ? 'tokens informados pelo Codex' : 'tokens reported by Codex')}</small>
       </div>
       <LimitRing label={pt ? 'Janela de 5 horas' : '5-hour window'} window={limits.usage?.fiveHours} pt={pt} locale={locale} note={limitNote} />
@@ -111,7 +128,7 @@ export function Usage() {
     <section className="usage-section" aria-labelledby="usage-daily">
       <div className="usage-section-head">
         <h2 id="usage-daily">{measure === 'cost' ? (pt ? 'Custo por dia' : 'Cost per day') : (pt ? 'Tokens por dia' : 'Tokens per day')}</h2>
-        {entries.length > 0 && <span className="usage-readout" aria-live="polite">{dayLabel(daily[shown].date)} · {format(value(daily[shown]))} · {daily[shown].turns} {pt ? 'respostas' : 'replies'}</span>}
+        {entries.length > 0 && <span className="usage-readout v2-mono" aria-live="polite">{dayLabel(daily[shown].date)} · {format(value(daily[shown]))} · {daily[shown].turns} {pt ? 'respostas' : 'replies'}</span>}
         <button type="button" className="text-link" aria-expanded={table} onClick={() => setTable(!table)}>{table ? (pt ? 'Ver gráfico' : 'Show chart') : (pt ? 'Ver tabela' : 'Show table')}</button>
       </div>
       {entries.length === 0 ? <p className="usage-empty">{pt ? `Nenhuma resposta do ${claude ? 'Claude' : 'Codex'} registrada neste período. O uso passa a aparecer a partir das próximas conversas.` : `No ${claude ? 'Claude' : 'Codex'} replies recorded in this period. Usage appears from your next chats.`}</p>
@@ -130,25 +147,37 @@ export function Usage() {
 
     <section className="usage-section" aria-labelledby="usage-tokens">
       <h2 id="usage-tokens">Tokens</h2>
-      <div className="usage-tiles">{tiles.map(([label, text]) => <div key={label}><span>{label}</span><strong>{text}</strong></div>)}</div>
+      <div className="usage-tiles v2-kpis">{tiles.map(([label, text]) => <div key={label}><span>{label}</span><strong className="v2-mono">{text}</strong></div>)}</div>
     </section>
 
     <section className="usage-section" aria-labelledby="usage-breakdown">
       <div className="usage-section-head">
         <h2 id="usage-breakdown">{pt ? `Por ${groupLabels[group].toLocaleLowerCase(locale)}` : `By ${groupLabels[group].toLocaleLowerCase(locale)}`}</h2>
-        <div className="usage-segment" role="group" aria-label={pt ? 'Agrupar por' : 'Group by'}>
+        <div className="usage-segment v2-segmented" role="group" aria-label={pt ? 'Agrupar por' : 'Group by'}>
           {(Object.keys(groupLabels) as Group[]).map((id) => <button key={id} type="button" aria-pressed={group === id} onClick={() => setGroup(id)}>{groupLabels[id]}</button>)}
         </div>
       </div>
-      {rows.length ? <div className="usage-breakdown" role="table" aria-label={pt ? 'Uso por grupo' : 'Usage by group'}>
+      {rows.length ? <div className="usage-breakdown v2-list" role="table" aria-label={pt ? 'Uso por grupo' : 'Usage by group'}>
         <div role="row" className="usage-row head"><span role="columnheader">{groupLabels[group]}</span><span role="columnheader">{measure === 'cost' ? (pt ? 'Custo' : 'Cost') : 'Tokens'}</span><span role="columnheader">{pt ? 'Participação' : 'Share'}</span><span role="columnheader">{pt ? 'Respostas' : 'Replies'}</span></div>
-        {rows.map((row) => { const share = rowTotal ? Math.round(value(row) / rowTotal * 100) : 0; return <div role="row" className="usage-row" key={row.key || 'none'}>
+        {rows.map((row) => { const share = rowTotal ? Math.round(value(row) / rowTotal * 100) : 0; return <div role="row" className="usage-row v2-row" key={row.key || 'none'}>
           <span role="cell" className="usage-row-name">{group === 'agent' && <AgentAvatar name={agentName(row.key)} image={agents.find((agent) => agent.id === row.key)?.avatarImage} mascot={agents.find((agent) => agent.id === row.key)?.avatarMascot} role={agents.find((agent) => agent.id === row.key)?.role} />}<span>{rowName(row.key)}</span></span>
-          <span role="cell">{format(value(row))}</span>
+          <span role="cell" className="v2-mono">{format(value(row))}</span>
           <span role="cell" className="usage-share"><i><b style={{ width: `${share}%` }} /></i><small>{share}%</small></span>
-          <span role="cell">{row.turns}</span>
+          <span role="cell" className="v2-mono">{row.turns}</span>
         </div>; })}
       </div> : <p className="usage-empty">{pt ? 'Sem respostas para agrupar.' : 'No replies to group.'}</p>}
+    </section>
+
+    <section className="usage-section" aria-labelledby="usage-runs" data-od-id="usage-top-runs">
+      <h2 id="usage-runs">{pt ? 'Execuções que mais consumiram' : 'Runs that used the most'}<span className="v2-sub"> · {pt ? `${days} dias` : `${days} days`}</span></h2>
+      {heavy.length ? <div className="usage-breakdown v2-list" role="table" aria-label={pt ? 'Execuções por consumo' : 'Runs by usage'}>
+        {heavy.map((row) => <button type="button" role="row" className="usage-row v2-row usage-run-row" key={row.run.id} onClick={() => { selectRun(currentWorkspaceId, row.run.id); window.location.hash = 'runs'; }}>
+          <span role="cell" className="usage-row-name"><span className="v2-mono">{runLabel(row.run.id)}</span> {row.run.name}</span>
+          <span role="cell" className="v2-mono">{row.tokens.toLocaleString(locale)}</span>
+          <span role="cell" className="v2-mono">{row.cost ? `US$ ${row.cost.toFixed(2)}` : '—'}</span>
+          <span role="cell" className="v2-mono">{row.calls}</span>
+        </button>)}
+      </div> : <p className="usage-empty">{pt ? 'Nenhuma execução de produção informou uso neste período.' : 'No production run reported usage in this period.'}</p>}
     </section>
   </div>;
 }

@@ -40,8 +40,8 @@ export function Agents({
   const providers = Array.from(new Set(agents.map((agent) => agent.providerId ?? 'codex')));
   const skillCount = agents.reduce((count, agent) => count + (agent.skills?.length ?? 0), 0);
   return (
-    <div className={`team-workspace ${selected?'has-details':''}`}><div className="page agents-page ag" data-od-id="agents-page">
-      <div className="ag-head">
+    <div className={`team-workspace v2-team ${selected?'has-details':''}`}><div className="page agents-page ag v2-page" data-od-id="agents-page">
+      <div className="ag-head v2-header">
         <div>
           <h1>{pt ? 'Sua equipe' : 'Your team'}</h1>
           <p>{agents.length
@@ -56,7 +56,7 @@ export function Agents({
             <Icon name="search" />
             <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={pt ? 'Buscar por nome ou função…' : 'Search by name or role…'} aria-label={pt ? 'Buscar agentes' : 'Search agents'} />
           </label>
-          <div className="ag-segment" role="group" aria-label={pt ? 'Filtrar por IA' : 'Filter by AI'} data-od-id="agent-filters">
+          <div className="ag-segment v2-segmented" role="group" aria-label={pt ? 'Filtrar por IA' : 'Filter by AI'} data-od-id="agent-filters">
             {[['all', pt ? 'Todas as IAs' : 'All AIs'], ...providers.map((id) => [id, id === 'claude' ? 'Claude' : id === 'gemini' ? 'Gemini' : 'Codex'])].map(([id, label]) => (
               <button key={id} aria-pressed={provider === id} onClick={() => setProvider(id)}>{label}</button>
             ))}

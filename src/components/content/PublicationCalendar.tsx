@@ -13,6 +13,9 @@ import {Icon} from '../common/Icon';
 import {useAgents} from '../../features/agents/AgentsProvider';
 import {useChat} from '../../features/chat/ChatProvider';
 import {AgentAvatar} from '../agents/AgentAvatar';
+import {useProduction} from '../../features/production/ProductionProvider';
+import {runLabel} from '../../features/inbox/inbox';
+import {openRunPage} from './StudioV2';
 import './publication-calendar.css';
 
 type CalendarView='month'|'week'|'agenda';
@@ -26,6 +29,10 @@ export function PublicationCalendar({workspaceId}:{workspaceId:string}) {
   const {state}=useContentWorkflow(),{locale}=useLanguage(),pt=locale==='pt-BR';
   const {agents}=useAgents(),{sessions,getRunState}=useChat();
   // The agents working on a post's content, with their mascot (thinking while they answer), under the day panel's tile.
+  const {runs}=useProduction();
+  // V2: each day post links to the production run behind its content.
+  const runFor=(contentId?:string)=>contentId?runs.filter(run=>run.workspaceId===workspaceId&&run.contentId===contentId&&run.stage!=='canceled').sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt))[0]:undefined;
+  const runLink=(contentId?:string)=>{const run=runFor(contentId);return run?<button type="button" className="v2-link calendar-run-link" onClick={()=>openRunPage(workspaceId,run.id)}><span className="v2-mono">{runLabel(run.id)}</span> · {pt?'abrir execução':'open run'}</button>:null};
   const crewFor=(contentId?:string)=>{
     if(!contentId)return null;
     const own=sessions.filter(session=>session.contentId===contentId);
@@ -107,7 +114,7 @@ export function PublicationCalendar({workspaceId}:{workspaceId:string}) {
         <div className={`publishing-agenda ${view==='agenda'?'visible':''}`} data-od-id="calendar-agenda">{Array.from(new Set(periodPosts.map(dateOf))).map(day=><section key={day} className="agenda-day"><header><strong>{dateLabel(day,{day:'numeric'})}</strong><span>{dateLabel(day,{weekday:'short',month:'short'})}</span>{day===today&&<small>{pt?'Hoje':'Today'}</small>}</header><div>{periodPosts.filter(item=>dateOf(item)===day).map(item=>tile(item,true,'agenda'))}</div></section>)}</div>
         {periodPosts.length===0&&<div className="calendar-empty" role="status"><Icon name="calendar"/><strong>{filtered?(pt?'Nenhum post com esses filtros':'No posts match these filters'):(pt?'Seu calendário está livre':'Your calendar is clear')}</strong><p>{filtered?(pt?'Tente outra rede ou palavra.':'Try another channel or keyword.'):(pt?'Adicione uma data às entregas no Estúdio para vê-las aqui.':'Add a date to deliveries in the Studio to see them here.')}</p>{filtered&&<button className="text-link" onClick={clearFilters}>{pt?'Limpar filtros':'Clear filters'}</button>}</div>}
       </div>
-      <aside className="calendar-day-panel" data-od-id="calendar-day-panel"><header><span>{selectedDay===today?(pt?'Hoje':'Today'):dateLabel(selectedDay,{weekday:'long'})}</span><h3>{dateLabel(selectedDay,{day:'numeric',month:'long'})}</h3><small>{selectedPosts.length} {pt?'posts':'posts'}</small></header><div>{selectedPosts.length?selectedPosts.map(item=><div className="day-post" key={item.id}>{tile(item,false,'day')}{crewFor(item.contentId)}</div>):<div className="day-panel-empty"><Icon name="calendar"/><p>{pt?'Sem posts neste dia.':'No posts on this day.'}</p><span>{pt?'Selecione uma data para ver os detalhes.':'Select a date to see its posts.'}</span></div>}</div><div className="calendar-day-note"><i/>{pt?'Rascunhos e aprovações ficam no Estúdio.':'Drafts and approvals live in the Studio.'}</div></aside>
+      <aside className="calendar-day-panel" data-od-id="calendar-day-panel"><header><span>{selectedDay===today?(pt?'Hoje':'Today'):dateLabel(selectedDay,{weekday:'long'})}</span><h3>{dateLabel(selectedDay,{day:'numeric',month:'long'})}</h3><small>{selectedPosts.length} {pt?'posts':'posts'}</small></header><div>{selectedPosts.length?selectedPosts.map(item=><div className="day-post" key={item.id}>{tile(item,false,'day')}{crewFor(item.contentId)}{runLink(item.contentId)}</div>):<div className="day-panel-empty"><Icon name="calendar"/><p>{pt?'Sem posts neste dia.':'No posts on this day.'}</p><span>{pt?'Selecione uma data para ver os detalhes.':'Select a date to see its posts.'}</span></div>}</div><div className="calendar-day-note"><i/>{pt?'Rascunhos e aprovações ficam no Estúdio.':'Drafts and approvals live in the Studio.'}</div></aside>
     </div>
     <footer className="calendar-footer"><div className="calendar-legend"><span><i className="draft"/>{pt?'Rascunho':'Draft'}</span><span><i className="in-review"/>{pt?'Revisão':'Review'}</span><span><i className="approved"/>{pt?'Aprovado':'Approved'}</span><span><i className="scheduled"/>{pt?'Agendado':'Scheduled'}</span></div><SelectMenu ariaLabel={pt?'Fuso do calendário':'Calendar time zone'} value={zone} onChange={setZone} options={[...new Set([zone,...zones])].map(value=>({value,label:value.replace('America/','').replaceAll('_',' ')}))}/></footer>
     <p className="calendar-confirmation-note">{pt?'Horários planejados. Agendamentos confirmados exibem o recibo do provedor.':'Planned times. Confirmed schedules display the provider receipt.'}</p>

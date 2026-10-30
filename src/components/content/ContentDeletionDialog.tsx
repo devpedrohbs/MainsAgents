@@ -18,16 +18,16 @@ export function ContentDeletionDialog({contentId,workspaceId,fallbackTitle,pt,on
  const {agents}=useAgents(),{respondingSessions,stopSessions}=useChat();
  const [preview,setPreview]=useState<DeletionPreview|null>(null),[loading,setLoading]=useState(true),[deleting,setDeleting]=useState(false);
  const [error,setError]=useState(''),[remaining,setRemaining]=useState<DeletionWork[]>([]),[, setTick]=useState(0);
- const live=useRef(true);
+ const live=useRef(true),onDeletedRef=useRef(onDeleted);onDeletedRef.current=onDeleted;
  const load=useCallback(async()=>{
   setLoading(true);
   try{
    const result=await previewContentDeletion(contentId,workspaceId);if(!live.current)return;
-   if('alreadyDeleted' in result){onDeleted({title:fallbackTitle,chats:0});return;}
+   if('alreadyDeleted' in result){onDeletedRef.current({title:fallbackTitle,chats:0});return;}
    setPreview(result);
   }catch(reason){if(live.current)setError(reason instanceof Error?reason.message:String(reason));}
   finally{if(live.current)setLoading(false);}
- },[contentId,workspaceId,fallbackTitle,onDeleted]);
+ },[contentId,workspaceId,fallbackTitle]);
  useEffect(()=>{live.current=true;void load();return()=>{live.current=false;};},[load]);
  // Responding chats are read live (a reply can start or end while the dialog is open).
  useEffect(()=>{const timer=window.setInterval(()=>setTick(value=>value+1),800);return()=>window.clearInterval(timer);},[]);
@@ -44,7 +44,7 @@ export function ContentDeletionDialog({contentId,workspaceId,fallbackTitle,pt,on
    const ids=preview.sessionIds,still=respondingSessions(ids).length?await stopSessions(ids):[];
    if(still.length){setError(pt?'Uma conversa deste conteúdo não confirmou a parada da resposta. Nada foi apagado; tente de novo em instantes.':'A chat of this content did not confirm that its reply stopped. Nothing was deleted; try again shortly.');return;}
    const result=await deleteContentLocally(preview,{stopLocalWork:preview.busy.length>0,rendererBusy:respondingSessions(ids)});
-   onDeleted({title,chats:result.alreadyDeleted?0:preview.counts.chats});
+   onDeletedRef.current({title,chats:result.alreadyDeleted?0:preview.counts.chats});
   }catch(reason){
    if(!live.current)return;
    const refused=reason instanceof DeletionRefused?reason:undefined;

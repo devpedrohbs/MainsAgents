@@ -1,9 +1,10 @@
-import {useEffect,useRef,useState} from 'react';
+import {useEffect,useLayoutEffect,useRef,useState} from 'react';
 import type {ReasoningEffort} from '../../features/chat/model/Chat';
 import {providerShortName} from '../../features/chat/providerChoice';
 import {useLanguage} from '../../app/LanguageProvider';
 import {Icon} from '../common/Icon';
 import {choiceStatus} from './ProviderChoice';
+import type {ProviderStatus} from '../../features/chat/AiProvider';
 
 const efforts:readonly {value:ReasoningEffort;pt:string;en:string;hintPt:string;hintEn:string}[]=[
   {value:'low',pt:'Leve',en:'Light',hintPt:'Respostas rápidas',hintEn:'Quick replies'},
@@ -22,44 +23,61 @@ function EffortBars({level}:{level:number}){
  * The model of this chat, chosen in the composer: one pill (provider, model, effort) that opens a panel with the
  * models as a list and the effort as four steps. Changing the provider still goes through the provider dialog.
  */
-export function ModelPicker({providerId,models,modelsLoading,modelId,effort,connection,locked,busy,providerReadOnly,providerBusy,onModel,onEffort,onProvider,onSkill,onCanvas}:{
+export function ModelPicker({providerId,defaultModel,models,modelsLoading,modelId,effort,connection,locked,busy,providerReadOnly,providerBusy,onModel,onEffort,onProvider,onSkill,onCanvas}:{
   providerId:string;models:readonly {id:string;name:string}[];modelsLoading:boolean;modelId:string;effort:ReasoningEffort;connection:string;
+  defaultModel?:ProviderStatus['defaultModel'];
   locked:boolean;busy:boolean;providerReadOnly:boolean;providerBusy:boolean;
   onModel:(modelId:string)=>void;onEffort:(effort:ReasoningEffort)=>void;onProvider:()=>void;onSkill:()=>void;onCanvas:()=>void;
 }){
   const {locale}=useLanguage(),pt=locale==='pt-BR';
   const [open,setOpen]=useState(false);
   const root=useRef<HTMLDivElement>(null);
+  const popover=useRef<HTMLDivElement>(null);
+  const [position,setPosition]=useState({left:12,top:12});
+  useLayoutEffect(()=>{
+    const menu=popover.current;if(!menu)return;
+    if(!open){if(menu.matches(':popover-open'))menu.hidePopover();return;}
+    // The browser top layer escapes the chat panel's clipping while retaining its styles and keyboard ancestry.
+    if(!menu.matches(':popover-open'))menu.showPopover();
+    const place=()=>{
+      const trigger=root.current?.querySelector('button')?.getBoundingClientRect();if(!trigger)return;
+      const box=menu.getBoundingClientRect();
+      setPosition({left:Math.max(12,Math.min(trigger.left,innerWidth-box.width-12)),top:Math.max(12,Math.min(trigger.top-box.height-12,innerHeight-box.height-12))});
+    };
+    place();window.addEventListener('resize',place);window.addEventListener('scroll',place,true);
+    return()=>{window.removeEventListener('resize',place);window.removeEventListener('scroll',place,true);};
+  },[open,modelsLoading,models.length,modelId,defaultModel?.name]);
   useEffect(()=>{
     if(!open)return;
     const close=(event:PointerEvent)=>{if(!root.current?.contains(event.target as Node))setOpen(false);};
     document.addEventListener('pointerdown',close);
     return()=>document.removeEventListener('pointerdown',close);
   },[open]);
-  const provider=providerShortName(providerId);
+  const provider=providerId==='claude'?'Claude Code':providerShortName(providerId);
   const current=models.find(model=>model.id===modelId);
-  const modelName=current?.name||modelId||(pt?'Padrão':'Default');
+  const modelName=current?.name||modelId||defaultModel?.name||(pt?'Padrão':'Default');
   const level=Math.max(0,efforts.findIndex(item=>item.value===effort));
   const offline=connection!=='connected'&&connection!=='checking';
   const options=[
-    {id:'',name:pt?'Padrão do provedor':'Provider default',note:pt?'O que estiver configurado no '+provider:'Whatever '+provider+' is set to'},
+    {id:'',name:providerId==='claude'?(pt?'Padrão do Claude Code':'Claude Code default'):(pt?'Padrão do provedor':'Provider default'),note:defaultModel?(pt?`Configurado: ${defaultModel.name}. Segue a configuração do ${provider}.`:`Configured: ${defaultModel.name}. Follows ${provider} settings.`):(pt?'O que estiver configurado no '+provider:'Whatever '+provider+' is set to')},
     ...(modelId&&!models.some(model=>model.id===modelId)?[{id:modelId,name:modelId,note:pt?'Salvo nesta conversa':'Saved in this chat'}]:[]),
     ...models.map(model=>({id:model.id,name:model.name,note:''})),
   ];
   const chatLabel=`${pt?'Conversa':'Chat'}: ${provider}`;
   return <div className={`composer-options-root model-picker${open?' is-open':''}`} ref={root} data-od-id="conversation-provider" data-provider={providerId}
-    onKeyDown={event=>{if(event.key==='Escape'&&open){event.preventDefault();setOpen(false);root.current?.querySelector<HTMLButtonElement>('.composer-options-trigger')?.focus();}}}>
-    <button type="button" className="composer-options-trigger model-picker-trigger" aria-haspopup="dialog" aria-expanded={open}
+    onKeyDown={event=>{if(event.key==='Escape'&&open){event.preventDefault();event.stopPropagation();setOpen(false);root.current?.querySelector<HTMLButtonElement>('.composer-options-trigger')?.focus();}}}>
+    <button type="button" className="composer-options-trigger model-picker-trigger" aria-haspopup="dialog" aria-expanded={open} data-model-source={modelId?'conversation':defaultModel?.source??'runtime-default'}
       aria-label={pt?`Modelo: ${provider} · ${modelName} · esforço ${effortLabel(effort,pt)}`:`Model: ${provider} · ${modelName} · ${effortLabel(effort,pt)} effort`}
       title={pt?'Modelo, esforço e skills':'Model, effort and skills'} onClick={()=>setOpen(value=>!value)}>
       <span className="model-picker-dot" aria-hidden="true"/>
-      <span className="model-picker-name">{current||modelId?modelName:provider}</span>
+      <span className="model-picker-name">{current||modelId||defaultModel?modelName:provider}</span>
       <EffortBars level={level}/>
       <Icon name="chevron" className="model-picker-chevron"/>
     </button>
     {offline&&<span className="model-picker-status" role="status">{choiceStatus(connection,pt)}</span>}
     {/* Kept mounted (hidden when closed): the provider switch and its status stay in the document for assistive tech and UI tests. */}
-    <div className="composer-options-popover model-picker-pop" role="dialog" hidden={!open} aria-label={pt?'Como o agente responde':'How the agent responds'}>
+    <div ref={popover} popover="manual" className="composer-options-popover model-picker-pop" role="dialog" hidden={!open} aria-label={pt?'Como o agente responde':'How the agent responds'}
+      style={{position:'fixed',left:position.left,top:position.top,bottom:'auto',right:'auto',margin:0,width:320,maxWidth:'calc(100vw - 24px)',maxHeight:'calc(100dvh - 24px)',transform:'none',animation:'none'}}>
       <div className="model-picker-provider">
         <span className="model-picker-dot" aria-hidden="true"/>
         <span className="model-picker-provider-text"><b>{provider}</b><small>{connection==='checking'?(pt?'Verificando conexão…':'Checking connection…'):choiceStatus(connection,pt)}</small></span>

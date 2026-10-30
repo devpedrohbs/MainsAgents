@@ -1,5 +1,6 @@
-// Editing upgrade (09/10) in real Electron: Remotion Player preview of the reviewed plan, transcript editing with undo,
-// opt-in voice treatment, manual focus, user motion moments, word captions and export of exactly the previewed plan.
+// Editing upgrade (09/10) in real Electron, on the staged edit (cuts → visual → SRT): Remotion Player preview of the reviewed
+// cut, transcript editing with undo, opt-in voice treatment, manual focus, user motion moments and export of exactly the
+// previewed plan; stage 1 refuses a cut base with motion and accepts the cut-only export. Visual + SRT: test-edit-stages-ui.
 // Synthetic Windows-voice fixture, real whisper.cpp/FFmpeg/Remotion, simulated agents; no personal accounts, videos or paid calls.
 // Run: npx electron scripts/test-edit-preview-ui.mjs
 import {app,BrowserWindow,ipcMain} from 'electron';
@@ -43,12 +44,22 @@ async function click(selector){await until(()=>js(`Boolean(document.querySelecto
 async function button(text){await until(()=>js(`Array.from(document.querySelectorAll('button')).some(el=>(el.querySelector('.select-menu-option-copy b')?.textContent??el.textContent).trim()===${JSON.stringify(text)}&&!el.disabled)`));await js(`Array.from(document.querySelectorAll('button')).find(el=>(el.querySelector('.select-menu-option-copy b')?.textContent??el.textContent).trim()===${JSON.stringify(text)}&&!el.disabled).click()`)}
 async function inputText(selector,value){await js(`(()=>{const el=document.querySelector(${JSON.stringify(selector)});Object.getOwnPropertyDescriptor(el.tagName==='TEXTAREA'?HTMLTextAreaElement.prototype:HTMLInputElement.prototype,'value').set.call(el,${JSON.stringify(value)});el.dispatchEvent(new Event('input',{bubbles:true}))})()`)}
 async function shot(name){writeFileSync(join(out,`${name}.png`),await captureReadyPng(win.webContents))}
-async function open(){win=new BrowserWindow({show:false,width:1440,height:1000,webPreferences:{preload:resolve(root,'tests/fixtures/assets-ui-preload.cjs'),contextIsolation:true,sandbox:true,offscreen:true,backgroundThrottling:false}});win.webContents.on('console-message',event=>{if(/Uncaught|Maximum update depth|Cannot update a component/.test(event.message))errors.push(event.message)});await win.loadURL(`http://127.0.0.1:${server.address().port}/app.html#flow`);await until(()=>js('Boolean(document.querySelector(".production-flow-page"))'))}
+async function open(){win=new BrowserWindow({show:false,width:1440,height:1000,webPreferences:{preload:resolve(root,'tests/fixtures/assets-ui-preload.cjs'),contextIsolation:true,sandbox:true,offscreen:true,backgroundThrottling:false}});win.webContents.on('console-message',event=>{if(/Uncaught|Maximum update depth|Cannot update a component/.test(event.message))errors.push(event.message)});await win.loadURL(`http://127.0.0.1:${server.address().port}/app.html#board`);await until(()=>js('Boolean(document.querySelector(".global-create"))'))}
+// The production dialog opens from Create → New production (the Flow area was retired).
+async function openNewProduction(){await click('.global-create');await until(()=>js('Array.from(document.querySelectorAll(".flow-option")).some(b=>b.textContent.includes("Nova produção"))'));await js('Array.from(document.querySelectorAll(".flow-option")).find(b=>b.textContent.includes("Nova produção")).click()');await until(()=>js('Boolean(document.querySelector(\'[aria-label="Produção atual"]\'))'))}
 app.whenReady().then(async()=>{try{
  const speech=join(out,'speech.wav'),voice=spawnSync('powershell.exe',['-NoProfile','-NonInteractive','-Command',"Add-Type -AssemblyName System.Speech;$s=New-Object System.Speech.Synthesis.SpeechSynthesizer;$v=$s.GetInstalledVoices()|Where-Object{$_.VoiceInfo.Culture.Name -eq 'pt-BR'}|Select-Object -First 1;if(-not $v){exit 3};$b=New-Object System.Speech.Synthesis.PromptBuilder([System.Globalization.CultureInfo]'pt-BR');$b.StartVoice($v.VoiceInfo);foreach($p in ($env:SPEECH_PARTS -split '\\|')){$b.AppendText($p);$b.AppendBreak([TimeSpan]::FromMilliseconds(1600))};$b.EndVoice();$s.SetOutputToWaveFile($env:SPEECH_OUT);$s.Speak($b);$s.Dispose()"],{env:{...process.env,SPEECH_PARTS:'Hoje vamos falar de edição|Hoje vamos falar de edição automática no computador|Obrigado por assistir',SPEECH_OUT:speech},windowsHide:true});if(voice.status!==0)throw Error('Windows pt-BR voice unavailable');
-  await runMediaProcess('ffmpeg',['-nostdin','-v','error','-n','-f','lavfi','-i','testsrc2=size=320x180:rate=24','-i',speech,'-shortest','-c:v','libx264','-pix_fmt','yuv420p','-c:a','aac','-ar','48000',input]);const originalSha=createHash('sha256').update(readFileSync(input)).digest('hex');await runMediaProcess('ffmpeg',['-nostdin','-v','error','-n','-f','lavfi','-i','color=c=white:size=64x96','-frames:v','1',png]);await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));await open();await button('Iniciar produção');await click('[aria-label="Ideia da produção"]');await button(topic.title);await until(()=>js('document.querySelector(".production-preflight [role=status]")?.textContent.includes("Nenhum bloqueio")'));assert.equal(await js('Array.from(document.querySelectorAll(".flow-dialog button")).find(el=>el.textContent.includes("Aprovar ideia e iniciar produção")).disabled'),true);assert.equal(bridge.production.list(profile).length,0);await click('.production-panel-body .production-check input[type=checkbox]');await until(()=>js('document.querySelector(".production-panel-body .production-check input[type=checkbox]").checked===true'));await button('Aprovar ideia e iniciar produção');await until(()=>js('document.body.textContent.includes("Aguardando aprovação do roteiro")'));await click('.production-script .production-check input');await button('Aprovar roteiro');await until(()=>js('document.body.textContent.includes("Aguardando gravação")'));assert.equal(posts,0);await button('Adicionar arquivos');await until(()=>js('document.querySelector(".production-panel-body").textContent.includes("original.mp4")'));await click('[aria-label="Vídeo da produção"]');await button('original.mp4');assert(await js(`document.querySelector('[aria-label="Movimento na edição"]')?.textContent.includes("Equilibrado")===true`),'motion intensity offered for the automatic edit');await button('Enviar vídeo e iniciar edição automática');await until(()=>js('document.body.textContent.includes("Aguardando aprovação do vídeo")'));const run1=bridge.production.list(profile)[0],job1=bridge.media.list(profile).find(job=>job.id===run1.videoJobId);
+  await runMediaProcess('ffmpeg',['-nostdin','-v','error','-n','-f','lavfi','-i','testsrc2=size=320x180:rate=24','-i',speech,'-shortest','-c:v','libx264','-pix_fmt','yuv420p','-c:a','aac','-ar','48000',input]);const originalSha=createHash('sha256').update(readFileSync(input)).digest('hex');await runMediaProcess('ffmpeg',['-nostdin','-v','error','-n','-f','lavfi','-i','color=c=white:size=64x96','-frames:v','1',png]);await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));await open();await openNewProduction();await click('[aria-label="Ideia da produção"]');await button(topic.title);await until(()=>js('document.querySelector(".production-preflight [role=status]")?.textContent.includes("Nenhum bloqueio")'));assert.equal(await js('Array.from(document.querySelectorAll(".flow-dialog button")).find(el=>el.textContent.includes("Aprovar ideia e iniciar produção")).disabled'),true);assert.equal(bridge.production.list(profile).length,0);await click('.production-panel-body .production-check input[type=checkbox]');await until(()=>js('document.querySelector(".production-panel-body .production-check input[type=checkbox]").checked===true'));await button('Aprovar ideia e iniciar produção');await until(()=>js('document.body.textContent.includes("Aguardando aprovação do roteiro")'));await click('.production-script .production-check input');await button('Aprovar roteiro');await until(()=>js('document.body.textContent.includes("Aguardando gravação")'));assert.equal(posts,0);await button('Adicionar arquivos');await until(()=>js('document.querySelector(".production-panel-body").textContent.includes("original.mp4")'));await click('[aria-label="Vídeo da produção"]');await button('original.mp4');
+  // Three-stage editing (cuts → visual → SRT): motion intensity is no longer asked at recording; visuals start only on an
+  // explicit request after the cut base. The fixture connects only the simulated Codex runtime, so Codex directs explicitly.
+  assert.equal(await js('Boolean(document.querySelector(\'[aria-label="Movimento na edição"]\'))'),false,'no motion choice before the cut base');
+  await click('[aria-label="Quem dirige a edição"]');await button('Codex');await until(()=>js('document.querySelector(\'[aria-label="Quem dirige a edição"]\')?.textContent.includes("Codex")'));
+  await button('Enviar vídeo e preparar cortes');
+  await until(()=>{const run=bridge.production.list(profile)[0];return run?.stage==='video-review'&&run.editWorkflow?.phase==='cuts'},240000);
+  await until(()=>js('document.querySelector("[data-od-id=edit-stages] h3")?.textContent.includes("1. Revise o corte base")'));const run1=bridge.production.list(profile)[0],job1=bridge.media.list(profile).find(job=>job.id===run1.videoJobId);
   assert.equal(run1.editPlan.mode,'smart');assert.equal(run1.editPlan.transcribed,true,'local whisper ran');assert(run1.editPlan.cuts>=2,`cuts ${run1.editPlan.cuts}`);
-  assert.equal(job1.mode,'advanced');assert.deepEqual(job1.plan.animations.map(item=>item.kind),['title','cta'],'Remotion overlays planned');
+  assert.equal(job1.mode,'advanced');assert.equal(bridge.production.list(profile)[0].editDirector?.choice,'codex','Codex chosen explicitly');
+  assert.deepEqual((job1.plan.animations??[]).map(item=>item.kind),[],'the cut base carries no motion before the visual request');
   const raw=await probeVideo(input),edited=await probeVideo(job1.result.file.path);assert(edited.duration<raw.duration-1.5,`edited ${edited.duration} raw ${raw.duration}`);assert.equal(edited.hasAudio,true);
   log.push(`automatic: raw ${raw.duration.toFixed(2)}s -> edited ${edited.duration.toFixed(2)}s, ${run1.editPlan.cuts} cuts, retakes ${run1.editPlan.possibleRetakes.length}, animations ${job1.plan.animations.length}`);
   for(const [name,time] of [['frame-title',1],['frame-end',edited.duration-0.8]])await runMediaProcess('ffmpeg',['-nostdin','-v','error','-n','-ss',String(time),'-i',job1.result.file.path,'-frames:v','1',join(out,`${name}.png`)]);
@@ -56,14 +67,14 @@ app.whenReady().then(async()=>{try{
   assert(srt,'SRT attached to the automatic edit');const srtText=readFileSync(srt.versions[0].path,'utf8');assert.match(srtText,/-->/);assert.match(srtText,/assistir/i);writeFileSync(join(out,'captions.srt'),srtText);
   // ---- Preview, transcript editing, voice, focus and export (editing upgrade 09/10) ----
   const previews=[],originalPreview=bridge.media.preview.bind(bridge.media);bridge.media.preview=async(...args)=>{const result=await originalPreview(...args);previews.push(result);return result;};
-  await button('Conferir edição (bruto × editado)');
+  await button('Conferir cortes (bruto × editado)');
   await until(()=>js('Boolean(document.querySelector(".edit-preview"))'));
   await until(()=>previews.length>=1,120000);
   await until(()=>js('(()=>{const v=document.querySelector(".edit-preview-stage video");return Boolean(v&&v.readyState>=1&&v.duration>0)})()'),60000);
   const p1=previews.at(-1),exported1=await probeVideo(job1.result.file.path);
   assert(Math.abs(p1.composition.durationSeconds-exported1.duration)<0.15,`preview ${p1.composition.durationSeconds}s vs exported ${exported1.duration}s`);
   assert.equal(p1.planHash,job1.planHash,'first preview = the plan of the exported edit');
-  assert.deepEqual(p1.overlays.sort(),['cta','title'],'same overlays as the render');
+  assert.deepEqual(p1.overlays.sort(),[],'same overlays as the render (none in the cut base)');
   assert.equal(p1.preview.audio==='processed'||p1.preview.audio==='processed-sfx',true);
   log.push(`preview v1: ${p1.composition.width}x${p1.composition.height} ${p1.composition.fps}fps ${p1.composition.durationSeconds}s (export ${exported1.duration}s), proxy ${p1.preview.width}x${p1.preview.height}, audio ${p1.preview.audio}`);
   await js('document.querySelector(".edit-preview").scrollIntoView()');await shot('preview-ready');
@@ -150,19 +161,35 @@ app.whenReady().then(async()=>{try{
   for(const [name,time] of [['adjusted-frame-start',0.6],['adjusted-frame-end',final.duration-0.6]])await runMediaProcess('ffmpeg',['-nostdin','-v','error','-n','-ss',String(time),'-i',adjusted.result.file.path,'-frames:v','1',join(out,`${name}.png`)]);
   log.push(`exported adjusted: ${exported1.duration}s -> ${final.duration}s (preview ${p2.composition.durationSeconds}s), audio ${JSON.stringify(adjusted.plan.audio)}`);
   await shot('adjusted-exported');
-  // Word-by-word captions on the adjusted video (production caption review), then the libass-compatible version exists.
-  await button('Usar esta versão na produção');await until(()=>bridge.production.list(profile)[0].outputVideo?.assetId!==run1.outputVideo.assetId,60000);
-  await until(()=>js('Boolean(document.querySelector(".caption-review"))'),60000);
-  await click('[aria-label="Tipo de legenda"]');await button('Palavra a palavra (1–3 por vez)');
-  await button('Transcrever fala (Whisper local)');
-  await until(()=>bridge.production.list(profile)[0].captions?.transcription?.status&&bridge.production.list(profile)[0].captions.transcription.status!=='running',240000);
-  const captionsRun=bridge.production.list(profile)[0].captions,wordVersion=captionsRun.versions.at(-1);
-  assert.equal(captionsRun.transcription.status,'done',captionsRun.transcription.error);assert.equal(captionsRun.transcription.mode,'words');
-  assert(wordVersion.warnings.includes('word-timing')||wordVersion.warnings.includes('no-word-timing'),JSON.stringify(wordVersion.warnings));
-  if(wordVersion.warnings.includes('word-timing'))assert(wordVersion.segments.every(item=>item.text.split(' ').length<=3),JSON.stringify(wordVersion.segments));
-  await until(()=>js('document.querySelector(".caption-review").textContent.includes("cada legenda usa o tempo reconhecido")&&!document.querySelector(".caption-review").textContent.includes("Transcrevendo localmente")'),60000);
-  log.push(`word captions: ${wordVersion.segments.length} captions, timing ${wordVersion.timing}, warnings ${wordVersion.warnings.join(',')}, first "${wordVersion.segments.slice(0,3).map(item=>item.text).join(' | ')}"`);
-  await js('document.querySelector(".caption-review").scrollIntoView()');await shot('word-captions');
+  // Stage 1 accepts only cuts and audio: the export above carries the user's focus and motion moments, so using it as the
+  // cut base is refused with the stage rule and the production keeps its version (motion belongs to stage 2, on request).
+  const before1=JSON.stringify(bridge.production.list(profile)[0].outputVideo);
+  await button('Usar esta versão na produção');
+  await until(()=>js('document.querySelector(".production-panel-body")?.textContent.includes("Etapa 1: entregue apenas os cortes e o áudio")'),60000);
+  assert.equal(JSON.stringify(bridge.production.list(profile)[0].outputVideo),before1,'a cut base with motion is never used');
+  log.push('cut base with focus/motion refused by stage 1');
+  // Same review, cut-only: back to the default focus, drop the user moments, keep the pause/transcript cut/voice; export and use it.
+  await button('Conferir cortes (bruto × editado)');await until(()=>js('Boolean(document.querySelector(".edit-preview"))'));
+  await until(()=>js('Boolean(document.querySelector(".edit-transcript-word"))'),60000);log.push(`reopened cut review: focus ${await js('document.querySelectorAll("[data-od-id=edit-focus] li").length')}, user moments ${await js('Array.from(document.querySelectorAll(".edit-review-motion-list li")).filter(li=>li.textContent.includes("escolhido por você")).length')}, kept ${await js('document.querySelectorAll(".edit-review-cuts li.is-kept").length')}`);
+  if(await js('Array.from(document.querySelectorAll("[data-od-id=edit-focus] button")).some(b=>b.textContent==="Voltar ao foco padrão")'))await button('Voltar ao foco padrão');
+  for(let i=0;i<4&&await js('Array.from(document.querySelectorAll(".edit-review-motion-list li")).some(li=>li.textContent.includes("escolhido por você"))');i++)
+   await js('Array.from(document.querySelectorAll(".edit-review-motion-list li")).find(li=>li.textContent.includes("escolhido por você")).querySelector("input[type=checkbox]").click()');
+  await until(()=>js('!Array.from(document.querySelectorAll(".edit-review-motion-list li")).some(li=>li.textContent.includes("escolhido por você"))&&!document.querySelector("[data-od-id=edit-focus] ol")'));
+  if(!await js('Array.from(document.querySelectorAll(".edit-review-cuts li")).some(li=>li.classList.contains("is-kept"))')){await js(`document.querySelectorAll(".edit-transcript-word")[${pick.before}].click()`);await js(`document.querySelectorAll(".edit-transcript-word")[${pick.after}].click()`);await button('Manter (desfazer corte/pausa)');}
+  await button('Exportar versão com meus ajustes');
+  await until(()=>js('document.body.textContent.includes("Versão ajustada exportada e verificada.")'),240000);
+  const cutOnly=bridge.media.list(profile).filter(job=>job.mode==='advanced'&&job.status==='succeeded').sort((a,b)=>b.createdAt.localeCompare(a.createdAt))[0];
+  assert.notEqual(cutOnly.id,adjusted.id);assert(!cutOnly.plan.motion?.reframe&&!(cutOnly.plan.motion?.cues??[]).length&&!(cutOnly.plan.animations??[]).length,'cut-only export has no motion');
+  assert(cutOnly.plan.segments.some(item=>item.start<=gap.start+0.01&&item.end>=gap.end-0.01),'kept pause is still in the cut-only export');
+  await button('Usar esta versão na produção');
+  await until(()=>bridge.production.list(profile)[0].outputVideo?.assetId!==run1.outputVideo.assetId,60000);
+  const used=bridge.production.list(profile)[0];assert.equal(used.videoJobId,cutOnly.id);assert.equal(used.editWorkflow?.phase,'cuts','using the adjusted cut never starts visuals');assert.equal(used.stage,'video-review');
+  await until(()=>js('document.querySelector("[data-od-id=edit-stages] h3")?.textContent.includes("1. Revise o corte base")&&Array.from(document.querySelectorAll("[data-od-id=edit-stages] button")).some(b=>b.textContent.includes("Aprovar este corte e iniciar visual"))'),60000);
+  log.push(`cut-only adjusted export used as the cut base (${cutOnly.id}), stage 1 kept`);await shot('cut-base-adjusted');
+  // OBSOLETE (three-stage editing): the word-by-word caption review (.caption-review, "Palavra a palavra", local Whisper
+  // captions) is shown only for runs without staged editing. Staged runs deliver SRT for CapCut in stage 3 after the visual
+  // edit; that path, with the visual request, is proven by scripts/test-edit-stages-ui.mjs. Not re-enabled here on purpose.
+  assert.equal(await js('Boolean(document.querySelector(".caption-review"))'),false,'legacy caption review is not offered to staged runs');
   assert.equal(createHash('sha256').update(readFileSync(input)).digest('hex'),originalSha,'original untouched');
   assert.deepEqual(errors,[]);writeFileSync(join(out,'journey.log'),log.join('\n'));
   console.log(`EDIT_PREVIEW_UI_OK: ${log.join(' | ')} | artifacts ${out}`);

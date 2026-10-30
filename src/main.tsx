@@ -28,6 +28,10 @@ import './styles/board-agents.css';
 import './styles/history-canvas.css';
 import './styles/canvas-interactions.css';
 import './styles/chat-clean.css';
+import './styles/v2.css';
+import './styles/v2-pages.css';
+import './styles/v2-team.css';
+import './styles/v2-shell.css';
 
 const root=document.getElementById('root');
 if(!root)throw new Error('Missing #root element');

@@ -8,7 +8,8 @@ export async function embedChatImages(data:Record<string,unknown>,readImage:(url
     if(message.type!=='message')continue;
     for(const image of message.images??[]){const source=chatImageSource(image);if(source?.startsWith('/api/codex/images/'))image.dataUrl=await embed(source);}
   }
-  for(const state of Object.values(copy['canvas-workspaces']??{}) as {nodes?:{data:{imageUrl?:string}}[]}[])for(const node of state.nodes??[]){
+  type CanvasImageNode={data:{imageUrl?:string}};
+  for(const state of Object.values(copy['canvas-workspaces']??{}) as {schemaVersion?:number;nodes?:CanvasImageNode[];boards?:{nodes:CanvasImageNode[]}[]}[])for(const node of state.schemaVersion===2?(state.boards??[]).flatMap(board=>board.nodes):state.nodes??[]){
     if(node.data.imageUrl&&/^\/api\/codex\/images\/[a-f0-9]{64}\.(?:png|jpg|webp)$/.test(node.data.imageUrl))node.data.imageUrl=await embed(node.data.imageUrl);
   }
   return copy;

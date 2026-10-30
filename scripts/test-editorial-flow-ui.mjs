@@ -58,7 +58,7 @@ app.whenReady().then(async()=>{
     await evaluate("window.mainsAgentsSaveNow()");
     const db=new DatabaseSync(dbPath);const saved=JSON.parse(db.prepare('SELECT state_json FROM editorial_state WHERE profile_id=?').get(profile).state_json);db.close();
     assert.equal(saved.contents[0].productionStage,'editing');assert.equal(saved.artifacts.filter(item=>item.type==='script').length,1);
-    assert.equal(state['canvas-workspaces'][workspaceId].nodes[0].data.contentId,'content');assert.deepEqual(errors,[]);
+    const canvas=state['canvas-workspaces'][workspaceId],nodes=canvas.nodes??canvas.boards.find(board=>board.id===canvas.activeBoardId).nodes;assert.equal(nodes[0].data.contentId,'content');assert.deepEqual(errors,[]);
     writeFileSync(resolve(out,'content-studio.png'),await captureReadyPng(window.webContents));
     console.log('PASS: approval, failed connection, explicit retry, deduplication, restart, edited script, production stage and linked Canvas. No AI tokens or remote writes.');
     writeFileSync(resolve(out,'result.json'),JSON.stringify({passed:true,calls,duplicateJobs:false,restart:true,linkedCanvas:true}));

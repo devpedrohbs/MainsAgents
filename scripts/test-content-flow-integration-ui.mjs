@@ -42,6 +42,8 @@ const text=()=>js('document.body.textContent');
 async function shot(name,focus){if(focus){await js(`document.querySelector(${JSON.stringify(focus)})?.scrollIntoView({block:'start'})`);await new Promise(resolve=>setTimeout(resolve,300));}writeFileSync(join(out,`${name}.png`),await captureReadyPng(win.webContents))}
 async function open(hash){win=new BrowserWindow({show:false,width:1440,height:1100,webPreferences:{preload:resolve(root,'tests/fixtures/assets-ui-preload.cjs'),contextIsolation:true,sandbox:true,offscreen:true,backgroundThrottling:false}});win.webContents.on('console-message',event=>{if(/Uncaught|Maximum update depth|Cannot update a component/.test(event.message))errors.push(event.message)});await win.loadURL(`http://127.0.0.1:${server.address().port}/app.html#${hash}`);}
 const run=()=>bridge.production.list(profile)[0];
+// The production dialog opens from Create → New production (the Flow area was retired).
+async function openNewProduction(){await click('.global-create');await until(()=>js('Array.from(document.querySelectorAll(".flow-option")).some(b=>b.textContent.includes("Nova produção"))'));await js('Array.from(document.querySelectorAll(".flow-option")).find(b=>b.textContent.includes("Nova produção")).click()');await until(()=>js('Boolean(document.querySelector(\'[aria-label="Produção atual"]\'))'))}
 app.whenReady().then(async()=>{try{
  await runMediaProcess('ffmpeg',['-nostdin','-v','error','-n','-f','lavfi','-i','testsrc2=size=360x640:rate=24','-f','lavfi','-i','sine=frequency=440:sample_rate=48000','-t','3','-c:v','libx264','-c:a','aac','-pix_fmt','yuv420p',input]);
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
@@ -53,13 +55,13 @@ app.whenReady().then(async()=>{try{
  await button('Usar como briefing');await until(()=>js('document.querySelector(".editorial-intake textarea")?.value.includes("Gancho forte")'));
  assert.equal(JSON.parse(new DatabaseSync(dbPath).prepare('SELECT state_json FROM editorial_state').get().state_json).topics.length,topics,'using a reference never creates a topic or calls AI');assert.deepEqual([calls.codex,calls.claude],[0,0]);await shot('02-briefing-filled');win.destroy();
  // 2) Production: script gate → recording package → edit → captions → local covers gate → package.
- await open('flow');await until(()=>js('Boolean(document.querySelector(".production-flow-page"))'));await button('Iniciar produção');await click('[aria-label="Ideia da produção"]');await button(topic.title);
+ await open('board');await until(()=>js('Boolean(document.querySelector(".global-create"))'));await openNewProduction();await click('[aria-label="Ideia da produção"]');await button(topic.title);
  await until(()=>js('document.querySelector(".production-preflight [role=status]")?.textContent.includes("Nenhum bloqueio")'));await click('.production-panel-body .production-check input[type=checkbox]');await button('Aprovar ideia e iniciar produção');
  await until(async()=>(await text()).includes('Aguardando aprovação do roteiro'));assert.equal(notionWrites,0,'no Notion card before script approval');assert.equal(calls.claude,1,'the Claude content agent wrote the script');
  await inputText('[aria-label="Texto do roteiro"]',options.draftScript+' Revisado por mim.');await button('Salvar como v2');await until(()=>run().scriptVersions.length===2);await shot('03-script-review','.production-script');
  await click('.production-script .production-check input');await button('Aprovar roteiro');await until(async()=>(await text()).includes('Aguardando gravação'));assert.equal(notionWrites,1);
  await until(()=>js('Boolean(document.querySelector(".recording-package"))'));await js('document.querySelector(".recording-package-check input").click()');await until(()=>run().recordingPrep?.checklist?.framing===true);await shot('04-recording-package','.recording-package');
- await button('Importar vídeo gravado');await until(()=>js('document.querySelector(".production-panel-body").textContent.includes("gravacao.mp4")'));await button('Enviar vídeo e iniciar edição automática');
+ await button('Importar vídeo gravado');await until(()=>js('document.querySelector(".production-panel-body").textContent.includes("gravacao.mp4")'));await button('Enviar vídeo e preparar cortes');
  await until(async()=>(await text()).includes('Aguardando aprovação do vídeo'),60000);await button('Aprovar este vídeo');await until(async()=>(await text()).includes('Onde deseja publicar?'));
  await js('Array.from(document.querySelectorAll(".production-check")).find(label=>label.textContent.trim()==="LinkedIn").querySelector("input").click()');await button('Gerar capas e legendas');await until(async()=>(await text()).includes('Capas locais por rede'),60000);const aiBefore={...calls};await shot('05-covers-review','.production-covers');
  for(const index of [0,1,2]){
@@ -89,7 +91,7 @@ app.whenReady().then(async()=>{try{
  await until(async()=>(await text()).includes('Aguardando aprovação do pacote'));await until(()=>js('document.querySelectorAll(".production-cover img").length===3'));
  const p=run(),chosen=p.covers.approved.selections;assert(p.reviewDeliveries.every(d=>chosen.some(s=>s.platform===d.platform&&s.assetId===d.cover.assetId&&s.sha256===d.cover.sha256)),'the package uses the exact approved covers');await shot('07-package-review','.production-package');
  await button('Aprovar vídeo, capas e legendas');await until(async()=>(await text()).includes('Quando e onde agendar?'));
- await js('window.mainsAgentsSaveNow?.()');win.destroy();await open('flow');await new Promise(resolve=>setTimeout(resolve,1200));assert.equal(run().id,p.id);assert.equal(run().stage,'schedule');
+ await js('window.mainsAgentsSaveNow?.()');win.destroy();await open('board');await new Promise(resolve=>setTimeout(resolve,1200));assert.equal(run().id,p.id);assert.equal(run().stage,'schedule');
  assert.deepEqual(errors,[]);console.log(`CONTENT_FLOW_UI_OK: references→briefing without AI; Claude script gate v2→Notion once; recording checklist persisted; real import/edit; three local covers per format exported and approved per network with zero AI calls; package uses the exact covers. Screenshots: ${out}`);
  win.destroy();await bridge.close();store.close();server.close();app.exit(0);
  }catch(error){console.error(error);console.error(errors);if(win&&!win.isDestroyed()){console.log((await js('document.body.innerText')).slice(0,6000));await shot('failure');win.destroy()}await bridge.close();store.close();server.close();app.exit(1)}

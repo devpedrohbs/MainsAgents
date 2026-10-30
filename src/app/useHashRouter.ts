@@ -16,12 +16,15 @@ export function useHashRouter() {
   }, []);
 
   useEffect(() => {
-    if (!window.location.hash || pageFromLocation() !== window.location.hash.slice(1)) {
-      try { window.history.replaceState(null, '', '#home'); }
+    // Unknown or retired hashes (e.g. an old #flow link) are rewritten to the page that actually opens.
+    const normalize = () => {
+      if (window.location.hash && pageFromLocation() === window.location.hash.slice(1)) return;
+      try { window.history.replaceState(null, '', `#${pageFromLocation()}`); }
       catch (error) { if (!(error instanceof DOMException) || error.name !== 'SecurityError') throw error; }
-    }
+    };
+    normalize();
 
-    const syncRoute = () => setPage(pageFromLocation());
+    const syncRoute = () => { normalize(); setPage(pageFromLocation()); };
     window.addEventListener('hashchange', syncRoute);
     window.addEventListener('popstate', syncRoute);
     return () => {

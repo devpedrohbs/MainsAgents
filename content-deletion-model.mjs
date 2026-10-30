@@ -7,13 +7,13 @@ const draftParts=key=>{try{const parts=JSON.parse(key);return Array.isArray(part
  * when nothing changes (the state store then keeps the caller's revision chain untouched).
  */
 export function sanitizeLinkedValue(key,value,ids){
- const {sessions=new Set(),contents=new Set(),runs=new Set(),artifacts=new Set()}=ids;
- if(!sessions.size&&!contents.size)return value;
+ const {sessions=new Set(),contents=new Set(),runs=new Set(),artifacts=new Set(),topics=new Set()}=ids;
+ if(!sessions.size&&!contents.size&&!topics.size)return value;
  const goneSession=id=>typeof id==='string'&&sessions.has(id);
  const goneScope=scope=>typeof scope==='string'&&scope.startsWith('content:')&&contents.has(scope.slice(8));
  if(key==='sessions'&&Array.isArray(value)){
   const kept=value.filter(session=>!goneSession(session?.id)&&!(session?.contentId&&contents.has(session.contentId)));
-  const next=kept.map(session=>goneSession(session?.agentConnection?.targetSessionId)?{...session,agentConnection:{...session.agentConnection,targetSessionId:undefined}}:session);
+  const next=kept.map(session=>{let next=session;if(topics.has(next?.topicId)){const {topicId:_topic,...rest}=next;next=rest;}return goneSession(next?.agentConnection?.targetSessionId)?{...next,agentConnection:{...next.agentConnection,targetSessionId:undefined}}:next;});
   return next.length===value.length&&next.every((item,index)=>item===value[index])?value:next;
  }
  if(key==='active-sessions'&&value&&typeof value==='object'){
@@ -39,7 +39,7 @@ export function sanitizeLinkedValue(key,value,ids){
   return entries.length===Object.keys(value).length?value:Object.fromEntries(entries);
  }
  if(key==='studio-drafts'&&value&&typeof value==='object'){
-  const gone=part=>typeof part==='string'&&(sessions.has(part)||contents.has(part)||runs.has(part)||artifacts.has(part));
+  const gone=part=>typeof part==='string'&&(sessions.has(part)||contents.has(part)||runs.has(part)||artifacts.has(part)||topics.has(part));
   const entries=Object.entries(value).filter(([draft])=>!draftParts(draft).some(gone));
   return entries.length===Object.keys(value).length?value:Object.fromEntries(entries);
  }
@@ -51,13 +51,13 @@ export function sanitizeLinkedValue(key,value,ids){
  * the topic's pointer to them; the idea/topic itself stays. Returns the same object when nothing belongs to them.
  */
 export function stripDeletedEditorial(state,ids){
- const {contents=new Set(),artifacts=new Set()}=ids;
- if(!state||typeof state!=='object'||!contents.size)return state;
- const gone=item=>contents.has(item?.contentId);
- const filters={contents:item=>!contents.has(item?.id),artifacts:item=>!gone(item)&&!artifacts.has(item?.id),approvals:item=>!gone(item)&&!artifacts.has(item?.artifactId),runs:item=>!gone(item),assets:item=>!gone(item),publications:item=>!gone(item)};
+ const {contents=new Set(),artifacts=new Set(),topics=new Set()}=ids;
+ if(!state||typeof state!=='object'||(!contents.size&&!topics.size))return state;
+ const gone=item=>contents.has(item?.contentId)||topics.has(item?.topicId);
+ const filters={topics:item=>!topics.has(item?.id),contents:item=>!contents.has(item?.id)&&!gone(item),artifacts:item=>!gone(item)&&!artifacts.has(item?.id),approvals:item=>!gone(item)&&!artifacts.has(item?.artifactId),runs:item=>!gone(item),assets:item=>!gone(item),publications:item=>!gone(item)};
  let changed=false;const next={...state};
  for(const [key,keep] of Object.entries(filters))if(Array.isArray(state[key])){const kept=state[key].filter(keep);if(kept.length!==state[key].length){next[key]=kept;changed=true;}}
- if(Array.isArray(state.topics)&&state.topics.some(gone)){changed=true;next.topics=state.topics.map(topic=>{if(!gone(topic))return topic;const {contentId:_c,...rest}=topic;return rest;});}
+ if(Array.isArray(next.topics)&&next.topics.some(gone)){changed=true;next.topics=next.topics.map(topic=>{if(!gone(topic))return topic;const {contentId:_c,...rest}=topic;return rest;});}
  return changed?next:state;
 }
 

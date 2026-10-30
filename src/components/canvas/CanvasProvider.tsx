@@ -11,13 +11,19 @@ import { canvasSizes, findCanvasPosition } from './canvasGeometry';
 import { browserHome } from './browserNavigation';
 import { chatImageSource } from '../../features/chat/chatImages';
 import { addCollaborationChats, type CollaborationCanvasInput } from './collaborationCanvas';
+import {canvasBoard,canvasScopeKey,createCanvasBoard,findCanvasNodeBoard,readCanvasWorkspace,removeCanvasBoard,renameCanvasBoard,updateCanvasBoard,type CanvasBoardSummary,type CanvasViewState} from './canvasBoards';
+import {storageProfile} from '../../data/IndexedDbStateStore';
 
-interface CanvasViewState { viewport:Viewport; width:number; height:number; ready:boolean }
-interface WorkspaceCanvasState { nodes:CanvasFlowNode[]; edges:Edge[]; view:CanvasViewState }
 interface AddResponseResult { kind:CanvasNodeKind; label:string; nodeId:string }
 interface CanvasContextValue {
+  boards:readonly CanvasBoardSummary[];
+  activeBoardId:string;
+  activateBoard:(boardId:string)=>void;
+  createBoard:(name:string)=>string;
+  renameBoard:(boardId:string,name:string)=>void;
+  removeBoard:(boardId:string)=>void;
   nodes:CanvasFlowNode[];
-  allNodes:readonly {workspaceId:string;node:CanvasFlowNode}[];
+  allNodes:readonly {workspaceId:string;boardId:string;boardName:string;node:CanvasFlowNode}[];
   edges:Edge[];
   setNodes:Dispatch<SetStateAction<CanvasFlowNode[]>>;
   setEdges:Dispatch<SetStateAction<Edge[]>>;
@@ -35,7 +41,7 @@ interface CanvasContextValue {
   removeNodeFromAgentContext:(agentId:AgentId,nodeId:string)=>void;
   clearAgentContext:(agentId:AgentId)=>void;
   groupNodes:(nodeIds:string[])=>string;
-  selectNode:(workspaceId:string,nodeId:string)=>void;
+  selectNode:(workspaceId:string,nodeId:string,boardId?:string)=>void;
   addCollaboration:(input:CollaborationCanvasInput)=>void;
   focusRequest:(CollaborationCanvasInput & {requestId:string})|null;
   clearFocusRequest:(requestId:string)=>void;
@@ -44,81 +50,101 @@ interface CanvasContextValue {
 }
 
 const kindLabels:Record<CanvasNodeKind,string>={note:'Note',research:'Research',image:'Image',contentIdea:'Content idea',hook:'Hook',script:'Script',terminal:'Terminal',browser:'Browser',chat:'Chat'};
-const initialView:CanvasViewState={viewport:{x:0,y:0,zoom:1},width:900,height:640,ready:false};
 const CanvasContext=createContext<CanvasContextValue|null>(null);
 
 export function CanvasProvider({children}:PropsWithChildren) {
   const {currentWorkspaceId}=useWorkspaces();
   const {getAgentById}=useAgents();
-  const [workspaceCanvases,setWorkspaceCanvases]=usePersistentState<Record<string,WorkspaceCanvasState>>('canvas-workspaces',{});
+  const profileId=storageProfile();
+  const [workspaceCanvases,setWorkspaceCanvases]=usePersistentState<Record<string,unknown>>('canvas-workspaces',{});
   const [contextNodeIds,setContextNodeIds]=useState<CanvasPendingContexts>({});
-  const canvasState=workspaceCanvases[currentWorkspaceId]??{nodes:[],edges:[],view:{...initialView,viewport:{...initialView.viewport}}};
+  const workspaceState=readCanvasWorkspace(workspaceCanvases[currentWorkspaceId]);
+  const activeBoardId=workspaceState.activeBoardId,scopeKey=canvasScopeKey(currentWorkspaceId,activeBoardId,profileId);
+  const canvasState=canvasBoard(workspaceState);
   const {nodes,edges,view}=canvasState;
-  const allNodes=useMemo(()=>Object.entries(workspaceCanvases).flatMap(([workspaceId,state])=>state.nodes.map((node)=>({workspaceId,node}))),[workspaceCanvases]);
+  const boards=workspaceState.boards.map(({id,name,nodes})=>({id,name,nodeCount:nodes.length}));
+  const allNodes=useMemo(()=>Object.entries(workspaceCanvases).flatMap(([workspaceId,raw])=>readCanvasWorkspace(raw).boards.flatMap(board=>board.nodes.map(node=>({workspaceId,boardId:board.id,boardName:board.name,node})))),[workspaceCanvases]);
+  const activateBoard=useCallback((boardId:string)=>setWorkspaceCanvases(current=>{if(storageProfile()!==profileId)return current;const state=readCanvasWorkspace(current[currentWorkspaceId]);canvasBoard(state,boardId);return state.activeBoardId===boardId?current:{...current,[currentWorkspaceId]:{...state,activeBoardId:boardId}};}),[currentWorkspaceId,profileId,setWorkspaceCanvases]);
+  const createBoard=useCallback((name:string)=>{if(storageProfile()!==profileId)throw Error('The active profile changed. Reopen the Canvas.');const id=`canvas-${crypto.randomUUID()}`;setWorkspaceCanvases(current=>({...current,[currentWorkspaceId]:createCanvasBoard(readCanvasWorkspace(current[currentWorkspaceId]),id,name)}));return id;},[currentWorkspaceId,profileId,setWorkspaceCanvases]);
+  const renameBoard=useCallback((id:string,name:string)=>setWorkspaceCanvases(current=>storageProfile()!==profileId?current:{...current,[currentWorkspaceId]:renameCanvasBoard(readCanvasWorkspace(current[currentWorkspaceId]),id,name)}),[currentWorkspaceId,profileId,setWorkspaceCanvases]);
+  const removeBoard=useCallback((id:string)=>{
+    if(storageProfile()!==profileId)return;
+    setWorkspaceCanvases(current=>({...current,[currentWorkspaceId]:removeCanvasBoard(readCanvasWorkspace(current[currentWorkspaceId]),id)}));
+    const key=canvasScopeKey(currentWorkspaceId,id,profileId);delete visibleChats.current[key];setContextNodeIds(current=>{const next={...current};delete next[key];return next;});
+  },[currentWorkspaceId,profileId,setWorkspaceCanvases]);
   const updateGraph=useCallback((update:(graph:CanvasGraph)=>CanvasGraph)=>{
+    if(storageProfile()!==profileId)return;
     // PersistentState is synchronous: read its live value rather than a render snapshot.
-    const current=readPersistentValue<Record<string,WorkspaceCanvasState>>('canvas-workspaces',{});
-    const state=current[currentWorkspaceId]??{nodes:[],edges:[],view:{...initialView,viewport:{...initialView.viewport}}};
+    const current=readPersistentValue<Record<string,unknown>>('canvas-workspaces',{});
+    const workspace=readCanvasWorkspace(current[currentWorkspaceId]);
+    // Late events from an unmounted board never mutate the newly selected board.
+    const state=workspace.boards.find(board=>board.id===activeBoardId);if(!state)return;
     const next=reconcileCanvasGraph(update({nodes:state.nodes,edges:state.edges}));
     if(next.nodes===state.nodes&&next.edges===state.edges)return;
-    setWorkspaceCanvases({...current,[currentWorkspaceId]:{...state,...next}});
-    if(next.nodes!==state.nodes)setContextNodeIds(pending=>pruneCanvasContext(pending,currentWorkspaceId,next.nodes));
-  },[currentWorkspaceId,setWorkspaceCanvases]);
+    setWorkspaceCanvases({...current,[currentWorkspaceId]:updateCanvasBoard(workspace,activeBoardId,board=>({...board,...next}))});
+    if(next.nodes!==state.nodes)setContextNodeIds(pending=>pruneCanvasContext(pending,scopeKey,next.nodes,currentWorkspaceId));
+  },[currentWorkspaceId,activeBoardId,scopeKey,profileId,setWorkspaceCanvases]);
   const setNodes=useCallback<Dispatch<SetStateAction<CanvasFlowNode[]>>>(update=>updateGraph(current=>({...current,nodes:typeof update==='function'?update(current.nodes):update})),[updateGraph]);
   const setEdges=useCallback<Dispatch<SetStateAction<Edge[]>>>(update=>updateGraph(current=>({...current,edges:typeof update==='function'?update(current.edges):update})),[updateGraph]);
   const [focusRequest,setFocusRequest]=useState<CanvasContextValue['focusRequest']>(null);
   const visibleChats=useRef<Record<string,string[]>>({});
-  const registerVisibleChats=useCallback((sessionIds:string[])=>{visibleChats.current[currentWorkspaceId]=sessionIds},[currentWorkspaceId]);
-  const hasVisibleChats=useCallback((sourceSessionId:string,targetSessionId:string)=>{const visible=visibleChats.current[currentWorkspaceId]??[];return visible.includes(sourceSessionId)&&visible.includes(targetSessionId)},[currentWorkspaceId]);
+  const registerVisibleChats=useCallback((sessionIds:string[])=>{visibleChats.current[scopeKey]=sessionIds},[scopeKey]);
+  const hasVisibleChats=useCallback((sourceSessionId:string,targetSessionId:string)=>{const visible=visibleChats.current[scopeKey]??[];return visible.includes(sourceSessionId)&&visible.includes(targetSessionId)},[scopeKey]);
   const clearFocusRequest=useCallback((requestId:string)=>setFocusRequest(current=>current?.requestId===requestId?null:current),[]);
   const addCollaboration=useCallback((input:CollaborationCanvasInput)=>{
+    if(storageProfile()!==profileId)return;
+    let boardId:string|undefined;
     setWorkspaceCanvases(current=>{
-      const state=current[input.workspaceId]??{nodes:[],edges:[],view:initialView};
-      const next=addCollaborationChats(state.nodes,state.edges,state.view,input);
-      return {...current,[input.workspaceId]:{...state,nodes:next.nodes,edges:next.edges}};
+      const workspace=readCanvasWorkspace(current[input.workspaceId]),state=canvasBoard(workspace);
+      boardId=state.id;
+      const next=addCollaborationChats(state.nodes,state.edges,state.view,{...input,boardId:state.id});
+      return {...current,[input.workspaceId]:updateCanvasBoard(workspace,state.id,board=>({...board,nodes:next.nodes,edges:next.edges}))};
     });
-    setFocusRequest({...input,requestId:crypto.randomUUID()});
-  },[setWorkspaceCanvases]);
+    setFocusRequest({...input,boardId,requestId:crypto.randomUUID()});
+  },[profileId,setWorkspaceCanvases]);
 
   const onNodesChange=useCallback((changes:NodeChange<CanvasFlowNode>[])=>setNodes((current)=>applyNodeChanges(changes,current)),[setNodes]);
   const onEdgesChange=useCallback((changes:EdgeChange[])=>setEdges((current)=>applyEdgeChanges(changes,current)),[setEdges]);
-  const updateView=useCallback((viewport:Viewport,width:number,height:number)=>setWorkspaceCanvases((current)=>{const state=current[currentWorkspaceId]??{nodes:[],edges:[],view:initialView};return {...current,[currentWorkspaceId]:{...state,view:{viewport,width,height,ready:true}}}}),[currentWorkspaceId]);
+  const updateView=useCallback((viewport:Viewport,width:number,height:number)=>setWorkspaceCanvases(current=>{if(storageProfile()!==profileId||![viewport.x,viewport.y,viewport.zoom,width,height].every(Number.isFinite)||viewport.zoom<=0||width<=0||height<=0)return current;const workspace=readCanvasWorkspace(current[currentWorkspaceId]);if(!workspace.boards.some(board=>board.id===activeBoardId))return current;return {...current,[currentWorkspaceId]:updateCanvasBoard(workspace,activeBoardId,board=>({...board,view:{viewport,width,height,ready:true}}))};}),[currentWorkspaceId,activeBoardId,profileId,setWorkspaceCanvases]);
   const addNode=useCallback((kind:CanvasNodeKind,position?:{x:number;y:number})=>{const nodeId=`node-${kind}-${crypto.randomUUID()}`;setNodes((current)=>[...current.map((node)=>({...node,selected:false})),{id:nodeId,type:kind,position:position??findCanvasPosition(current,view,kind),width:canvasSizes[kind].width,height:canvasSizes[kind].height,selected:true,data:newNodeData(kind,currentWorkspaceId)}]);return nodeId},[currentWorkspaceId,setNodes,view]);
-  const updateNodeData=useCallback((workspaceId:string,nodeId:string,change:Partial<CanvasNodeData>|((data:CanvasNodeData)=>CanvasNodeData))=>setWorkspaceCanvases((current)=>{const state=current[workspaceId];if(!state)return current;return {...current,[workspaceId]:{...state,nodes:state.nodes.map((node)=>{if(node.id!==nodeId)return node;return {...node,data:typeof change==='function'?change(node.data):{...node.data,...change}}})}}}),[setWorkspaceCanvases]);
+  const updateNodeData=useCallback((workspaceId:string,nodeId:string,change:Partial<CanvasNodeData>|((data:CanvasNodeData)=>CanvasNodeData))=>setWorkspaceCanvases(current=>{if(storageProfile()!==profileId||!current[workspaceId])return current;const workspace=readCanvasWorkspace(current[workspaceId]),state=findCanvasNodeBoard(workspace,nodeId);if(!state)return current;return {...current,[workspaceId]:updateCanvasBoard(workspace,state.id,board=>({...board,nodes:board.nodes.map(node=>node.id===nodeId?{...node,data:typeof change==='function'?change(node.data):{...node.data,...change}}:node)}))};}),[profileId,setWorkspaceCanvases]);
 
   const addAgentResponse=useCallback((message:ChatMessageItem,agent:Agent,link?:{contentId?:string;topicId?:string}):AddResponseResult=>{
+    if(storageProfile()!==profileId)throw Error('The active profile changed. Reopen this conversation.');
     const kind=message.images?.some(image=>chatImageSource(image))?'image':classifyResponse(message.content,agent);
     const owner=agent.workspaceId;
-    const current=readPersistentValue<Record<string,WorkspaceCanvasState>>('canvas-workspaces',{});
-    const state=current[owner]??{nodes:[],edges:[],view:{...initialView,viewport:{...initialView.viewport}}};
-    const existing=state.nodes.find(node=>node.data.sourceMessageId===message.id);
+    const current=readPersistentValue<Record<string,unknown>>('canvas-workspaces',{}),workspace=readCanvasWorkspace(current[owner]);
+    const state=canvasBoard(workspace);
+    const existing=workspace.boards.flatMap(board=>board.nodes).find(node=>node.data.sourceMessageId===message.id);
     if(existing)return {kind:existing.type??kind,label:kindLabels[existing.type??kind],nodeId:existing.id};
     const nodeId=`chat-${message.id}-${crypto.randomUUID()}`;
     const node:CanvasFlowNode={id:nodeId,type:kind,position:findCanvasPosition(state.nodes,state.view,kind),width:canvasSizes[kind].width,height:canvasSizes[kind].height,selected:true,data:{...responseData(kind,message,agent),...link,workspaceId:owner}};
-    setWorkspaceCanvases({...current,[owner]:{...state,nodes:[...state.nodes.map(item=>({...item,selected:false})),node]}});
+    setWorkspaceCanvases({...current,[owner]:updateCanvasBoard(workspace,state.id,board=>({...board,nodes:[...board.nodes.map(item=>({...item,selected:false})),node]}))});
     return {kind,label:kindLabels[kind],nodeId};
-  },[setWorkspaceCanvases]);
+  },[profileId,setWorkspaceCanvases]);
 
   const attachNodesToAgent=useCallback((agentId:AgentId,nodeIds:string[])=>{
-    const current=readPersistentValue<Record<string,WorkspaceCanvasState>>('canvas-workspaces',{});
+    if(storageProfile()!==profileId)return;
+    const current=readPersistentValue<Record<string,unknown>>('canvas-workspaces',{});
     const agent=readPersistentValue<Agent[]>('agents',[]).find(item=>item.id===agentId);
-    setContextNodeIds(pending=>attachCanvasContext(pending,currentWorkspaceId,agent,nodeIds,current[currentWorkspaceId]?.nodes??[]));
-  },[currentWorkspaceId]);
+    const workspace=readCanvasWorkspace(current[currentWorkspaceId]),board=workspace.boards.find(board=>board.id===activeBoardId);if(!board)return;
+    setContextNodeIds(pending=>attachCanvasContext(pending,scopeKey,agent,nodeIds,board.nodes,currentWorkspaceId));
+  },[currentWorkspaceId,activeBoardId,scopeKey,profileId]);
   const removeNodeFromAgentContext=useCallback((agentId:AgentId,nodeId:string)=>setContextNodeIds(current=>{
-    const entries=current[currentWorkspaceId];if(!entries?.[agentId])return current;
-    return {...current,[currentWorkspaceId]:{...entries,[agentId]:entries[agentId].filter(id=>id!==nodeId)}};
-  }),[currentWorkspaceId]);
+    const entries=current[scopeKey];if(!entries?.[agentId])return current;
+    return {...current,[scopeKey]:{...entries,[agentId]:entries[agentId].filter(id=>id!==nodeId)}};
+  }),[scopeKey]);
   const clearAgentContext=useCallback((agentId:AgentId)=>setContextNodeIds(current=>{
-    const entries=current[currentWorkspaceId];if(!entries?.[agentId])return current;
-    const next={...entries};delete next[agentId];return {...current,[currentWorkspaceId]:next};
-  }),[currentWorkspaceId]);
-  const getAgentContext=useCallback((agentId:AgentId):ChatContextReference[]=>pendingCanvasNodeIds(contextNodeIds,currentWorkspaceId,getAgentById(agentId),nodes).flatMap(nodeId=>{
-    const node=nodes.find(item=>item.id===nodeId)!;return [{nodeId,label:getNodeContextLabel(node),kind:node.type,content:getNodeContextContent(node)}];
-  }),[contextNodeIds,currentWorkspaceId,getAgentById,nodes]);
+    const entries=current[scopeKey];if(!entries?.[agentId])return current;
+    const next={...entries};delete next[agentId];return {...current,[scopeKey]:next};
+  }),[scopeKey]);
+  const getAgentContext=useCallback((agentId:AgentId):ChatContextReference[]=>storageProfile()!==profileId?[]:pendingCanvasNodeIds(contextNodeIds,scopeKey,getAgentById(agentId),nodes,currentWorkspaceId).flatMap(nodeId=>{
+    const node=nodes.find(item=>item.id===nodeId)!;return [{nodeId,boardId:activeBoardId,label:getNodeContextLabel(node),kind:node.type,content:getNodeContextContent(node)}];
+  }),[contextNodeIds,currentWorkspaceId,activeBoardId,profileId,scopeKey,getAgentById,nodes]);
   const groupNodes=useCallback((nodeIds:string[])=>{const groupId=`group-${Date.now().toString(36)}`;setNodes((current)=>{const groupNumber=new Set(current.map((node)=>node.data.groupId).filter(Boolean)).size+1;return current.map((node)=>nodeIds.includes(node.id)?{...node,data:{...node.data,groupId,groupLabel:`Group ${String(groupNumber).padStart(2,'0')}`}}:node)});return groupId},[setNodes]);
-  const selectNode=useCallback((workspaceId:string,nodeId:string)=>setWorkspaceCanvases((current)=>{const state=current[workspaceId];if(!state)return current;return {...current,[workspaceId]:{...state,nodes:state.nodes.map((node)=>({...node,selected:node.id===nodeId}))}}}),[setWorkspaceCanvases]);
+  const selectNode=useCallback((workspaceId:string,nodeId:string,boardId?:string)=>setWorkspaceCanvases(current=>{if(storageProfile()!==profileId||!current[workspaceId])return current;const workspace=readCanvasWorkspace(current[workspaceId]),state=findCanvasNodeBoard(workspace,nodeId,boardId);if(!state)return current;const next=updateCanvasBoard(workspace,state.id,board=>({...board,nodes:board.nodes.map(node=>({...node,selected:node.id===nodeId}))}));return {...current,[workspaceId]:{...next,activeBoardId:state.id}};}),[profileId,setWorkspaceCanvases]);
 
-  const value=useMemo<CanvasContextValue>(()=>({nodes,allNodes,edges,setNodes,setEdges,updateGraph,onNodesChange,onEdgesChange,view,updateView,addNode,updateNodeData,addAgentResponse,hasMessageNode:(messageId)=>nodes.some((node)=>node.data.sourceMessageId===messageId),attachNodesToAgent,getAgentContext,removeNodeFromAgentContext,clearAgentContext,groupNodes,selectNode,addCollaboration,focusRequest,clearFocusRequest,registerVisibleChats,hasVisibleChats}),[addAgentResponse,addNode,allNodes,attachNodesToAgent,clearAgentContext,edges,getAgentContext,groupNodes,nodes,onEdgesChange,onNodesChange,removeNodeFromAgentContext,selectNode,updateGraph,updateNodeData,updateView,view,addCollaboration,focusRequest,clearFocusRequest,registerVisibleChats,hasVisibleChats]);
+  const value=useMemo<CanvasContextValue>(()=>({boards,activeBoardId,activateBoard,createBoard,renameBoard,removeBoard,nodes,allNodes,edges,setNodes,setEdges,updateGraph,onNodesChange,onEdgesChange,view,updateView,addNode,updateNodeData,addAgentResponse,hasMessageNode:(messageId)=>allNodes.some(item=>item.workspaceId===currentWorkspaceId&&item.node.data.sourceMessageId===messageId),attachNodesToAgent,getAgentContext,removeNodeFromAgentContext,clearAgentContext,groupNodes,selectNode,addCollaboration,focusRequest,clearFocusRequest,registerVisibleChats,hasVisibleChats}),[boards,activeBoardId,activateBoard,createBoard,renameBoard,removeBoard,currentWorkspaceId,addAgentResponse,addNode,allNodes,attachNodesToAgent,clearAgentContext,edges,getAgentContext,groupNodes,nodes,onEdgesChange,onNodesChange,removeNodeFromAgentContext,selectNode,updateGraph,updateNodeData,updateView,view,addCollaboration,focusRequest,clearFocusRequest,registerVisibleChats,hasVisibleChats]);
   return <CanvasContext.Provider value={value}>{children}</CanvasContext.Provider>;
 }
 

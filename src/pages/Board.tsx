@@ -5,6 +5,7 @@ import { TaskColumn } from '../components/tasks/TaskColumn';
 import { useLanguage } from '../app/LanguageProvider';
 import { useAgents } from '../features/agents/AgentsProvider';
 import { AgentAvatar } from '../components/agents/AgentAvatar';
+import { StatusIcon } from '../components/common/StatusIcon';
 import { Icon } from '../components/common/Icon';
 
 const columns: { status: TaskStatus; label: string }[] = [
@@ -32,6 +33,8 @@ export function Board({
   const { agents } = useAgents();
   const [agentFilter, setAgentFilter] = useState('all');
   const { t, locale } = useLanguage();
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [inspectorOpen, setInspectorOpen] = useState(true);
   const [query, setQuery] = useState('');
   const filtered = tasks
     .filter(
@@ -42,6 +45,8 @@ export function Board({
           .includes(query.trim().toLocaleLowerCase(locale)),
     )
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const selectedTask = filtered.find(task => task.id === selectedTaskId) ?? filtered[0];
+  const selectedAgent = agents.find(agent => agent.id === selectedTask?.agentId);
   const pt = locale === 'pt-BR';
   const workspaceAgents = agents.filter((agent) => agent.workspaceId === currentWorkspaceId);
   const review = tasks.filter((task) => task.status === 'review').length;
@@ -60,8 +65,8 @@ export function Board({
     finishDrag();
   };
   return (
-    <div className="page board-page qb" data-od-id="task-board">
-      <div className="qb-head">
+    <div className="page board-page qb v2-team v2-page" data-od-id="task-board">
+      <div className="qb-head v2-header">
         <div>
           <h1>{pt ? 'Quadro' : 'Board'}</h1>
           <p>{summary}</p>
@@ -113,6 +118,7 @@ export function Board({
           {locale === 'pt-BR' ? 'Nenhuma tarefa corresponde à busca.' : 'No tasks match your search.'}
         </p>
       )}
+      <div className="v2-board-body">
       <div className={`board ${draggingTaskId ? 'is-dragging' : ''}`}>
         {columns.map(({ status, label }) => (
           <TaskColumn
@@ -123,6 +129,8 @@ export function Board({
             draggingTaskId={draggingTaskId}
             isDropTarget={dropTarget === status}
             onOpen={onOpenTask}
+            onInspect={task=>{setSelectedTaskId(task.id);setInspectorOpen(true);}}
+            selectedId={inspectorOpen ? selectedTask?.id : undefined}
             onAdd={onAddTask}
             onRemove={onRemoveTask}
             onDragStart={(taskId) => {
@@ -137,6 +145,19 @@ export function Board({
             onDrop={drop}
           />
         ))}
+      </div>
+      {selectedTask && inspectorOpen && <aside className="v2-inspector task-inspector" aria-label={pt ? 'Detalhe da tarefa' : 'Task details'}>
+        <header><span className="v2-mono">{selectedTask.id}</span><button className="icon-button" onClick={()=>setInspectorOpen(false)} aria-label={pt ? 'Fechar detalhes' : 'Close details'}><Icon name="close"/></button></header>
+        <h2>{selectedTask.title}</h2>
+        <span className="task-inspector-state"><StatusIcon state={selectedTask.status==='research'?'queued':selectedTask.status==='running'?'running':selectedTask.status==='review'?'waiting':'done'}/>{t(columns.find(column=>column.status===selectedTask.status)!.label)}</span>
+        <dl><dt>{pt?'Agente':'Agent'}</dt><dd>{selectedAgent?.name ?? (selectedTask.contentId ? (pt?'Fluxo editorial':'Editorial workflow') : t('Deleted agent'))}</dd>
+          <dt>{pt?'Criada':'Created'}</dt><dd className="v2-mono">{new Date(selectedTask.createdAt).toLocaleDateString(locale)}</dd>
+          {selectedTask.executionId && <><dt>{pt?'Execução':'Execution'}</dt><dd className="v2-mono">{selectedTask.executionId}</dd></>}
+        </dl>
+        {selectedTask.description && <p>{selectedTask.description}</p>}
+        {selectedTask.metadata && <p className="task-inspector-meta">{selectedTask.metadata}</p>}
+        <button className="primary-button" onClick={()=>onOpenTask(selectedTask)}>{pt?'Abrir tarefa':'Open task'}</button>
+      </aside>}
       </div>
     </div>
   );

@@ -9,6 +9,7 @@ export function QuickCreate({
   onSession,
   onNote,
   onContent,
+  onProduction,
 }: {
   onClose: () => void;
   onAgent: () => void;
@@ -16,6 +17,7 @@ export function QuickCreate({
   onSession: () => void;
   onNote: () => void;
   onContent: () => void;
+  onProduction: () => void;
 }) {
   const { locale, t } = useLanguage();
   const pt = locale === 'pt-BR';
@@ -55,6 +57,14 @@ export function QuickCreate({
         : 'Research, review, and turn it into a script.',
       icon: 'script',
       action: onContent,
+    },
+    {
+      label: pt ? 'Nova produção' : 'New production',
+      detail: pt
+        ? 'Escolha a ideia, quem faz cada etapa e acompanhe até o agendamento.'
+        : 'Pick the idea, who does each stage, and follow it to scheduling.',
+      icon: 'play',
+      action: onProduction,
     },
   ];
   return (

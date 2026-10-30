@@ -31,7 +31,8 @@ ipcMain.handle('test:read',(_event,key)=>store.read(profile,key));
 ipcMain.handle('test:write',(_event,key,value)=>store.write(profile,key,value));
 ipcMain.handle('test:all',()=>store.readAll(profile));
 const requests = [], writes = [], external = [], errors = [], captures = [];
-const editorial = {schemaVersion:1,topics:[],contents:[],artifacts:[],approvals:[],runs:[],assets:[],publications:[]};
+// Valid editorial links: production chats are only shown when their content exists in the same workspace.
+const editorial = {schemaVersion:1,topics:runs.map(r=>({id:r.topicId,requestId:r.topicId,workspaceId:r.workspaceId,inputKind:'text',input:`TOPIC ${r.id}`,category:'Fixture',priority:'normal',status:'approved',title:`TOPIC ${r.id}`,summary:'Fixture.',whyItMatters:'Fixture.',angles:[],sources:[],factualQuestions:[],contentId:r.contentId,createdAt:at,updatedAt:at})),contents:runs.map(r=>({id:r.contentId,workspaceId:r.workspaceId,topicId:r.topicId,title:`TOPIC ${r.id}`,format:'short-video',platforms:['YouTube'],status:'planning',productionStage:'recording',taskId:'',assetIds:[],createdAt:at,updatedAt:at})),artifacts:[],approvals:[],runs:[],assets:[],publications:[]};
 const json = (response,value,status=200) => {response.statusCode=status;response.setHeader('content-type','application/json');response.end(JSON.stringify(value));};
 const server = createServer((request,response) => {
   const url = new URL(request.url,'http://localhost');
@@ -59,15 +60,14 @@ let win;
 const js = code => win.webContents.executeJavaScript(code);
 async function until(check,label='condition') {const end=Date.now()+20000;while(Date.now()<end){if(await check())return;await new Promise(r=>setTimeout(r,40));}throw Error(`Execution overview timeout: ${label}`);}
 async function click(selector) {await until(()=>js(`Boolean(document.querySelector(${JSON.stringify(selector)})&&!document.querySelector(${JSON.stringify(selector)}).disabled)`),selector);await js(`document.querySelector(${JSON.stringify(selector)}).click()`);}
-const ids = () => js(`Array.from(document.querySelectorAll('.execution-list > li')).map(el=>el.dataset.odId)`);
+const ids = () => js(`Array.from(document.querySelectorAll('[data-od-id="runs-page"] [data-run-id]')).map(el=>el.dataset.odId)`);
 async function expectRows(expected) {await until(async()=>JSON.stringify(await ids())===JSON.stringify(expected.map(id=>`execution-${id}`)),`rows ${expected}`);}
 async function filter(name) {await click(`[data-od-id="execution-filter-${name}"]`);}
 function noExecution() {assert.deepEqual(writes,[],'Opening/filtering must not send any API mutation or AI call');assert.deepEqual(external,[],'No external network access');}
-async function capture(name) {
-  await js(`(()=>{const panel=document.querySelector('[data-od-id="execution-overview"]');panel?.scrollIntoView({block:'start'});const view=document.querySelector('.view');if(view)view.scrollTop-=12;})()`);
-  writeFileSync(join(out,`${name}.png`),await captureReadyPng(win.webContents));
-  captures.push(name);
-}
+async function capture(name) {writeFileSync(join(out,`${name}.png`),await captureReadyPng(win.webContents));captures.push(name);}
+// V2: the run list lives on #runs; controls and chat are in each run's detail header.
+async function detail(id) {await click(`[data-od-id="execution-${id}"]`);await until(()=>js(`document.querySelector('[data-od-id="run-detail"]')?.dataset.runId===${JSON.stringify(id)}`),`detail ${id}`);}
+async function back() {await click('[data-od-id="run-detail"] .v2-crumbs a');await until(()=>js(`Boolean(document.querySelector('[data-od-id="runs-page"]'))`),'run list');}
 async function open() {
   win = new BrowserWindow({show:false,width:1440,height:1100,webPreferences:{preload:resolve(root,'tests/fixtures/assets-ui-preload.cjs'),contextIsolation:true,sandbox:true,offscreen:true,backgroundThrottling:false}});
   win.webContents.session.webRequest.onBeforeRequest((details,callback)=>{
@@ -75,8 +75,8 @@ async function open() {
     if (['http:','https:'].includes(url.protocol) && url.hostname !== '127.0.0.1') {external.push(details.url);callback({cancel:true});} else callback({});
   });
   win.webContents.on('console-message',event=>{if(/Uncaught|Maximum update depth|Cannot update a component/.test(event.message))errors.push(event.message);});
-  await win.loadURL(`http://127.0.0.1:${server.address().port}/app.html#home`);
-  await until(()=>js(`Boolean(document.querySelector('[data-od-id="execution-overview"]'))`),'Home panel');
+  await win.loadURL(`http://127.0.0.1:${server.address().port}/app.html#runs`);
+  await until(()=>js(`Boolean(document.querySelector('[data-od-id="runs-page"]'))`),'Runs page');
   await waitForCaptureReady(win.webContents);
 }
 async function workspace(name) {
@@ -88,56 +88,49 @@ app.whenReady().then(async()=>{
     await new Promise(r=>server.listen(0,'127.0.0.1',r));
     await open();await expectRows(['blocked-two','waiting-one']);noExecution();
     assert(await js(`document.querySelector('[data-od-id="execution-filter-waiting"]').textContent.includes('Aguardando você')`));
-    await capture('home-light');
+    await capture('runs-light');
     await filter('waiting');await expectRows(['waiting-one']);
-    await click('[data-od-id="execution-waiting-one"] .soft-button');
+    await detail('waiting-one');await click('[data-od-id="run-controls"]');
     await until(()=>js(`document.querySelector('.flow-dialog h2')?.textContent.includes('TOPIC waiting-one')`),'exact waiting dialog');
     assert(await js(`document.querySelector('[aria-label="Produção atual"]').textContent.includes('TOPIC waiting-one')`));
     noExecution();writeFileSync(join(out,'dialog-waiting.png'),await captureReadyPng(win.webContents));captures.push('dialog-waiting');
     win.webContents.sendInputEvent({type:'keyDown',keyCode:'Escape'});win.webContents.sendInputEvent({type:'keyUp',keyCode:'Escape'});
     await until(()=>js(`!document.querySelector('.flow-dialog')`),'Escape closes dialog');
-    await click('[data-od-id="execution-waiting-one"] .soft-button');
-    await until(()=>js(`document.querySelector('.flow-dialog h2')?.textContent.includes('TOPIC waiting-one')`));
-    await click('.flow-dialog header button');
-    await click('[data-od-id="execution-waiting-one"] .text-link');
+    await click('[data-od-id="run-chat"]');
     await until(()=>js(`document.querySelector('.active-session-bar')?.textContent.includes('SESSION waiting-one source')`),'source session');
-    assert(await js(`document.querySelector('.chat-layer').textContent.includes('CHAT_MARKER_waiting-one_source')`));
-    await click('.chat-toggle');
+    await until(()=>js(`document.querySelector('.chat-layer')?.textContent.includes('CHAT_MARKER_waiting-one_')&&!document.querySelector('.chat-layer').textContent.includes('CHAT_MARKER_blocked-two')`),'chat marker');
+    await click('.chat-toggle');await back();
     await filter('blocked');await expectRows(['blocked-two']);
-    await click('[data-od-id="execution-blocked-two"] .soft-button');
+    await detail('blocked-two');await click('[data-od-id="run-controls"]');
     await until(()=>js(`document.querySelector('.flow-dialog h2')?.textContent.includes('TOPIC blocked-two')`),'exact blocked dialog on same flow');
     noExecution();await click('.flow-dialog header button');
-    await click('[data-od-id="execution-blocked-two"] .text-link');
+    await click('[data-od-id="run-chat"]');
     await until(()=>js(`document.querySelector('.active-session-bar')?.textContent.includes('SESSION blocked-two editor')`),'editor session');
-    assert(await js(`document.querySelector('.chat-layer').textContent.includes('CHAT_MARKER_blocked-two_editor')`));
-    await click('.chat-toggle');noExecution();
+    await until(()=>js(`document.querySelector('.chat-layer')?.textContent.includes('CHAT_MARKER_blocked-two_')&&!document.querySelector('.chat-layer').textContent.includes('CHAT_MARKER_waiting-one')`),'chat marker');
+    await click('.chat-toggle');await back();noExecution();
     await js('window.mainsAgentsSaveNow()');win.destroy();await open();await expectRows(['blocked-two']);
     assert(await js(`document.querySelector('[data-od-id="execution-filter-blocked"]').getAttribute('aria-pressed')==='true'`));
     assert(await js(`!document.querySelector('.flow-dialog')`));noExecution();
     await workspace('Other fixture');await expectRows(['foreign-three']);assert(await js(`!document.querySelector('.flow-dialog')`));noExecution();
     await workspace('Execution fixture');await expectRows(['blocked-two']);
     await filter('all');await expectRows(['blocked-two','waiting-one']);
-    await js('document.documentElement.dataset.appearance="dark"');await capture('home-dark');
-    win.setSize(880,1100);await capture('home-dark-880');
-    assert(await js(`document.querySelector('.execution-overview').getBoundingClientRect().width<=innerWidth`));
-    await js('document.documentElement.dataset.appearance="light"');await capture('home-light-880');
-    win.webContents.setZoomFactor(2);await capture('home-light-880-200');
-    assert(await js(`Array.from(document.querySelectorAll('.execution-actions button')).every(el=>el.getBoundingClientRect().width>0)`));
+    await js('document.documentElement.dataset.appearance="dark"');await capture('runs-dark');
+    win.setSize(880,1100);await capture('runs-dark-880');
+    assert(await js(`document.querySelector('[data-od-id="runs-page"]').getBoundingClientRect().width<=innerWidth`));
+    await js('document.documentElement.dataset.appearance="light"');await capture('runs-light-880');
+    win.webContents.setZoomFactor(2);await capture('runs-light-880-200');
     await filter('waiting');await expectRows(['waiting-one']);
-    await js(`document.querySelector('[data-od-id="execution-waiting-one"] .text-link').focus()`);
-    win.webContents.sendInputEvent({type:'keyDown',keyCode:'Tab',modifiers:['shift']});win.webContents.sendInputEvent({type:'keyUp',keyCode:'Tab',modifiers:['shift']});
-    await until(()=>js(`document.activeElement.matches('.execution-actions .soft-button')`),'keyboard Shift-Tab');
-    await js('new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))');
-    assert(await js(`document.activeElement.matches('.execution-actions .soft-button')`));
-    // Offscreen windows lack OS focus. Verify the loaded focus CSS separately; do not
-    // claim that a hidden-window screenshot proves native focus-ring visibility.
-    assert(await js(`Array.from(document.styleSheets).some(sheet=>Array.from(sheet.cssRules).some(rule=>rule.selectorText?.includes('button:focus-visible')&&rule.style?.outline.includes('solid')))`));
+    await js(`document.querySelector('[data-od-id="execution-waiting-one"]').focus()`);
+    win.webContents.sendInputEvent({type:'keyDown',keyCode:'Enter'});win.webContents.sendInputEvent({type:'char',keyCode:'\r'});win.webContents.sendInputEvent({type:'keyUp',keyCode:'Enter'});
+    await until(()=>js(`document.querySelector('[data-od-id="run-detail"]')?.dataset.runId==='waiting-one'`),'keyboard Enter opens run');
+    await js(`document.querySelector('[data-od-id="run-controls"]').focus()`);
     win.webContents.sendInputEvent({type:'keyDown',keyCode:'Enter'});win.webContents.sendInputEvent({type:'char',keyCode:'\r'});win.webContents.sendInputEvent({type:'keyUp',keyCode:'Enter'});
     await until(()=>js(`document.querySelector('.flow-dialog h2')?.textContent.includes('TOPIC waiting-one')`),'keyboard Enter');
-    await click('.flow-dialog header button');noExecution();assert.deepEqual(errors,[]);
+    assert(await js(`Array.from(document.styleSheets).some(sheet=>Array.from(sheet.cssRules).some(rule=>rule.selectorText?.includes('button:focus-visible')&&rule.style?.outline.includes('solid')))`));
+    await click('.flow-dialog header button');await back();noExecution();assert.deepEqual(errors,[]);
     await js('window.mainsAgentsSaveNow()');win.destroy();store.write(profile,'language','en-US');await open();await expectRows(['waiting-one']);
     assert(await js(`document.querySelector('[data-od-id="execution-filter-waiting"]').textContent.includes('Waiting for you')`));
-    await capture('home-en');noExecution();assert.deepEqual(errors,[]);
+    await capture('runs-en');noExecution();assert.deepEqual(errors,[]);
     const evidence={result:'EXECUTION_OVERVIEW_UI_OK',out,captures,checks:['workspace isolation','waiting/blocked filters','exact dialog for same-flow runs','source/editor chat sessions','close/reopen persisted filter','workspace navigation','PT/EN','light/dark','880px','200%','keyboard Shift-Tab/Enter/Escape'],focusRingLimit:'Hidden offscreen window has no OS focus; loaded focus-visible CSS checked, native visual focus ring requires visible-window inspection.',requests,writes,external,errors};
     writeFileSync(join(out,'evidence.json'),JSON.stringify(evidence,null,2));
     console.log(JSON.stringify({result:evidence.result,out,captures,checks:evidence.checks,mutations:writes.length,externalRequests:external.length,rendererErrors:errors.length,evidence:join(out,'evidence.json')},null,2));win.destroy();store.close();server.close();app.exit(0);

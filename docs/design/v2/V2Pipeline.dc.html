@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>MainsAgents V2 — Pipeline</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0b0b0d}
+a{color:#8aa8ff}a:hover{color:#b3c6ff}
+button{font:inherit;cursor:pointer}
+input,textarea,select{font:inherit}
+.v2node:hover{border-color:#3a3a44}
+@media (max-width: 900px){.v2-side{display:none !important}.v2-rail{display:none !important}}
+</style>
+</helmet>
+<div style="width: 100%; height: 900px; box-sizing: border-box; display: flex; background: #0b0b0d; color: #ececef; font-family: Inter, -apple-system, system-ui, sans-serif; font-size: 13px; line-height: 20px; font-feature-settings: 'cv11' 1, 'ss01' 1; overflow: hidden">
+  <div class="v2-side" style="flex: 0 0 220px">
+    <dc-import name="V2Sidebar" active="pipeline" hint-size="220px,900px"></dc-import>
+  </div>
+
+  <div style="flex: 1 1 auto; min-width: 0; display: flex; padding: 8px 8px 8px 0">
+    <div style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; background: #111113; border: 1px solid #1f1f24; border-radius: 10px; overflow: hidden">
+
+      <header style="flex: 0 0 auto; min-height: 44px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 6px 12px 6px 20px; border-bottom: 1px solid #1f1f24; box-sizing: border-box">
+        <nav aria-label="Trilha" style="display: flex; align-items: center; gap: 8px; color: #85858f; min-width: 0">
+          <a href="#" style="color: #a4a4ad; text-decoration: none">Pipelines</a>
+          <span aria-hidden="true">/</span>
+          <b style="color: #ececef; font-weight: 600; white-space: nowrap">Produção semanal</b>
+        </nav>
+        <span style="display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border: 1px solid #2a2a31; border-radius: 4px; font-size: 12px; color: #a4a4ad">Rascunho v7 · 2 mudanças</span>
+        <span style="font-size: 12px; color: #85858f">publicado: v6, há 3 dias</span>
+        <div style="flex-grow: 1"></div>
+        <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #a4a4ad; cursor: pointer">
+          <button type="button" role="switch" aria-checked="{{dbg.on}}" aria-label="Depurar passo a passo" onClick="{{dbg.toggle}}" style="position: relative; width: 28px; height: 16px; padding: 0; border: 0; border-radius: 8px; background: {{dbg.bg}}">
+            <i aria-hidden="true" style="position: absolute; top: 2px; left: {{dbg.x}}px; width: 12px; height: 12px; border-radius: 50%; background: #ececef"></i>
+          </button>
+          Pausar a cada nó
+        </label>
+        <button type="button" style="display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px; border: 1px solid #2a2a31; border-radius: 6px; background: #16161a; color: #ececef">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true"><path d="M7 5l12 7-12 7z"></path></svg>Testar
+        </button>
+        <button type="button" style="height: 30px; padding: 0 12px; border: 0; border-radius: 6px; background: #ececef; color: #0b0b0d; font-weight: 500">Publicar v7</button>
+      </header>
+
+      <div style="flex: 1 1 auto; min-height: 0; display: flex">
+
+        <!-- Tool rail -->
+        <nav class="v2-rail" aria-label="Ferramentas do editor" style="flex: 0 0 44px; border-right: 1px solid #1f1f24; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 0">
+          <button type="button" aria-label="Selecionar (V)" aria-pressed="true" style="width: 32px; height: 32px; border: 0; border-radius: 6px; background: #1c1c21; color: #ececef; display: flex; align-items: center; justify-content: center; padding: 0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l12 7-5.5 1.5L10 18z"></path></svg></button>
+          <button type="button" aria-label="Adicionar nó (A)" aria-pressed="false" style="width: 32px; height: 32px; border: 0; border-radius: 6px; background: transparent; color: #a4a4ad; display: flex; align-items: center; justify-content: center; padding: 0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"></rect><path d="M12 8.5v7M8.5 12h7"></path></svg></button>
+          <button type="button" aria-label="Variáveis" aria-pressed="false" style="width: 32px; height: 32px; border: 0; border-radius: 6px; background: transparent; color: #a4a4ad; display: flex; align-items: center; justify-content: center; padding: 0; font-family: 'JetBrains Mono', monospace; font-size: 12px">{x}</button>
+          <button type="button" aria-label="Nota" aria-pressed="false" style="width: 32px; height: 32px; border: 0; border-radius: 6px; background: transparent; color: #a4a4ad; display: flex; align-items: center; justify-content: center; padding: 0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h14v11l-5 5H5z"></path><path d="M14 20v-5h5"></path></svg></button>
+          <div style="flex-grow: 1"></div>
+          <button type="button" aria-label="Versões" aria-pressed="false" style="width: 32px; height: 32px; border: 0; border-radius: 6px; background: transparent; color: #a4a4ad; display: flex; align-items: center; justify-content: center; padding: 0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 7.5V12l3 2"></path></svg></button>
+        </nav>
+
+        <!-- Canvas -->
+        <section aria-label="Nós do pipeline" style="position: relative; flex: 999 1 520px; min-width: 0; overflow: hidden; background-color: #0e0e10; background-image: radial-gradient(#22222a 1px, transparent 1px); background-size: 16px 16px">
+          <div style="position: absolute; left: 50%; top: 16px; width: 760px; height: 780px; margin-left: -380px">
+
+            <!-- Edges -->
+            <i aria-hidden="true" style="position: absolute; left: 379px; top: 108px; width: 2px; height: 36px; background: #46557d"></i>
+            <i aria-hidden="true" style="position: absolute; left: 379px; top: 228px; width: 2px; height: 36px; background: #46557d"></i>
+            <i aria-hidden="true" style="position: absolute; left: 379px; top: 348px; width: 2px; height: 24px; background: #46557d"></i>
+            <i aria-hidden="true" style="position: absolute; left: 219px; top: 371px; width: 322px; height: 2px; background: #46557d"></i>
+            <i aria-hidden="true" style="position: absolute; left: 219px; top: 371px; width: 2px; height: 29px; background: #46557d"></i>
+            <i aria-hidden="true" style="position: absolute; left: 539px; top: 371px; width: 2px; height: 29px; background: #46557d"></i>
+            <span style="position: absolute; left: 390px; top: 350px; font-size: 11px; line-height: 14px; color: #8aa8ff; background: #0e0e10; padding: 0 4px">aprovado · em paralelo</span>
+            <i aria-hidden="true" style="position: absolute; left: 219px; top: 484px; width: 2px; height: 27px; background: #33333b"></i>
+            <i aria-hidden="true" style="position: absolute; left: 539px; top: 484px; width: 2px; height: 27px; background: #33333b"></i>
+            <i aria-hidden="true" style="position: absolute; left: 219px; top: 509px; width: 322px; height: 2px; background: #33333b"></i>
+            <i aria-hidden="true" style="position: absolute; left: 379px; top: 509px; width: 2px; height: 27px; background: #33333b"></i>
+            <span style="position: absolute; left: 390px; top: 512px; font-size: 11px; line-height: 14px; color: #85858f; background: #0e0e10; padding: 0 4px">espera os dois</span>
+            <i aria-hidden="true" style="position: absolute; left: 379px; top: 620px; width: 2px; height: 36px; background: #33333b"></i>
+            <!-- Loop back -->
+            <svg aria-hidden="true" style="position: absolute; left: 196px; top: 180px" width="76" height="134" viewBox="0 0 76 134"><path d="M72 128 H24 A12 12 0 0 1 12 116 V18 A12 12 0 0 1 24 6 H72" fill="none" stroke="#6e5a2e" stroke-width="1.5" stroke-dasharray="4 3"></path><path d="M66 1 L72 6 L66 11" fill="none" stroke="#6e5a2e" stroke-width="1.5"></path></svg>
+            <span style="position: absolute; left: 112px; top: 236px; width: 92px; text-align: right; font-size: 11px; line-height: 14px; color: #c9a25a">pedir ajuste volta ao roteiro</span>
+
+            <!-- Nodes -->
+            <sc-for list="{{nodes}}" as="n" hint-placeholder-count="7">
+              <button type="button" class="v2node" onClick="{{n.pick}}" aria-pressed="{{n.on}}" style="position: absolute; left: {{n.x}}px; top: {{n.y}}px; width: 224px; height: 84px; box-sizing: border-box; display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border: 1px solid {{n.bd}}; border-radius: 8px; background: #16161a; box-shadow: {{n.ring}}; color: #ececef; text-align: left">
+                <span style="display: flex; align-items: center; gap: 8px; width: 100%">
+                  <span aria-hidden="true" style="flex: 0 0 20px; height: 20px; border-radius: 5px; background: {{n.tile}}; color: {{n.tileFg}}; font-size: 9px; font-weight: 700; display: flex; align-items: center; justify-content: center">{{n.glyph}}</span>
+                  <b style="flex: 1; min-width: 0; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{n.title}}</b>
+                  <dc-import name="V2Status" state="{{n.st}}" hint-size="14px,14px"></dc-import>
+                </span>
+                <span style="display: flex; align-items: center; gap: 8px; width: 100%; font-size: 12px; line-height: 16px; color: #85858f">
+                  <span style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{n.meta}}</span>
+                  <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px">{{n.dur}}</span>
+                </span>
+                <span style="display: flex; gap: 4px; width: 100%">
+                  <sc-for list="{{n.chips}}" as="c" hint-placeholder-count="2"><span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; line-height: 16px; padding: 0 5px; border-radius: 4px; background: #1f1f24; color: #a4a4ad">{{c}}</span></sc-for>
+                </span>
+              </button>
+            </sc-for>
+          </div>
+
+          <!-- Floating bars -->
+          <div style="position: absolute; left: 12px; bottom: 12px; display: flex; align-items: center; gap: 2px; padding: 2px; border: 1px solid #2a2a31; border-radius: 7px; background: #16161a">
+            <button type="button" aria-label="Diminuir zoom" style="width: 28px; height: 28px; border: 0; border-radius: 5px; background: transparent; color: #a4a4ad; padding: 0">−</button>
+            <span style="width: 44px; text-align: center; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #a4a4ad">100%</span>
+            <button type="button" aria-label="Aumentar zoom" style="width: 28px; height: 28px; border: 0; border-radius: 5px; background: transparent; color: #a4a4ad; padding: 0">+</button>
+            <button type="button" style="height: 28px; padding: 0 8px; border: 0; border-radius: 5px; background: transparent; color: #a4a4ad; font-size: 12px">Encaixar</button>
+          </div>
+          <a href="V2Execucao.dc.html" style="position: absolute; right: 12px; bottom: 12px; display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 12px; border: 1px solid #2a2a31; border-radius: 7px; background: #16161a; color: #ececef; text-decoration: none; font-size: 12px">
+            <dc-import name="V2Status" state="aguardando" sz="{{ 12 }}" hint-size="12px,12px"></dc-import>
+            Estados da <span style="font-family: 'JetBrains Mono', monospace">RUN-284</span> sobre os nós
+            <span style="color: #8aa8ff">Abrir rastro</span>
+          </a>
+        </section>
+
+        <!-- Inspector -->
+        <aside aria-label="Configurar nó" style="flex: 1 1 320px; max-width: 360px; min-width: 300px; border-left: 1px solid #1f1f24; display: flex; flex-direction: column; overflow: auto">
+          <div style="padding: 14px 16px 0; display: flex; flex-direction: column; gap: 10px">
+            <div style="display: flex; align-items: center; gap: 10px">
+              <span aria-hidden="true" style="flex: 0 0 24px; height: 24px; border-radius: 6px; background: {{sel.tile}}; color: {{sel.tileFg}}; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center">{{sel.glyph}}</span>
+              <div style="display: flex; flex-direction: column; min-width: 0">
+                <h2 style="margin: 0; font-size: 15px; line-height: 22px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{sel.title}}</h2>
+                <span style="font-size: 12px; line-height: 16px; color: #85858f">{{sel.kindLabel}}</span>
+              </div>
+            </div>
+            <div role="tablist" aria-label="Seções do nó" style="display: flex; gap: 18px; border-bottom: 1px solid #1f1f24">
+              <sc-for list="{{tabs}}" as="t" hint-placeholder-count="2">
+                <button type="button" role="tab" aria-selected="{{t.on}}" onClick="{{t.pick}}" style="height: 34px; padding: 0; border: 0; border-bottom: 2px solid {{t.line}}; margin-bottom: -1px; background: transparent; color: {{t.fg}}; font-size: 12px">{{t.label}}</button>
+              </sc-for>
+            </div>
+          </div>
+
+          <sc-if value="{{show.cfgHuman}}" hint-placeholder-val="{{ true }}">
+            <div style="padding: 14px 16px; display: flex; flex-direction: column; gap: 16px">
+              <label style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 12px; color: #a4a4ad">Quem aprova</span>
+                <select style="height: 32px; padding: 0 8px; border: 1px solid #2a2a31; border-radius: 6px; background: #0b0b0d; color: #ececef"><option>Você</option><option>Qualquer pessoa do workspace</option></select>
+              </label>
+              <div style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 12px; color: #a4a4ad">Mostrar para revisar</span>
+                <div style="display: flex; flex-wrap: wrap; gap: 6px">
+                  <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 2px 6px; border: 1px solid #2a2a31; border-radius: 4px; color: #ececef">roteiro.texto</span>
+                  <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 2px 6px; border: 1px solid #2a2a31; border-radius: 4px; color: #ececef">roteiro.cenas</span>
+                  <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 2px 6px; border: 1px solid #2a2a31; border-radius: 4px; color: #ececef">pauta.fontes</span>
+                  <button type="button" style="font-size: 11px; padding: 2px 6px; border: 1px dashed #33333b; border-radius: 4px; background: transparent; color: #a4a4ad">+ campo</button>
+                </div>
+              </div>
+              <fieldset style="margin: 0; padding: 0; border: 0; display: flex; flex-direction: column; gap: 2px">
+                <legend style="font-size: 12px; color: #a4a4ad; padding: 0; margin-bottom: 6px">O que você pode fazer</legend>
+                <label style="display: flex; align-items: center; gap: 10px; min-height: 30px"><input type="checkbox" checked="checked" style="accent-color: #ececef; margin: 0">Aprovar e seguir</label>
+                <label style="display: flex; align-items: center; gap: 10px; min-height: 30px"><input type="checkbox" checked="checked" style="accent-color: #ececef; margin: 0">Editar o texto e aprovar</label>
+                <label style="display: flex; align-items: center; gap: 10px; min-height: 30px"><input type="checkbox" checked="checked" style="accent-color: #ececef; margin: 0"><span>Pedir ajuste <span style="color: #85858f">→ volta ao Roteirista</span></span></label>
+                <label style="display: flex; align-items: center; gap: 10px; min-height: 30px"><input type="checkbox" style="accent-color: #ececef; margin: 0"><span>Recusar <span style="color: #85858f">→ encerra a execução</span></span></label>
+              </fieldset>
+              <div style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 12px; color: #a4a4ad">Se ninguém responder em <b style="color: #ececef; font-weight: 500">24 h</b></span>
+                <div role="group" aria-label="Ao vencer o prazo" style="display: flex; padding: 2px; border: 1px solid #2a2a31; border-radius: 7px; background: #0b0b0d">
+                  <sc-for list="{{timeout}}" as="o" hint-placeholder-count="3">
+                    <button type="button" aria-pressed="{{o.on}}" onClick="{{o.pick}}" style="flex: 1; height: 26px; padding: 0 8px; border: 0; border-radius: 5px; background: {{o.bg}}; color: {{o.fg}}; font-size: 12px">{{o.label}}</button>
+                  </sc-for>
+                </div>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 12px; color: #a4a4ad">Avisar em</span>
+                <label style="display: flex; align-items: center; gap: 10px; min-height: 30px"><input type="checkbox" checked="checked" style="accent-color: #ececef; margin: 0">Caixa de entrada</label>
+                <label style="display: flex; align-items: center; gap: 10px; min-height: 30px"><input type="checkbox" checked="checked" style="accent-color: #ececef; margin: 0">Notificação do Windows</label>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{show.cfgAgent}}" hint-placeholder-val="{{ false }}">
+            <div style="padding: 14px 16px; display: flex; flex-direction: column; gap: 16px">
+              <label style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 12px; color: #a4a4ad">Agente</span>
+                <select style="height: 32px; padding: 0 8px; border: 1px solid #2a2a31; border-radius: 6px; background: #0b0b0d; color: #ececef"><option>{{sel.agent}}</option></select>
+              </label>
+              <label style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 12px; color: #a4a4ad">Instrução deste passo</span>
+                <textarea rows="4" style="padding: 8px; border: 1px solid #2a2a31; border-radius: 6px; background: #0b0b0d; color: #ececef; font-size: 13px; line-height: 20px; resize: vertical">{{sel.prompt}}</textarea>
+              </label>
+              <div style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 12px; color: #a4a4ad">Ferramentas liberadas</span>
+                <div style="display: flex; flex-wrap: wrap; gap: 6px">
+                  <sc-for list="{{sel.tools}}" as="t" hint-placeholder-count="2"><span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 2px 6px; border: 1px solid #2a2a31; border-radius: 4px">{{t}}</span></sc-for>
+                </div>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 12px; color: #a4a4ad">Se falhar</span>
+                <span style="display: flex; align-items: center; gap: 8px">Tentar de novo <b style="font-weight: 500; font-family: 'JetBrains Mono', monospace">2×</b> e depois <b style="font-weight: 500">parar e avisar</b></span>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{show.cfgOther}}" hint-placeholder-val="{{ false }}">
+            <p style="margin: 0; padding: 14px 16px; color: #a4a4ad">{{sel.note}}</p>
+          </sc-if>
+
+          <sc-if value="{{show.last}}" hint-placeholder-val="{{ false }}">
+            <div style="padding: 14px 16px; display: flex; flex-direction: column; gap: 10px">
+              <span style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #a4a4ad"><dc-import name="V2Status" state="{{sel.st}}" sz="{{ 12 }}" hint-size="12px,12px"></dc-import>Na <span style="font-family: 'JetBrains Mono', monospace; color: #ececef">RUN-284</span> · {{sel.dur}}</span>
+              <dl style="margin: 0; display: flex; flex-direction: column">
+                <sc-for list="{{sel.kv}}" as="v" hint-placeholder-count="3">
+                  <div style="display: flex; gap: 12px; padding: 6px 0; border-bottom: 1px solid #1a1a1f"><dt style="flex: 0 0 104px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #85858f">{{v.k}}</dt><dd style="margin: 0; font-family: 'JetBrains Mono', monospace; font-size: 12px">{{v.v}}</dd></div>
+                </sc-for>
+              </dl>
+            </div>
+          </sc-if>
+
+          <div style="margin-top: auto; padding: 12px 16px; border-top: 1px solid #1f1f24; display: flex; align-items: center; gap: 10px">
+            <button type="button" style="display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px; border: 1px solid #2a2a31; border-radius: 6px; background: #16161a; color: #ececef">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" aria-hidden="true"><path d="M7 5l12 7-12 7z"></path></svg>Testar só este nó
+            </button>
+            <span style="font-size: 12px; line-height: 16px; color: #85858f">usa a entrada da última execução</span>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { sel: 'n3', tab: 'cfg', debug: false, timeout: 'remind' }; }
+  renderVals() {
+    var self = this, st = this.state;
+    var human = { tile: '#3d3220', tileFg: '#f0b03f', glyph: 'VC' };
+    var defs = [
+      { id: 'n1', x: 268, y: 24, kind: 'other', kindLabel: 'Gatilho', title: 'Pauta aprovada no Radar', meta: 'Gatilho · ao aprovar', tile: '#26262c', tileFg: '#ececef', glyph: 'GT', st: 'feito', dur: '', chips: ['pauta'], note: 'Começa quando você aprova uma pauta no Radar. Entrega ao próximo nó a pauta e as fontes.', kv: [['pauta', 'Automação no Excel'], ['fontes', '4']] },
+      { id: 'n2', x: 268, y: 144, kind: 'agent', kindLabel: 'Agente · Roteirista', agent: 'Roteirista', title: 'Escrever roteiro', meta: 'Claude Sonnet 5.5', tile: '#f5b544', tileFg: '#0b0b0d', glyph: 'RO', st: 'feito', dur: '3m 10s', chips: ['pauta', '→ roteiro'], prompt: 'Escreva um roteiro de 6 a 7 minutos a partir da pauta. Use as fontes e mantenha o tom do Meu estilo.', tools: ['notion.pages', 'web.search'], kv: [['roteiro', 'v2 · 7 cenas'], ['tokens', '9,8k']] },
+      { id: 'n3', x: 268, y: 264, kind: 'human', kindLabel: 'Revisão humana', title: 'Aprovar roteiro', meta: 'Você · prazo de 24 h', tile: human.tile, tileFg: human.tileFg, glyph: human.glyph, st: 'feito', dur: '41m', chips: ['roteiro'], kv: [['decisão', 'aprovado'], ['edições', '2 trechos'], ['tempo', '41 min']] },
+      { id: 'n4', x: 108, y: 400, kind: 'agent', kindLabel: 'Agente · Editor de vídeo', agent: 'Editor de vídeo', title: 'Cortes e legenda', meta: 'Claude Sonnet 5.5 + ffmpeg', tile: '#2dd4bf', tileFg: '#0b0b0d', glyph: 'ED', st: 'aguardando', dur: '8m', chips: ['vídeo', 'roteiro'], prompt: 'Remova pausas acima de 1,2 s e falsos inícios. Peça aprovação antes de aplicar. Depois aplique o preset de legenda da última entrega.', tools: ['ffmpeg', 'whisper', 'presets'], kv: [['estado', 'espera aprovação'], ['cortes', '10']] },
+      { id: 'n5', x: 428, y: 400, kind: 'agent', kindLabel: 'Agente · Designer de capa', agent: 'Designer de capa', title: 'Gerar 3 capas', meta: 'Codex · imagem', tile: '#f472b6', tileFg: '#0b0b0d', glyph: 'DC', st: 'rodando', dur: '7m 40s', chips: ['roteiro', 'estilo'], prompt: 'Crie 3 opções de capa 1280×720 no estilo Capa clara. Título com no máximo 5 palavras.', tools: ['image.generate', 'referências'], kv: [['prontas', '2 de 3']] },
+      { id: 'n6', x: 268, y: 536, kind: 'human', kindLabel: 'Revisão humana', title: 'Aprovar entrega', meta: 'Você · prazo de 24 h', tile: human.tile, tileFg: human.tileFg, glyph: human.glyph, st: 'fila', dur: '', chips: ['vídeo', 'capa'], kv: [] },
+      { id: 'n7', x: 268, y: 656, kind: 'agent', kindLabel: 'Agente · Publicador', agent: 'Publicador', title: 'Agendar publicação', meta: 'YouTube · LinkedIn', tile: '#9aa8ff', tileFg: '#0b0b0d', glyph: 'PB', st: 'fila', dur: '', chips: ['entrega'], prompt: 'Agende no próximo horário livre do calendário e prepare título, descrição e tags.', tools: ['youtube.upload', 'linkedin.post', 'calendário'], kv: [] }
+    ];
+    var cur = defs.filter(function (d) { return d.id === st.sel; })[0] || defs[2];
+    var nodes = defs.map(function (d) {
+      var on = d.id === st.sel;
+      return Object.assign({}, d, { on: on ? 'true' : 'false', bd: on ? '#5b8cff' : '#2a2a31', ring: on ? '0 0 0 3px rgba(91,140,255,0.18)' : 'none', pick: function () { self.setState({ sel: d.id }); } });
+    });
+    var tabs = [['cfg', 'Configurar'], ['last', 'Última execução']].map(function (x) {
+      var on = st.tab === x[0];
+      return { label: x[1], on: on ? 'true' : 'false', fg: on ? '#ececef' : '#a4a4ad', line: on ? '#ececef' : 'transparent', pick: function () { self.setState({ tab: x[0] }); } };
+    });
+    var timeout = [['remind', 'Lembrar'], ['auto', 'Aprovar sozinho'], ['stop', 'Parar']].map(function (x) {
+      var on = st.timeout === x[0];
+      return { label: x[1], on: on ? 'true' : 'false', bg: on ? '#1c1c21' : 'transparent', fg: on ? '#ececef' : '#a4a4ad', pick: function () { self.setState({ timeout: x[0] }); } };
+    });
+    var cfg = st.tab === 'cfg';
+    return {
+      nodes: nodes, tabs: tabs, timeout: timeout,
+      sel: Object.assign({}, cur, { dur: cur.dur || 'ainda não rodou', kv: (cur.kv.length ? cur.kv : [['—', 'sem dados ainda']]).map(function (v) { return { k: v[0], v: v[1] }; }), note: cur.note || '' }),
+      show: { cfgHuman: cfg && cur.kind === 'human', cfgAgent: cfg && cur.kind === 'agent', cfgOther: cfg && cur.kind === 'other', last: !cfg },
+      dbg: { on: st.debug ? 'true' : 'false', bg: st.debug ? '#5b8cff' : '#33333b', x: st.debug ? 14 : 2, toggle: function () { self.setState({ debug: !st.debug }); } }
+    };
+  }
+}
+</script>
+</body>
+</html>

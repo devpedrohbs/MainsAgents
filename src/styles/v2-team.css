@@ -1,0 +1,363 @@
+/* Team V2: shared tokens only; provider rings keep the existing identity tokens. */
+:root .studio-shell .v2-team.page,:root .studio-shell .v2-team>.page{width:100%;max-width:none;margin:0;padding:0;gap:0;background:var(--bg);color:var(--fg);box-sizing:border-box}
+:root .studio-shell .v2-team .v2-header{align-items:center;gap:10px;min-height:44px;margin:0;padding:6px 12px 6px 20px;border-bottom:1px solid var(--border);background:var(--bg)}
+:root .studio-shell .v2-team .v2-header h1{margin:0;font-size:13px;line-height:20px;font-weight:600;letter-spacing:0}
+:root .studio-shell .v2-team .v2-header>div:first-child{min-width:0}
+:root .studio-shell .v2-team .v2-header p{margin:0;color:var(--meta);font-size:12px;line-height:16px;max-width:65ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+:root .studio-shell .v2-team .v2-header .eyebrow{display:none}
+:root .studio-shell .v2-team .v2-header .select-menu-trigger{height:30px;min-height:30px;padding:0 10px;font-size:12px}
+:root .studio-shell .v2-team .v2-header .filter-select{min-height:0}
+:root .studio-shell .v2-team .v2-header .icon-button{width:28px;height:28px;min-height:28px;padding:0}
+:root .studio-shell :is(.settings-page,.agent-settings-page).v2-team>.v2-header>div:first-child{display:flex;align-items:center;gap:16px;flex:1;overflow:hidden}
+:root .studio-shell .v2-team .v2-header :is(.primary-button,.soft-button){min-height:30px;height:30px;padding:0 10px;font-size:12px;border-radius:var(--radius-sm)}
+:root .studio-shell .v2-team .v2-header .search-field{height:28px;min-height:28px;max-width:220px;flex:0 1 220px;background:var(--frame);border:1px solid var(--line);border-radius:var(--radius-sm)}
+:root .studio-shell .v2-team .search-field input{min-height:0;height:26px;font-size:12px;background:transparent}
+:root .studio-shell .v2-team .v2-segmented{border-color:var(--line);border-radius:var(--radius-sm);background:var(--frame)}
+:root .studio-shell .v2-team .v2-segmented button{height:24px;padding:0 8px;border-radius:var(--radius-xs);font-size:12px;font-weight:400}
+:root .studio-shell .v2-team .v2-segmented button[aria-pressed=true]{background:var(--surface-2);color:var(--fg)}
+:root .studio-shell .v2-team .v2-inspector{background:var(--bg);border-color:var(--border);box-shadow:none}
+:root .studio-shell .v2-team .status{display:inline-flex;align-items:center;gap:6px;padding:0;border:0;background:transparent;border-radius:0;font-size:12px}
+:root .studio-shell .v2-team .ov-shimmer{animation:none;background:none;color:var(--muted);-webkit-text-fill-color:currentColor}
+:root .studio-shell .v2-team :is(.result-count,.v2-count,time){font-family:var(--font-mono);font-size:11px;font-variant-numeric:tabular-nums}
+
+/* Agentes: grouped directory and inspector under one header. */
+:root .studio-shell .team-workspace.v2-team{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);height:100%;min-width:0;overflow:hidden}
+:root .studio-shell .team-workspace.v2-team.has-details{grid-template-columns:minmax(0,1fr) 340px}
+:root .studio-shell .team-workspace.v2-team>.ag{display:contents}
+:root .studio-shell .v2-team .ag-head{grid-column:1/-1;grid-row:1;flex-wrap:wrap}
+:root .studio-shell .v2-team .ag-head>div:first-child{flex:1;min-width:130px}
+:root .studio-shell .v2-team .ag-head p{display:none}
+:root .studio-shell .v2-team .ag-grid{display:block;grid-column:1;grid-row:2;overflow:auto;min-width:0;padding:0}
+:root .studio-shell .v2-team .ag .agents-list{display:block;border:0;border-radius:0;min-width:830px;overflow:visible}
+:root .studio-shell .v2-team .agent-table-head{display:grid;grid-template-columns:minmax(300px,1fr) 140px 150px 164px;gap:12px;align-items:center;height:32px;padding:0 16px;color:var(--meta);font-size:11px;line-height:16px;white-space:nowrap;border-bottom:1px solid var(--border)}
+:root .studio-shell .v2-team .agent-table-head>span:last-child{text-align:right}
+:root .studio-shell .v2-team .agent-group-head{display:flex;align-items:center;gap:8px;height:32px;padding:0 16px;background:var(--frame);border-bottom:1px solid var(--border);font-size:12px;color:var(--muted)}
+:root .studio-shell .v2-team .agent-group-head b{font-weight:500;color:var(--fg-2)}
+:root .studio-shell .v2-team .ag .specialist-tile{display:flex;flex-direction:row;align-items:center;gap:12px;width:100%;min-height:48px;margin:0;padding:4px 16px;border:0;border-bottom:1px solid var(--border);border-radius:0;background:var(--bg);box-shadow:none;transform:none}
+:root .studio-shell .v2-team .ag .specialist-tile:hover{background:var(--surface);border-color:var(--border);box-shadow:none}
+:root .studio-shell .v2-team .ag .specialist-tile.selected{background:var(--surface-2);border-color:var(--border)}
+:root .studio-shell .v2-team .ag .specialist-open{display:grid;grid-template-columns:minmax(300px,1fr) 140px 150px;align-items:center;gap:12px;flex:1;min-width:0;padding:0;background:none}
+:root .studio-shell .v2-team .ag .specialist-identity{display:flex;align-items:center;gap:10px;min-width:0}
+:root .studio-shell .v2-team .ag .specialist-identity>.agent-avatar{width:26px;height:26px;min-width:26px;border-radius:var(--radius-sm)}
+:root .studio-shell .v2-team .ag .specialist-identity>div{display:grid;grid-template-columns:minmax(100px,1fr) 132px;column-gap:10px;min-width:0;flex:1}
+:root .studio-shell .v2-team .ag .specialist-identity h2{display:flex;gap:6px;min-width:0;margin:0;font-size:13px;line-height:18px;font-weight:500;letter-spacing:0;white-space:nowrap}
+:root .studio-shell .v2-team .ag .specialist-identity h2 small{border:0;border-radius:0;padding:0;font-size:10px;color:var(--meta)}
+:root .studio-shell .v2-team .ag .specialist-role{grid-column:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;line-height:16px;color:var(--meta)}
+:root .studio-shell .v2-team .ag .specialist-state{grid-column:2;grid-row:1/3;align-self:center;margin:0;min-width:0;font-size:12px}
+:root .studio-shell .v2-team .ag .specialist-state>.v2-status{overflow:visible}
+:root .studio-shell .v2-team .specialist-model{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:var(--muted)}
+:root .studio-shell .v2-team .ag .specialist-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+:root .studio-shell .v2-team .ag .specialist-stats>span{display:flex;flex-direction:column;align-items:flex-end;gap:0;padding:0;background:none;font-size:10px;color:var(--meta)}
+:root .studio-shell .v2-team .ag .specialist-stats b{font-size:12px;font-weight:400;color:var(--fg)}
+:root .studio-shell .v2-team .ag .specialist-chips{display:none}
+:root .studio-shell .v2-team .ag .precision-agent-actions{flex:0 0 164px;display:flex;flex-direction:row;flex-wrap:nowrap;gap:6px;margin:0;padding:0}
+:root .studio-shell .v2-team .ag .specialist-configure{position:static}
+:root .studio-shell .v2-team .ag .precision-agent-actions :is(.specialist-chat,.specialist-configure){min-height:26px;height:26px;padding:0 8px;border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--surface);color:var(--fg-2);font-size:11px;font-weight:400}
+:root .studio-shell .v2-team .ag-new{display:flex;flex-direction:row;justify-content:flex-start;gap:8px;min-height:44px;width:100%;padding:8px 16px;border:0;border-bottom:1px solid var(--border);border-radius:0;text-align:left}
+:root .studio-shell .v2-team .ag-new>span{width:20px;height:20px;border:0}
+:root .studio-shell .v2-team .ag-new small{max-width:none;text-align:left;font-size:12px}
+:root .studio-shell .v2-team .workspace-empty{margin:20px;border-radius:var(--radius-md)}
+:root .studio-shell .v2-team .studio-detail-panel{grid-column:2;grid-row:2;position:static;display:flex;flex-direction:column;gap:0;min-width:0;width:340px;padding:0;border-left:1px solid var(--border);overflow:hidden}
+:root .studio-shell .v2-team .studio-detail-panel>header{padding:8px 16px;min-height:40px;box-sizing:border-box;font-size:12px}
+:root .studio-shell .v2-team .studio-detail-scroll{padding:16px}
+:root .studio-shell .v2-team .studio-detail-scroll>.agent-avatar{width:40px;height:40px;margin-bottom:8px;border-radius:var(--radius-md)}
+:root .studio-shell .v2-team .studio-detail-scroll h2{font-size:15px;line-height:22px;letter-spacing:0;margin:0 0 2px}
+:root .studio-shell .v2-team .studio-detail-scroll .detail-role{font-size:12px;margin:0 0 8px;color:var(--meta)}
+:root .studio-shell .v2-team .studio-detail-tabs{margin:16px 0;gap:16px}
+:root .studio-shell .v2-team .studio-detail-tabs button{padding-bottom:8px;font-size:12px}
+:root .studio-shell .v2-team .studio-detail-scroll :is(.detail-description,.detail-instructions){font-size:12px;line-height:20px;color:var(--fg-2)}
+:root .studio-shell .v2-team .studio-detail-scroll dl{margin:16px 0;gap:10px;font-size:12px}
+:root .studio-shell .v2-team .studio-detail-scroll h3{margin:16px 0 6px;font-size:13px}
+:root .studio-shell .v2-team .studio-detail-panel>footer{display:flex;flex-wrap:wrap;gap:8px;padding:12px 16px}
+:root .studio-shell .v2-team .studio-detail-panel>footer button{flex:1;min-height:30px;padding:5px 8px;font-size:11px}
+
+/* Histórico: dense scope groups and an unboxed transcript. */
+:root .studio-shell .hs.v2-team{display:grid;grid-template-columns:minmax(300px,440px) minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);height:100%;min-height:0;border:0;border-radius:0;overflow:hidden;background:var(--bg)}
+:root .studio-shell .hs.v2-team>.hs-title{grid-column:1/-1}
+:root .studio-shell .hs.v2-team .hs-title>div{display:flex;align-items:center;gap:16px;min-width:0;flex:1}
+:root .studio-shell .hs.v2-team .hs-title p{line-height:20px}
+:root .studio-shell .hs.v2-team .hs-list{min-width:0;border-right:0;overflow:hidden}
+:root .studio-shell .hs.v2-team .hs-head{gap:8px;padding:12px 16px;border-bottom:1px solid var(--border)}
+:root .studio-shell .hs.v2-team .hs-head .search-field{min-height:28px;height:28px;border:1px solid var(--line);background:var(--frame);border-radius:var(--radius-sm)}
+:root .studio-shell .hs.v2-team .hs-faces button{height:26px;width:26px;border-radius:var(--radius-sm)}
+:root .studio-shell .hs.v2-team .hs-faces .agent-avatar{border-radius:var(--radius-sm)}
+:root .studio-shell .hs.v2-team .hs-groups{padding:0 0 12px}
+:root .studio-shell .hs.v2-team .hs-group-head{padding:0 8px;background:var(--frame);border-bottom:1px solid var(--border)}
+:root .studio-shell .hs.v2-team .content-space-box{min-height:32px;padding:4px 8px;border-radius:0;background:transparent}
+:root .studio-shell .hs.v2-team .content-space-title b{text-transform:none;letter-spacing:0;font-weight:500}
+:root .studio-shell .hs.v2-team .content-space-box small{max-width:42%;overflow:hidden;text-overflow:ellipsis}
+:root .studio-shell .hs.v2-team .conversation-list{gap:0;margin:0;border:0;border-radius:0}
+:root .studio-shell .hs.v2-team .conversation-row{min-height:60px;border-radius:0;border-bottom:1px solid var(--border)}
+:root .studio-shell .hs.v2-team .conversation-row.selected{background:var(--surface-2)}
+:root .studio-shell .hs.v2-team .conversation-open{padding:10px 12px;align-items:center;gap:10px}
+:root .studio-shell .hs.v2-team .conversation-open>.agent-avatar{width:26px;height:26px;min-width:26px;border-radius:var(--radius-sm)}
+:root .studio-shell .hs.v2-team .conversation-line{align-items:center;gap:6px}
+:root .studio-shell .hs.v2-team .conversation-actions{position:static;max-width:112px}
+:root .studio-shell .hs.v2-team .conversation-actions:has(.danger-button){max-width:none}
+:root .studio-shell .hs.v2-team .hs-preview{padding:0;gap:0;border-left:1px solid var(--border);overflow:hidden}
+:root .studio-shell .hs.v2-team .hs-preview-head{padding:16px;flex-wrap:wrap;gap:10px}
+:root .studio-shell .hs.v2-team .hs-preview-head>.agent-avatar{width:32px;height:32px;min-width:32px;border-radius:var(--radius-md)}
+:root .studio-shell .hs.v2-team .hs-preview-head>div{min-width:150px}
+:root .studio-shell .hs.v2-team .hs-preview-head button{min-height:30px;padding:0 10px;font-size:12px}
+:root .studio-shell .hs.v2-team .hs-chips{padding:8px 16px}
+:root .studio-shell .hs.v2-team :is(.hs-scope,.hs-running){display:inline-flex;align-items:center;gap:6px;padding:1px 6px;border:1px solid var(--line);border-radius:var(--radius-xs);background:transparent;color:var(--muted)}
+:root .studio-shell .hs.v2-team .hs-thread{padding:20px;gap:20px;max-width:none}
+:root .studio-shell .hs.v2-team .hs-bubble{max-width:640px;padding:0;border:0;background:transparent;box-shadow:none}
+:root .studio-shell .hs.v2-team .hs-bubble.user{align-self:stretch;justify-items:start;border-bottom:1px solid var(--border);padding-bottom:16px}
+:root .studio-shell .hs.v2-team .hs-bubble p{padding:0;margin:0;border:0;border-radius:0;background:none;font-size:13px;line-height:22px;color:var(--fg-2)}
+
+/* Escopos: keep the directory beside the selected scope. */
+:root .studio-shell :is(.scopes-page,.scope-page).v2-team{display:flex;flex-direction:column;min-height:100%}
+:root .studio-shell .v2-team.scopes-page>.v2-header>div:first-child{flex:1}
+:root .studio-shell .v2-team.scopes-page>.v2-header p:not(.eyebrow){display:none}
+:root .studio-shell .v2-team .scope-filter{margin:12px 16px;align-self:flex-start}
+:root .studio-shell .v2-team .scope-grid{display:flex;flex-direction:column;gap:0;margin:0;border:0;border-radius:0;min-width:0;overflow:hidden}
+:root .studio-shell .v2-team .scope-card{display:grid;grid-template-columns:minmax(180px,1fr) auto;align-items:center;gap:2px 20px;min-height:60px;padding:10px 16px;border:0;border-bottom:1px solid var(--border);border-radius:0;background:var(--bg);box-shadow:none}
+:root .studio-shell .v2-team .scope-card:hover{background:var(--surface)}
+:root .studio-shell .v2-team .scope-card.selected{background:var(--surface-2)}
+:root .studio-shell .v2-team .scope-card-head{align-items:center;grid-column:1;grid-row:1;gap:8px;min-width:0}
+:root .studio-shell .v2-team .scope-card-head .scope-mark{display:none}
+:root .studio-shell .v2-team .scope-card-head b{font-size:13px;font-weight:500}
+:root .studio-shell .v2-team .scope-card-head small{display:none}
+:root .studio-shell .v2-team .scope-state{border:1px solid var(--line);border-radius:var(--radius-xs);background:transparent;color:var(--muted);padding:0 5px}
+:root .studio-shell .v2-team .scope-card>p{grid-column:1;grid-row:2;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:16px;font-size:12px;padding-left:22px;color:var(--meta)}
+:root .studio-shell .v2-team .scope-card-foot{grid-column:2;grid-row:1/3;justify-content:flex-end;gap:8px;max-width:240px;font-size:12px}
+:root .studio-shell .v2-team .scope-card-foot small{font-family:var(--font-mono);font-size:11px}
+:root .studio-shell .v2-team .scope-card-new{display:flex;flex-direction:row;justify-content:flex-start;gap:8px;min-height:44px;padding:8px 16px;text-align:left}
+:root .studio-shell .v2-team .scope-plus{width:20px;height:20px;border:0}
+:root .studio-shell .v2-team .scope-card-new small{max-width:none}
+:root .studio-shell .v2-team .scope-layout{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:0;flex:1;align-items:stretch;min-height:0}
+:root .studio-shell .v2-team .scope-directory{min-width:0;overflow:auto}
+:root .studio-shell .v2-team .scope-detail{min-width:0;gap:20px;padding:16px;overflow:auto}
+:root .studio-shell .v2-team .scope-main{gap:20px}
+:root .studio-shell .v2-team .scope-head{align-items:flex-start;padding:0;border:0;gap:10px;min-height:0}
+:root .studio-shell .v2-team .scope-head h1{font-size:17px;line-height:24px}
+:root .studio-shell .v2-team .scope-head p{white-space:normal;font-size:12px;line-height:18px;margin-top:4px}
+:root .studio-shell .v2-team .scope-head .scope-mark{display:none}
+:root .studio-shell .v2-team .scope-agent-grid{display:flex;flex-direction:column;gap:0}
+:root .studio-shell .v2-team .scope-agent{padding:10px 0;border:0;border-bottom:1px solid var(--border);border-radius:0;background:transparent;gap:6px}
+:root .studio-shell .v2-team .scope-agent-head{gap:8px;flex-wrap:wrap}
+:root .studio-shell .v2-team .scope-agent-head b{font-size:13px;font-weight:500}
+:root .studio-shell .v2-team .scope-agent-head .agent-avatar{width:24px;height:24px;border-radius:var(--radius-sm)}
+:root .studio-shell .v2-team .scope-agent>p{padding:0;background:none;border-radius:0;font-size:12px;line-height:18px;-webkit-line-clamp:2}
+:root .studio-shell .v2-team :is(.scope-section-head h2,.scope-aside h2){font-size:13px}
+:root .studio-shell .v2-team .scope-aside{padding:0;border:0;gap:20px;overflow:visible}
+:root .studio-shell .v2-team :is(.scope-collab,.scope-link-card,.scope-danger,.scope-switch){border-radius:var(--radius-md)}
+:root .studio-shell .v2-team .scope-muted{font-size:12px;line-height:19px}
+:root .studio-shell .v2-team .scope-switch input::after{background:var(--primary-bg)}
+
+/* Uso: real ledger, unchanged Claude orange and Codex light rings. */
+:root .studio-shell>.main>.view:has(.usage-page.v2-team){background:var(--bg)}
+:root .studio-shell .usage-page.v2-team{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(320px,1fr);align-content:start;gap:20px;padding-bottom:24px}
+:root .studio-shell .v2-team .usage-toolbar{grid-column:1/-1;margin:0}
+:root .studio-shell .v2-team .usage-toolbar h1{margin-right:8px}
+:root .studio-shell .v2-team .usage-toolbar>.usage-segment:first-of-type{border:0;background:none;padding:0;gap:16px}
+:root .studio-shell .v2-team .usage-toolbar>.usage-segment:first-of-type button{height:30px;padding:0;border-radius:0;border-bottom:2px solid transparent;background:none;color:var(--muted)}
+:root .studio-shell .v2-team .usage-toolbar>.usage-segment:first-of-type button[aria-pressed=true]{border-bottom-color:var(--fg);color:var(--fg)}
+:root .studio-shell .v2-team .usage-hero{grid-column:1/-1;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:0 20px}
+:root .studio-shell .v2-team .usage-headline{display:flex;flex-direction:row;align-items:baseline;justify-content:flex-start;gap:12px;flex-wrap:wrap;grid-column:1/-1}
+:root .studio-shell .v2-team .usage-headline strong{font-family:var(--font-mono);font-size:24px;line-height:30px;font-weight:500;letter-spacing:0}
+:root .studio-shell .v2-team .usage-eyebrow{font-size:12px;letter-spacing:0;text-transform:none;color:var(--muted)}
+:root .studio-shell .v2-team .usage-limit{padding:14px 16px;gap:16px;border-radius:var(--radius-md);background:var(--surface)}
+:root .studio-shell .v2-team .usage-limit svg{width:88px;height:88px;flex-basis:88px}
+:root .studio-shell .v2-team .usage-limit text{font-size:24px;font-weight:500;font-family:var(--font-mono)}
+:root .studio-shell .v2-team .usage-limit strong{font-size:13px;font-weight:500}
+:root .studio-shell .v2-team .usage-limit small{line-height:18px}
+:root .studio-shell .v2-team .usage-section{min-width:0;margin:0 20px;gap:10px}
+:root .studio-shell .v2-team .usage-section[aria-labelledby=usage-daily]{grid-column:1;grid-row:3}
+:root .studio-shell .v2-team .usage-section[aria-labelledby=usage-breakdown]{grid-column:2;grid-row:3/5;margin-left:0}
+:root .studio-shell .v2-team .usage-section[aria-labelledby=usage-tokens]{grid-column:1;grid-row:4}
+:root .studio-shell .v2-team .usage-section h2{font-size:13px;font-weight:600}
+:root .studio-shell .v2-team .usage-chart{box-sizing:border-box;height:180px;border:1px solid var(--border);border-radius:var(--radius-md);padding:12px 12px 0 56px;gap:4px;background:none}
+:root .studio-shell .v2-team .usage-axis{left:8px;font-family:var(--font-mono)}
+:root .studio-shell .v2-team .usage-chart-dates{font-family:var(--font-mono);padding-left:56px}
+:root .studio-shell .v2-team .usage-empty{border:1px solid var(--border);border-radius:var(--radius-md);padding:16px;font-size:12px;line-height:20px}
+:root .studio-shell .v2-team .usage-tiles{grid-template-columns:repeat(auto-fit,minmax(95px,1fr));gap:1px;border-radius:var(--radius-md);background:var(--border)}
+:root .studio-shell .v2-team .usage-tiles>div{padding:10px;border:0;border-radius:0;background:var(--bg)}
+:root .studio-shell .v2-team .usage-tiles strong{font-size:18px;font-weight:500}
+:root .studio-shell .v2-team .usage-breakdown{border-radius:var(--radius-md)}
+:root .studio-shell .v2-team .usage-row{display:grid;grid-template-columns:minmax(95px,1.7fr) minmax(55px,1fr) minmax(60px,1fr) 40px;gap:10px;width:100%;min-height:40px;padding:6px 12px;border:0;border-bottom:1px solid var(--border);font-size:12px}
+:root .studio-shell .v2-team .usage-row.head{min-height:32px;background:var(--surface);color:var(--meta)}
+:root .studio-shell .v2-team .usage-row:last-child{border-bottom:0}
+:root .studio-shell .v2-team .usage-table td{font-family:var(--font-mono);font-size:12px}
+
+/* Configurações: narrow navigation and one readable settings column. */
+:root .studio-shell .settings-page.v2-team .settings-grid{display:grid;grid-template-columns:220px minmax(0,760px);gap:0;align-items:stretch;flex:1;min-height:0}
+:root .studio-shell .settings-page.v2-team .settings-nav{position:static;display:flex;flex-direction:column;flex-wrap:nowrap;gap:2px;padding:12px 8px;border-right:1px solid var(--border);box-sizing:border-box;margin:0;width:auto;overflow:visible}
+:root .studio-shell .settings-page.v2-team .settings-nav button{display:flex;align-items:center;min-height:30px;padding:0 10px;border-radius:var(--radius-sm);font-size:13px;font-weight:400}
+:root .studio-shell .settings-page.v2-team .settings-nav button.active{font-weight:500}
+:root .studio-shell .settings-page.v2-team .settings-panel{padding:24px 32px 40px;border:0;border-radius:0;background:var(--bg);width:auto;min-width:0;overflow:visible}
+:root .studio-shell .settings-page.v2-team .settings-section-head{padding:0;margin:0 0 24px;border:0}
+:root .studio-shell .settings-page.v2-team .settings-section-head h2{margin:0 0 4px;font-size:20px;line-height:28px;font-weight:600}
+:root .studio-shell .settings-page.v2-team .settings-section-head p{margin:0;font-size:13px;line-height:20px}
+:root .studio-shell .settings-page.v2-team .settings-group:not([hidden]){border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden}
+:root .studio-shell .settings-page.v2-team .settings-group .setting-row{padding:14px 16px;gap:16px;border:0;border-bottom:1px solid var(--border);background:transparent}
+:root .studio-shell .settings-page.v2-team .settings-group .setting-row:last-child{border-bottom:0}
+:root .studio-shell .settings-page.v2-team .setting-copy b{font-size:13px;font-weight:500}
+:root .studio-shell .settings-page.v2-team .v2-provider-label{display:flex;align-items:center;gap:8px}
+:root .studio-shell .settings-page.v2-team .setting-copy p{font-size:12px;line-height:18px;margin:3px 0 0;color:var(--meta)}
+:root .studio-shell .settings-page.v2-team .appearance-options{display:flex;gap:2px;max-width:none;width:auto;padding:2px;border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--frame)}
+:root .studio-shell .settings-page.v2-team .appearance-setting{flex-direction:row;align-items:center}
+:root .studio-shell .settings-page.v2-team .appearance-option{display:flex;align-items:center;gap:6px;width:auto;height:28px;min-height:0;padding:0 10px;border:0;border-radius:var(--radius-xs);background:transparent;box-shadow:none;color:var(--muted)}
+:root .studio-shell .settings-page.v2-team .appearance-option.selected{background:var(--surface-2);color:var(--fg)}
+:root .studio-shell .settings-page.v2-team .appearance-preview{display:none}
+:root .studio-shell .settings-page.v2-team .appearance-label{padding:0;font-size:12px}
+:root .studio-shell .settings-page.v2-team .appearance-check{position:static;display:none}
+:root .studio-shell .settings-page.v2-team .settings-version{font-family:var(--font-mono);font-size:11px;margin:12px 16px;color:var(--meta)}
+:root .studio-shell .agent-settings-page.v2-team .agent-settings-hero{margin:20px 20px 0;padding:12px 16px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface)}
+:root .studio-shell .agent-settings-page.v2-team .agent-settings-hero .agent-avatar{width:40px;height:40px;border-radius:var(--radius-md)}
+:root .studio-shell .agent-settings-page.v2-team .agent-settings-panel{margin:16px 20px 24px;padding:16px;border-radius:var(--radius-md);background:var(--bg)}
+:root .studio-shell .agent-settings-page.v2-team .setting-row{padding:12px 0;border-color:var(--border)}
+
+/* Quadro: compact workflow columns with optional inspector. */
+:root .studio-shell .qb.v2-team{display:flex;flex-direction:column;height:100%;min-height:0;overflow:hidden}
+:root .studio-shell .v2-team .qb-head>div:first-child{min-width:150px;flex:1}
+:root .studio-shell .v2-team .qb-head p{display:none}
+:root .studio-shell .v2-team .qb-faces{margin:12px 16px;gap:6px}
+:root .studio-shell .v2-team .qb-faces>button:not(.text-link){height:26px;padding:0 8px;border:1px solid var(--line);border-radius:var(--radius-sm);background:transparent;color:var(--muted)}
+:root .studio-shell .v2-team .qb-faces>button[aria-pressed=true]{background:var(--surface-2);border-color:var(--line-strong);color:var(--fg)}
+:root .studio-shell .v2-team .qb-faces .agent-avatar{width:18px;height:18px;min-width:18px;border-radius:var(--radius-xs)}
+:root .studio-shell .v2-team .board-guidance{margin:12px 16px 0;padding:12px 14px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface)}
+:root .studio-shell .v2-team .board-guidance .first-use-mark{width:30px;height:30px;border-radius:var(--radius-sm);background:var(--surface-2);color:var(--meta)}
+:root .studio-shell .v2-team .v2-board-body{display:flex;flex:1;min-height:0;min-width:0;overflow:hidden}
+:root .studio-shell .qb.v2-team .board{display:flex;align-items:stretch;gap:12px;flex:1;min-width:0;padding:4px 16px 16px;overflow:auto}
+:root .studio-shell .qb.v2-team .board-column{flex:1 0 236px;min-width:236px;max-width:320px;padding:8px;gap:8px;border:0;border-radius:var(--radius-md);background:var(--frame);box-sizing:border-box}
+:root .studio-shell .qb.v2-team .board-column.drop-target{background:var(--accent-soft);outline:1px solid var(--accent)}
+:root .studio-shell .qb.v2-team .column-head{padding:0 4px 4px;font-size:12px}
+:root .studio-shell .qb.v2-team .column-empty{padding:16px 8px;border-radius:var(--radius-sm);font-size:12px}
+:root .studio-shell .qb.v2-team .task-card{gap:8px;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface);box-shadow:none;transform:none;transition:border-color .15s}
+:root .studio-shell .qb.v2-team .task-card:hover{transform:none;border-color:var(--line-strong)}
+:root .studio-shell .qb.v2-team .task-card.selected{border-color:var(--accent);box-shadow:var(--focus-ring)}
+:root .studio-shell .qb.v2-team .task-card.needs-review:not(.selected){border-color:var(--line)}
+:root .studio-shell .qb.v2-team .task-card h3{font-size:13px;line-height:20px;font-weight:500;overflow-wrap:anywhere}
+:root .studio-shell .qb.v2-team .task-state{display:flex;align-items:center;gap:8px;min-width:0;padding-right:40px}
+:root .studio-shell .qb.v2-team .task-id{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:10px;color:var(--meta)}
+:root .studio-shell .qb.v2-team .task-agent{gap:6px;font-size:11px}
+:root .studio-shell .qb.v2-team .task-agent .agent-avatar{width:20px;height:20px;min-width:20px;border-radius:var(--radius-xs)}
+:root .studio-shell .qb.v2-team .task-scope{padding:0 5px;border-radius:var(--radius-xs);font-size:11px;background:transparent}
+:root .studio-shell .qb.v2-team .task-review-action{height:22px;justify-content:flex-start;padding:0;border-radius:0;background:transparent;color:var(--warn);font-size:11px;font-weight:400}
+:root .studio-shell .qb.v2-team .task-card-inspect{position:absolute;top:8px;right:32px;display:grid;place-items:center;width:22px;height:22px;border:0;border-radius:var(--radius-xs);padding:0;background:transparent;color:var(--meta);cursor:pointer}
+:root .studio-shell .qb.v2-team .task-card-inspect svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.5}
+:root .studio-shell .qb.v2-team .task-card-remove{opacity:1}
+:root .studio-shell .v2-team .task-inspector{flex:0 0 340px;gap:14px;min-width:0;overflow:auto}
+:root .studio-shell .v2-team .task-inspector>header{display:flex;align-items:center;justify-content:space-between;gap:12px;color:var(--meta)}
+:root .studio-shell .v2-team .task-inspector>header>span{overflow-wrap:anywhere}
+:root .studio-shell .v2-team .task-inspector h2{margin:0;font-size:17px;line-height:24px;font-weight:600}
+:root .studio-shell .v2-team .task-inspector-state{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+:root .studio-shell .v2-team .task-inspector dl{display:grid;grid-template-columns:84px minmax(0,1fr);gap:8px 12px;margin:0;font-size:12px}
+:root .studio-shell .v2-team .task-inspector dt{color:var(--meta)}
+:root .studio-shell .v2-team .task-inspector dd{margin:0;overflow-wrap:anywhere}
+:root .studio-shell .v2-team .task-inspector p{margin:0;font-size:13px;line-height:21px;color:var(--fg-2);white-space:pre-wrap;overflow-wrap:anywhere}
+:root .studio-shell .v2-team .task-inspector .task-inspector-meta{font-size:12px;color:var(--meta)}
+:root .studio-shell .v2-team .task-inspector>.primary-button{margin-top:auto;min-height:32px}
+
+/* Referências: preserve folders and full study tools, preview real evidence. */
+:root .studio-shell .er-page.v2-team{display:flex;flex-direction:column;gap:0;max-width:none;min-height:100%;padding:0}
+:root .studio-shell .v2-team .er-head{gap:16px;flex-wrap:wrap}
+:root .studio-shell .v2-team .er-head-title{flex:0 1 auto;min-width:0}
+:root .studio-shell .v2-team .er-head-title p{display:none}
+:root .studio-shell .v2-team .er-views{display:flex;gap:18px;align-self:stretch;border:0;background:none;padding:0;flex:1}
+:root .studio-shell .v2-team .er-views button{display:flex;align-items:center;gap:6px;height:30px;padding:0;border:0;border-bottom:2px solid transparent;border-radius:0;background:none;color:var(--muted);box-shadow:none;font-size:12px;font-weight:400;white-space:nowrap}
+:root .studio-shell .v2-team .er-views button.active{border-bottom-color:var(--fg);color:var(--fg);background:none}
+:root .studio-shell .v2-team .er-views small{font-family:var(--font-mono);font-size:11px;color:var(--meta);background:none;padding:0}
+:root .studio-shell .v2-team .er-body{gap:0;flex:1}
+:root .studio-shell .v2-team .er-library{grid-template-columns:170px minmax(250px,1fr) 340px;gap:0;min-height:100%;align-items:stretch}
+:root .studio-shell .v2-team .er-library-side{padding:16px 8px;position:static;align-content:start;gap:12px;border-right:1px solid var(--border);min-width:0}
+:root .studio-shell .v2-team .er-folders{min-width:0;overflow:hidden}
+:root .studio-shell .v2-team .er-folders ul{display:grid;grid-template-columns:minmax(0,1fr);gap:1px;overflow:visible;padding:0}
+:root .studio-shell .v2-team .er-folders ul ul{display:grid}
+:root .studio-shell .v2-team :is(.er-folder,.er-folder-row){min-width:0;max-width:100%;white-space:normal}
+:root .studio-shell .v2-team .er-folder{border:0}
+:root .studio-shell .v2-team .er-library-main{padding:16px 20px;align-content:start;gap:12px;min-width:0}
+:root .studio-shell .v2-team .er-grid{grid-template-columns:repeat(auto-fill,minmax(min(100%,220px),1fr));gap:12px}
+:root .studio-shell .v2-team .er-card{border-radius:var(--radius-md);background:var(--surface);box-shadow:none}
+:root .studio-shell .v2-team .er-card:hover{box-shadow:none;border-color:var(--line-strong)}
+:root .studio-shell .v2-team .er-card.selected{border-color:var(--accent)}
+:root .studio-shell .v2-team .er-card-body{padding:10px 12px;gap:4px}
+:root .studio-shell .v2-team .er-card-body>b{font-size:13px;font-weight:500}
+:root .studio-shell .v2-team .er-thumb{background:var(--surface-2)}
+:root .studio-shell .v2-team .er-duration{font-family:var(--font-mono);font-size:11px;background:var(--frame);color:var(--fg);border-radius:var(--radius-xs)}
+:root .studio-shell .v2-team :is(.er-chips button,.er-pill,.er-badge){border-radius:var(--radius-xs)}
+:root .studio-shell .v2-team .er-chips button[aria-pressed=true]{background:var(--surface-2);border-color:var(--line-strong)}
+:root .studio-shell .v2-team .er-status{font-weight:400;font-size:12px}
+:root .studio-shell .v2-team .er-status .v2-status svg{stroke-width:initial;stroke:none}
+:root .studio-shell .v2-team .er-card-inspect{position:absolute;right:6px;top:6px;display:grid;place-items:center;width:26px;height:26px;border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--frame);color:var(--fg);cursor:pointer}
+:root .studio-shell .v2-team .er-card-inspect svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.5}
+:root .studio-shell .v2-team .er-card-inspect[aria-pressed=true]{border-color:var(--accent)}
+:root .studio-shell .v2-team .er-library-preview{min-width:0;gap:16px;overflow:visible}
+:root .studio-shell .v2-team .er-library-preview h2{margin:0 0 4px;font-size:15px;line-height:22px;font-weight:600;overflow-wrap:anywhere}
+:root .studio-shell .v2-team .er-library-preview h3{margin:0 0 8px;font-size:13px;font-weight:600}
+:root .studio-shell .v2-team .er-inspector-video{display:block;width:100%;aspect-ratio:16/9;object-fit:contain;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface-2)}
+:root .studio-shell .v2-team .er-inspector-placeholder{display:grid;place-items:center;aspect-ratio:16/9;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface-2)}
+:root .studio-shell .v2-team .er-inspector-observations{display:grid;gap:6px}
+:root .studio-shell .v2-team .er-inspector-observation{display:flex;align-items:flex-start;gap:10px;padding:8px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:12px;line-height:18px}
+:root .studio-shell .v2-team .er-inspector-observation>span:first-child{flex:0 0 auto;max-width:100px;font-size:10px;color:var(--link)}
+:root .studio-shell .v2-team .er-inspector-observation>span:nth-child(2){flex:1;min-width:0;overflow-wrap:anywhere}
+:root .studio-shell .v2-team .er-library-preview>.primary-button{margin-top:auto;min-height:32px}
+:root .studio-shell .v2-team .er-pending{background:var(--warn-soft);border-color:var(--line);border-radius:var(--radius-md);padding:10px 12px;flex-wrap:wrap}
+:root .studio-shell .v2-team .er-pending>svg{stroke:var(--warn)}
+:root .studio-shell .v2-team .er-style{grid-template-columns:180px minmax(0,1fr);gap:0}
+:root .studio-shell .v2-team .er-guidelines{border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden;gap:0}
+:root .studio-shell .v2-team .er-guideline{padding:10px 14px;border:0;border-bottom:1px solid var(--border);border-radius:0;background:var(--bg)}
+:root .studio-shell .v2-team .er-guideline:last-child{border-bottom:0}
+:root .studio-shell .v2-team .er-kit{padding:20px;gap:20px}
+:root .studio-shell .v2-team :is(.er-study-grid,.er-kit-list){gap:12px}
+:root .studio-shell .v2-team .er-study{padding:16px 20px}
+:root .studio-shell .v2-team .er-study-head{padding-bottom:12px}
+:root .studio-shell .v2-team .er-study-title h1{font-size:15px;font-weight:600}
+:root .studio-shell .v2-team .er-study-body{gap:0}
+:root .studio-shell .v2-team .er-study-stage{padding-right:20px}
+:root .studio-shell .v2-team .er-study-side{border-left:1px solid var(--border);border-radius:0;gap:0;padding:0 0 0 16px;background:var(--bg)}
+:root .studio-shell .v2-team .er-side-body{padding:12px 0}
+:root .studio-shell .v2-team :is(.er-time,.er-range,.er-facts dd,.er-count,.er-folder small){font-family:var(--font-mono);font-variant-numeric:tabular-nums;font-size:11px}
+:root .studio-shell .v2-team .er-add-panel{border-left:1px solid var(--border);border-radius:0;background:var(--bg)}
+
+/* Reflow based on the page width, including when chat takes half the app. */
+@container (max-width:1000px){
+ :root .studio-shell .v2-team .er-library{grid-template-columns:150px minmax(220px,1fr)}
+ :root .studio-shell .v2-team .er-library-preview{grid-column:2;border-top:1px solid var(--border);border-left:0}
+ :root .studio-shell .usage-page.v2-team{grid-template-columns:minmax(0,1fr)}
+ :root .studio-shell .v2-team .usage-section[aria-labelledby]{grid-column:1;grid-row:auto;margin:0 20px}
+}
+@media(max-width:1100px){
+ :root .studio-shell .v2-team .scope-layout{grid-template-columns:minmax(0,1fr) 340px}
+ :root .studio-shell .v2-team .scope-card-foot{max-width:160px;flex-wrap:wrap}
+ :root .studio-shell .v2-team .scope-card-foot .scope-faces{display:none}
+ :root .studio-shell .v2-team .task-inspector{flex-basis:300px}
+}
+@media(max-width:760px){
+ :root .studio-shell .team-workspace.v2-team.has-details{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(180px,1fr) auto;overflow:auto}
+ :root .studio-shell .v2-team .studio-detail-panel{grid-column:1;grid-row:3;width:auto;min-height:300px;max-height:65vh;border-left:0;border-top:1px solid var(--border)}
+ :root .studio-shell .hs.v2-team{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(200px,1fr) minmax(240px,1fr);overflow:auto;height:auto;min-height:100%}
+ :root .studio-shell .hs.v2-team .hs-title>div{display:block}
+ :root .studio-shell .hs.v2-team .hs-preview{border-top:1px solid var(--border);border-left:0}
+ :root .studio-shell .v2-team .scope-layout{display:flex;flex-direction:column}
+ :root .studio-shell .v2-team .scope-detail{border-left:0;border-top:1px solid var(--border)}
+ :root .studio-shell .v2-team .scope-card{grid-template-columns:minmax(0,1fr);gap:4px}
+ :root .studio-shell .v2-team .scope-card-foot{grid-column:1;grid-row:3;max-width:none;justify-content:flex-start;padding-left:22px}
+ :root .studio-shell .v2-team .scope-card-head{flex-wrap:wrap}
+ :root .studio-shell .v2-team .scope-card-head>div{min-width:120px}
+ :root .studio-shell .settings-page.v2-team .settings-grid{display:block}
+ :root .studio-shell .settings-page.v2-team .settings-nav{flex-direction:row;overflow-x:auto;padding:8px;border-right:0;border-bottom:1px solid var(--border)}
+ :root .studio-shell .settings-page.v2-team .settings-nav button{width:auto;flex:0 0 auto;white-space:nowrap}
+ :root .studio-shell .settings-page.v2-team .settings-panel{padding:20px 16px}
+ :root .studio-shell .settings-page.v2-team .setting-row{flex-wrap:wrap}
+ :root .studio-shell .v2-team .v2-board-body{display:flex;flex-direction:column;overflow:auto}
+ :root .studio-shell .v2-team .task-inspector{flex-basis:auto;min-height:260px;border-left:0;border-top:1px solid var(--border)}
+ :root .studio-shell .qb.v2-team .board{min-height:260px;flex:none}
+ :root .studio-shell .v2-team .er-head{gap:8px 12px}
+ :root .studio-shell .v2-team .er-head-title{flex:1 1 100%}
+ :root .studio-shell .v2-team .er-library{grid-template-columns:minmax(0,1fr)}
+ :root .studio-shell .v2-team .er-library-side{padding:12px;border-right:0;border-bottom:1px solid var(--border)}
+ :root .studio-shell .v2-team .er-library-preview{grid-column:1;border-top:1px solid var(--border);border-left:0}
+ :root .studio-shell .v2-team .er-library-main{padding:16px}
+ :root .studio-shell .v2-team .er-style{grid-template-columns:minmax(0,1fr)}
+ :root .studio-shell .v2-team .er-study{padding:12px}
+ :root .studio-shell .v2-team .er-study-stage{padding-right:0}
+ :root .studio-shell .v2-team .er-study-side{padding:16px 0 0;border-left:0;border-top:1px solid var(--border)}
+ :root .studio-shell .v2-team .er-body.with-panel{grid-template-columns:minmax(0,1fr)}
+ :root .studio-shell .v2-team .usage-hero{grid-template-columns:minmax(0,1fr);margin:0 16px}
+ :root .studio-shell .v2-team .usage-section[aria-labelledby]{margin:0 16px}
+ :root .studio-shell .v2-team .usage-toolbar .usage-refresh{margin-left:0}
+}
+@media(prefers-reduced-motion:reduce){:root .studio-shell .v2-team .task-card{transition:none}}

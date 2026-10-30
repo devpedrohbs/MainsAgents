@@ -205,7 +205,7 @@ export function ReferenceStudy({ api, referenceId, pt, locale, onBack, onCreateS
           </ul>}
         </div>}
       </section>
-      <aside className="er-study-side">
+      <aside className="er-study-side v2-inspector">
         <div className="er-tabs" role="tablist" aria-label={pt ? 'Painel da referência' : 'Reference panel'}>
           <button type="button" role="tab" aria-selected={tab === 'notes'} onClick={() => setTab('notes')}>{pt ? 'Notas' : 'Notes'}</button>
           <button type="button" role="tab" aria-selected={tab === 'analysis'} onClick={() => setTab('analysis')}>{pt ? 'Análise' : 'Analysis'}{pendingCount > 0 && <span className="er-badge">{pendingCount}</span>}</button>

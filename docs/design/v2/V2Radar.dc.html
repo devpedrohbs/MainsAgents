@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>MainsAgents V2 — Radar</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0b0b0d}
+a{color:#8aa8ff}a:hover{color:#b3c6ff}
+button{font:inherit;cursor:pointer}
+.v2row:hover{background:#16161a}
+@media (max-width: 900px){.v2-side{display:none !important}}
+</style>
+</helmet>
+<div style="width: 100%; height: 900px; box-sizing: border-box; display: flex; background: #0b0b0d; color: #ececef; font-family: Inter, -apple-system, system-ui, sans-serif; font-size: 13px; line-height: 20px; font-feature-settings: 'cv11' 1, 'ss01' 1; overflow: hidden">
+  <div class="v2-side" style="flex: 0 0 220px">
+    <dc-import name="V2Sidebar" active="radar" hint-size="220px,900px"></dc-import>
+  </div>
+
+  <div style="flex: 1 1 auto; min-width: 0; display: flex; padding: 8px 8px 8px 0">
+    <div style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; background: #111113; border: 1px solid #1f1f24; border-radius: 10px; overflow: hidden">
+
+      <header style="flex: 0 0 auto; min-height: 44px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 6px 12px 6px 20px; border-bottom: 1px solid #1f1f24; box-sizing: border-box">
+        <h1 style="margin: 0; font-size: 13px; font-weight: 600">Radar</h1>
+        <span style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: #85858f"><dc-import name="V2Status" state="feito" sz="{{ 12 }}" hint-size="12px,12px"></dc-import>Coleta das 06:00 · próxima às 18:00</span>
+        <div style="flex-grow: 1"></div>
+        <button type="button" style="height: 30px; padding: 0 12px; border: 0; border-radius: 6px; background: transparent; color: #a4a4ad">Fontes <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #85858f">14</span></button>
+        <button type="button" style="display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px; border: 1px solid #2a2a31; border-radius: 6px; background: #16161a; color: #ececef">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v4h-4"></path></svg>Coletar agora
+        </button>
+      </header>
+
+      <div style="flex: 0 0 auto; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 16px; border-bottom: 1px solid #1f1f24">
+        <div role="group" aria-label="Origem" style="display: flex; padding: 2px; border: 1px solid #2a2a31; border-radius: 7px; background: #0b0b0d">
+          <sc-for list="{{srcTabs}}" as="t" hint-placeholder-count="3">
+            <button type="button" aria-pressed="{{t.on}}" onClick="{{t.pick}}" style="height: 24px; padding: 0 10px; border: 0; border-radius: 5px; background: {{t.bg}}; color: {{t.fg}}; font-size: 12px">{{t.label}} <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #85858f">{{t.n}}</span></button>
+          </sc-for>
+        </div>
+        <span style="display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 8px; border: 1px solid #2a2a31; border-radius: 6px; font-size: 12px; color: #a4a4ad">Nota ≥ <b style="color: #ececef; font-weight: 500">60</b></span>
+        <span style="display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 8px; border: 1px solid #2a2a31; border-radius: 6px; font-size: 12px; color: #a4a4ad">Temas: <b style="color: #ececef; font-weight: 500">Excel, Power BI, IA</b></span>
+        <span style="margin-left: auto; font-size: 12px; color: #85858f">Ordenado por nota · sinais somem em 14 dias sem uso</span>
+      </div>
+
+      <div style="flex: 1 1 auto; min-height: 0; display: flex; flex-wrap: wrap; overflow: auto">
+        <section aria-label="Sinais" style="flex: 999 1 560px; min-width: 0; overflow-x: auto">
+          <div style="min-width: 700px">
+            <div style="display: flex; align-items: center; gap: 12px; height: 32px; padding: 0 16px; font-size: 12px; color: #85858f; border-bottom: 1px solid #1f1f24">
+              <span style="flex: 0 0 76px">Nota</span><span style="flex: 1 1 auto">Sinal</span><span style="flex: 0 0 96px">7 dias</span><span style="flex: 0 0 90px">Tema</span><span style="flex: 0 0 48px; text-align: right">Idade</span>
+            </div>
+            <sc-for list="{{rows}}" as="r" hint-placeholder-count="8">
+              <button type="button" class="v2row" onClick="{{r.pick}}" aria-pressed="{{r.on}}" style="width: 100%; display: flex; align-items: center; gap: 12px; height: 54px; padding: 0 16px; border: 0; border-bottom: 1px solid #1f1f24; background: {{r.bg}}; color: #ececef; text-align: left">
+                <span style="flex: 0 0 76px; display: flex; align-items: center; gap: 8px">
+                  <b style="width: 22px; font-family: 'JetBrains Mono', monospace; font-size: 13px; font-weight: 500; color: {{r.sc}}">{{r.score}}</b>
+                  <span aria-hidden="true" style="flex: 1; height: 4px; border-radius: 2px; background: #1f1f24; display: flex; overflow: hidden"><i style="width: {{r.score}}%; background: {{r.sc}}"></i></span>
+                </span>
+                <span style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column">
+                  <span style="display: flex; align-items: center; gap: 8px; min-width: 0">
+                    <sc-if value="{{r.isNew}}" hint-placeholder-val="{{ false }}"><span style="flex: 0 0 auto; font-size: 10px; line-height: 16px; padding: 0 5px; border-radius: 4px; background: #16203a; color: #8aa8ff">novo</span></sc-if>
+                    <b style="font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{r.title}}</b>
+                  </span>
+                  <span style="font-size: 12px; line-height: 16px; color: #85858f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{r.src}} · {{r.metric}}</span>
+                </span>
+                <svg width="96" height="22" viewBox="0 0 100 22" preserveAspectRatio="none" aria-hidden="true" style="flex: 0 0 96px"><polyline points="{{r.pts}}" fill="none" stroke="{{r.tc}}" stroke-width="1.5" vector-effect="non-scaling-stroke" stroke-linejoin="round"></polyline></svg>
+                <span style="flex: 0 0 90px"><span style="display: inline-flex; align-items: center; gap: 6px; height: 20px; padding: 0 6px; border: 1px solid #2a2a31; border-radius: 4px; font-size: 11px; color: #a4a4ad"><i aria-hidden="true" style="width: 6px; height: 6px; border-radius: 50%; background: {{r.topicC}}"></i>{{r.topic}}</span></span>
+                <span style="flex: 0 0 48px; text-align: right; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #85858f">{{r.age}}</span>
+              </button>
+            </sc-for>
+          </div>
+        </section>
+
+        <aside aria-label="Detalhe do sinal" style="flex: 1 1 340px; max-width: 400px; min-width: 300px; border-left: 1px solid #1f1f24; display: flex; flex-direction: column; gap: 18px; padding: 16px; box-sizing: border-box; overflow: auto">
+          <div style="display: flex; flex-direction: column; gap: 6px">
+            <span style="font-size: 12px; color: #85858f">{{s.src}}</span>
+            <h2 style="margin: 0; font-size: 17px; line-height: 24px; font-weight: 600; letter-spacing: -0.01em">{{s.title}}</h2>
+          </div>
+
+          <section aria-labelledby="rd-score" style="display: flex; flex-direction: column; gap: 8px">
+            <div style="display: flex; align-items: baseline; gap: 8px"><h3 id="rd-score" style="margin: 0; font-size: 13px; font-weight: 600">Por que a nota {{s.score}}</h3></div>
+            <sc-for list="{{s.parts}}" as="p" hint-placeholder-count="4">
+              <div style="display: flex; align-items: center; gap: 10px; font-size: 12px">
+                <span style="flex: 0 0 130px; color: #a4a4ad">{{p.k}}</span>
+                <span aria-hidden="true" style="flex: 1; height: 4px; border-radius: 2px; background: #1f1f24; display: flex; overflow: hidden"><i style="width: {{p.v}}%; background: #5b8cff"></i></span>
+                <span style="flex: 0 0 24px; text-align: right; font-family: 'JetBrains Mono', monospace">{{p.v}}</span>
+              </div>
+            </sc-for>
+          </section>
+
+          <section aria-labelledby="rd-syn" style="display: flex; flex-direction: column; gap: 6px">
+            <h3 id="rd-syn" style="margin: 0; font-size: 13px; font-weight: 600">Síntese</h3>
+            <p style="margin: 0; font-size: 13px; line-height: 21px; color: #c9c9d1">{{s.syn}}</p>
+            <span style="font-size: 11px; color: #85858f">Gerado pelo Pesquisador a partir de {{s.nsrc}} fontes · Claude Haiku 5.5</span>
+          </section>
+
+          <section aria-labelledby="rd-ang" style="display: flex; flex-direction: column; gap: 6px">
+            <h3 id="rd-ang" style="margin: 0; font-size: 13px; font-weight: 600">Ângulos para você</h3>
+            <sc-for list="{{s.angles}}" as="a" hint-placeholder-count="3">
+              <label style="display: flex; align-items: flex-start; gap: 10px; padding: 8px 10px; border: 1px solid #1f1f24; border-radius: 6px; cursor: pointer">
+                <input type="radio" name="angulo" style="margin: 3px 0 0; accent-color: #ececef">
+                <span style="display: flex; flex-direction: column"><span>{{a.t}}</span><span style="font-size: 12px; color: #85858f">{{a.f}}</span></span>
+              </label>
+            </sc-for>
+          </section>
+
+          <section aria-labelledby="rd-src" style="display: flex; flex-direction: column; gap: 4px">
+            <h3 id="rd-src" style="margin: 0 0 4px; font-size: 13px; font-weight: 600">Fontes</h3>
+            <sc-for list="{{s.sources}}" as="f" hint-placeholder-count="3">
+              <a href="#" style="display: flex; align-items: center; gap: 10px; min-height: 30px; text-decoration: none; color: #ececef; font-size: 12px">
+                <span style="flex: 0 0 64px; color: #85858f">{{f.k}}</span>
+                <span style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{f.t}}</span>
+                <span style="font-family: 'JetBrains Mono', monospace; color: #85858f">{{f.m}}</span>
+              </a>
+            </sc-for>
+          </section>
+
+          <div style="margin-top: auto; display: flex; flex-direction: column; gap: 8px; padding-top: 14px; border-top: 1px solid #1f1f24">
+            <a href="V2Pipeline.dc.html" style="display: flex; align-items: center; justify-content: center; gap: 8px; height: 34px; border-radius: 6px; background: #ececef; color: #0b0b0d; font-weight: 500; text-decoration: none">Promover a pauta <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #55555e">P</span></a>
+            <span style="font-size: 12px; line-height: 16px; color: #85858f; text-align: center">Inicia o pipeline Produção semanal com este sinal e o ângulo escolhido.</span>
+            <div style="display: flex; gap: 8px">
+              <button type="button" style="flex: 1; height: 30px; border: 1px solid #2a2a31; border-radius: 6px; background: #16161a; color: #ececef">Guardar</button>
+              <button type="button" style="flex: 1; height: 30px; border: 0; border-radius: 6px; background: transparent; color: #a4a4ad">Descartar <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #85858f">D</span></button>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { sel: 'r1', src: 'all' }; }
+  renderVals() {
+    var self = this, st = this.state;
+    var T = { Excel: '#3ecf8e', 'Power BI': '#f0b03f', IA: '#a78bfa', Produtividade: '#5b8cff' };
+    var data = [
+      { id: 'r1', score: 91, isNew: true, type: 'yt', title: 'Copilot no Excel agora escreve fórmulas em português', src: 'YouTube · 6 canais', metric: '1,2 mi views em 3 dias', topic: 'Excel', age: '6h', s: [2, 3, 3, 5, 8, 12, 18],
+        parts: [['Seus temas', 96], ['Velocidade', 94], ['Lacuna de conteúdo', 82], ['Combina com Meu estilo', 88]],
+        syn: 'A atualização liberou o Copilot em português para o Excel de consumidor. Os vídeos mais vistos mostram o recurso, mas quase nenhum compara com fórmulas escritas à mão ou mostra os erros mais comuns.',
+        angles: [['Copilot × fórmula na mão: quando cada um ganha', 'Tutorial · 8 a 10 min'], ['5 pedidos ao Copilot que dão errado (e como corrigir)', 'Reels · 45 s'], ['Montei um painel só falando com o Excel', 'Carrossel · 6 telas']],
+        sources: [['YouTube', 'Copilot in Excel: Full Tutorial', '640k'], ['YouTube', 'O Excel agora fala português', '310k'], ['Notícia', 'Microsoft amplia Copilot no Microsoft 365', 'The Verge']] },
+      { id: 'r2', score: 84, isNew: true, type: 'news', title: 'Power BI muda licença gratuita para relatórios compartilhados', src: 'Notícias · 4 veículos', metric: 'citada 38× em 24h', topic: 'Power BI', age: '9h', s: [0, 0, 1, 2, 4, 9, 12],
+        parts: [['Seus temas', 90], ['Velocidade', 86], ['Lacuna de conteúdo', 78], ['Combina com Meu estilo', 70]],
+        syn: 'A mudança afeta quem publica relatórios para colegas sem licença Pro. Há muita dúvida nos comentários e pouca explicação prática do que fazer agora.',
+        angles: [['O que muda pra você no Power BI gratuito', 'Tutorial · 6 min'], ['3 saídas sem pagar licença', 'Carrossel · 5 telas'], ['Resumo em 30 segundos', 'Reels · 30 s']],
+        sources: [['Notícia', 'Power BI licensing update', 'Microsoft'], ['Notícia', 'Mudança na licença do Power BI', 'Canaltech'], ['YouTube', 'Power BI Free is changing', '88k']] },
+      { id: 'r3', score: 77, isNew: false, type: 'yt', title: 'Atalhos do VS Code que ninguém usa', src: 'YouTube · 3 canais', metric: '420k views na semana', topic: 'Produtividade', age: '2d', s: [6, 7, 8, 8, 9, 9, 10], parts: [['Seus temas', 70], ['Velocidade', 72], ['Lacuna de conteúdo', 80], ['Combina com Meu estilo', 86]],
+        syn: 'O tema segue crescendo devagar. Já está em produção no RUN-279.', angles: [['Já em produção', 'RUN-279']], sources: [['YouTube', '25 VS Code shortcuts', '210k']] },
+      { id: 'r4', score: 72, isNew: false, type: 'news', title: 'Agentes de IA para planilhas: o que já funciona', src: 'Notícias · 2 veículos', metric: 'citada 12× em 3 dias', topic: 'IA', age: '3d', s: [3, 4, 4, 5, 5, 6, 6], parts: [['Seus temas', 74], ['Velocidade', 60], ['Lacuna de conteúdo', 76], ['Combina com Meu estilo', 72]],
+        syn: 'Comparações entre ferramentas que automatizam planilhas. Bom para um vídeo opinativo.', angles: [['Testei 3 agentes de planilha', 'Tutorial · 10 min']], sources: [['Notícia', 'AI agents for spreadsheets', 'TechCrunch']] },
+      { id: 'r5', score: 66, isNew: false, type: 'yt', title: 'Tabela dinâmica com dados de várias abas', src: 'YouTube · 2 canais', metric: '95k views na semana', topic: 'Excel', age: '4d', s: [5, 5, 4, 5, 5, 5, 6], parts: [['Seus temas', 88], ['Velocidade', 40], ['Lacuna de conteúdo', 62], ['Combina com Meu estilo', 74]],
+        syn: 'Busca estável, sem pico. Bom para conteúdo evergreen.', angles: [['Passo a passo com Power Query', 'Tutorial · 8 min']], sources: [['YouTube', 'Pivot from multiple sheets', '60k']] },
+      { id: 'r6', score: 61, isNew: false, type: 'news', title: 'Python no Excel chega ao plano doméstico', src: 'Notícias · 1 veículo', metric: 'citada 5× em 2 dias', topic: 'Excel', age: '5d', s: [1, 2, 2, 2, 3, 3, 3], parts: [['Seus temas', 80], ['Velocidade', 44], ['Lacuna de conteúdo', 58], ['Combina com Meu estilo', 60]],
+        syn: 'Notícia pequena, mas com potencial de série.', angles: [['Primeiro script Python dentro do Excel', 'Tutorial · 7 min']], sources: [['Notícia', 'Python in Excel for Home', 'Microsoft']] }
+    ];
+    var shown = data.filter(function (r) { return st.src === 'all' || r.type === st.src; });
+    var pts = function (arr) {
+      var max = Math.max.apply(null, arr), min = Math.min.apply(null, arr), span = (max - min) || 1;
+      return arr.map(function (v, i) { return (i * 100 / (arr.length - 1)).toFixed(1) + ',' + (19 - (v - min) / span * 16).toFixed(1); }).join(' ');
+    };
+    var cur = data.filter(function (r) { return r.id === st.sel; })[0] || data[0];
+    var tabs = [['all', 'Todos', data.length], ['yt', 'YouTube', 3], ['news', 'Notícias', 3]].map(function (t) {
+      var on = st.src === t[0];
+      return { label: t[1], n: t[2], on: on ? 'true' : 'false', bg: on ? '#1c1c21' : 'transparent', fg: on ? '#ececef' : '#a4a4ad', pick: function () { self.setState({ src: t[0] }); } };
+    });
+    return {
+      srcTabs: tabs,
+      rows: shown.map(function (r) {
+        var on = r.id === st.sel;
+        var rising = r.s[r.s.length - 1] - r.s[0] > 4;
+        return { title: r.title, src: r.src, metric: r.metric, topic: r.topic, topicC: T[r.topic], age: r.age, score: r.score, isNew: r.isNew,
+          sc: r.score >= 80 ? '#ececef' : '#a4a4ad', pts: pts(r.s), tc: rising ? '#3ecf8e' : '#85858f',
+          on: on ? 'true' : 'false', bg: on ? '#1c1c21' : 'transparent', pick: function () { self.setState({ sel: r.id }); } };
+      }),
+      s: { title: cur.title, src: cur.src + ' · ' + cur.metric, score: cur.score, syn: cur.syn, nsrc: cur.sources.length,
+        parts: cur.parts.map(function (p) { return { k: p[0], v: p[1] }; }),
+        angles: cur.angles.map(function (a) { return { t: a[0], f: a[1] }; }),
+        sources: cur.sources.map(function (f) { return { k: f[0], t: f[1], m: f[2] }; }) }
+    };
+  }
+}
+</script>
+</body>
+</html>

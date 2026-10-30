@@ -16,6 +16,9 @@ export const routes: Record<PageId, RouteDefinition> = {
     sidebarPage: 'home',
     breadcrumbs: ['Content', 'Home'],
   },
+  inbox: { id: 'inbox', label: 'Inbox', title: 'Inbox', sidebarPage: 'inbox', breadcrumbs: ['Content', 'Inbox'] },
+  runs: { id: 'runs', label: 'Runs', title: 'Runs', sidebarPage: 'runs', breadcrumbs: ['Content', 'Runs'] },
+  pipelines: { id: 'pipelines', label: 'Pipelines', title: 'Pipelines', sidebarPage: 'pipelines', breadcrumbs: ['Content', 'Pipelines'] },
   content: {
     id: 'content',
     label: 'Content Studio',
@@ -45,7 +48,6 @@ export const routes: Record<PageId, RouteDefinition> = {
     sidebarPage: 'canvas',
     breadcrumbs: ['Content', 'Canvas'],
   },
-  flow: { id: 'flow', label: 'Flow', title: 'Flow', sidebarPage: 'flow', breadcrumbs: ['Content', 'Flow'] },
   agents: {
     id: 'agents',
     label: 'Agents',
@@ -80,7 +82,10 @@ export const routes: Record<PageId, RouteDefinition> = {
 
 export const isPageId = (value: string): value is PageId => value in routes;
 
+/** Old links to retired areas open their replacement (the Flow area was folded into Canvas and the production dialog). */
+const retiredPages: Record<string, PageId> = { flow: 'canvas' };
+
 export function pageFromLocation(): PageId {
   const value = window.location.hash.slice(1);
-  return isPageId(value) ? value : 'home';
+  return isPageId(value) ? value : retiredPages[value] ?? 'home';
 }

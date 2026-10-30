@@ -1,4 +1,5 @@
 import {InspirationLibrary} from '../components/content/InspirationLibrary';
+import { StudioContextPanel, StudioConversation, StudioStageRail, useTopicSessions } from '../components/content/StudioV2';
 import {ReferenceAnalysisPanel,useReferenceAnalyses} from '../components/content/ReferenceAnalysis';
 import {parseInspirationState} from '../features/content/inspiration';
 import {peekReferenceForStudio} from '../features/references/viewModel';
@@ -21,6 +22,7 @@ import type {
 } from '../features/content/model';
 import { SelectMenu } from '../components/common/SelectMenu';
 import { Icon } from '../components/common/Icon';
+import {FlowDialog} from '../components/common/FlowDialog';
 import {useCanvas} from '../components/canvas/CanvasProvider';
 import {ContentAssetLibrary} from '../components/content/ContentAssetLibrary';
 import {EditorialWorkPanel} from '../components/content/EditorialWorkPanel';
@@ -53,8 +55,8 @@ function studioNextAction({topic,hasContent,hasOptions,hasApproved,notionConfirm
   if(!hasContent&&topic.status!=='approved')return {...say(['Decidir a pauta','Leia o resumo e as fontes, então aprove ou descarte.'],['Decide on the topic','Read the summary and sources, then approve or reject.']),target:'topic'};
   if(!hasContent||!hasOptions)return {...say(['Gerar opções de roteiro','Peça as opções de roteiro no card de conteúdo.'],['Generate script options','Ask for script options in the content card.']),target:'content'};
   if(!hasApproved)return {...say(['Escolher o roteiro','Compare as opções e aprove uma para seguir.'],['Choose the script','Compare the options and approve one to continue.']),target:'content'};
-  if(!notionConfirmed)return {...say(['Levar para a produção','Roteiro aprovado. Envie ao Notion se usar, grave o vídeo e siga no Fluxo.'],['Move to production','Script approved. Send it to Notion if you use it, record and continue in Flow.']),target:'content'};
-  return say(['Roteiro pronto','Tudo registrado. Grave o vídeo e acompanhe a produção no Fluxo.'],['Script ready','Everything is recorded. Record the video and follow production in Flow.']);
+  if(!notionConfirmed)return {...say(['Levar para a produção','Roteiro aprovado. Envie ao Notion se usar, grave o vídeo e continue pela janela de produção.'],['Move to production','Script approved. Send it to Notion if you use it, record and continue in the production dialog.']),target:'content'};
+  return say(['Roteiro pronto','Tudo registrado. Grave o vídeo e acompanhe a produção.'],['Script ready','Everything is recorded. Record the video and follow production.']);
 }
 const contentStatus: Record<EditorialContent['status'], [string, string]> = {
   planning: ['Roteiro pendente', 'Script needed'],
@@ -83,6 +85,10 @@ export function ContentStudio({
   const [pendingReference,setPendingReference]=useState(peekReferenceForStudio);
   const [reviewArtifact,setReviewArtifact]=useState<EditorialArtifact|null>(null);
   const [contentToDelete,setContentToDelete]=useState<{contentId:string;title:string}|null>(null);
+  const [topicToDelete,setTopicToDelete]=useState<EditorialTopic|null>(null);
+  const [topicDeleteError,setTopicDeleteError]=useState('');
+  const [deletingTopic,setDeletingTopic]=useState(false);
+  const beginTopicDeletion=(item:EditorialTopic)=>{setTopicDeleteError('');setTopicToDelete(item);};
   useEffect(()=>{const open=()=>setView('calendar');window.addEventListener('mainsagents:publication-calendar',open);return()=>window.removeEventListener('mainsagents:publication-calendar',open)},[]);
   useEffect(()=>{if(selectedContentId||requestedTopicId)setView('studio')},[selectedContentId,requestedTopicId]);
   const { agents: allAgents } = useAgents();
@@ -92,6 +98,7 @@ export function ContentStudio({
     ready,
     storageError,
     createTopic,
+    deleteTopic,
     runResearch,
     reviseTopic,
     decideTopic,
@@ -134,6 +141,14 @@ export function ContentStudio({
   const visibleTopics=topics.filter(item=>topicFilter==='all'||item.status===topicFilter);
   const topic = topics.find((item) => item.id === (selectedTopicId ?? linkedContent?.topicId)) ?? topics[0];
   const content = topic?.contentId ? state.contents.find((item) => item.id === topic.contentId) : undefined;
+  const topicSessions=useTopicSessions(currentWorkspaceId,topic,content);
+  const [centerPref,setCenterPref]=usePersistentState<'auto'|'conversation'|'stages'>('studio-center','auto');
+  // Opening the Studio on a specific content (e.g. "Abrir no Estúdio" from a chat) shows its stages; the tabs clear this.
+  const [openedOnContent,setOpenedOnContent]=useState(Boolean(selectedContentId||requestedTopicId));
+  useEffect(()=>{if(selectedContentId||requestedTopicId)setOpenedOnContent(true)},[selectedContentId,requestedTopicId]);
+  const chooseCenter=(next:'conversation'|'stages')=>{setOpenedOnContent(false);setCenterPref(next)};
+  const centerView=openedOnContent?'stages':centerPref==='auto'?(topicSessions.length?'conversation':'stages'):centerPref;
+  const pendingGate=topic?.status==='review'?{title:pt?'A pauta espera sua decisão':'The topic awaits your decision',detail:pt?'Revise a pesquisa e aprove, ajuste ou descarte a pauta.':'Review the research and approve, revise or discard the topic.'}:content?.status==='script-review'?{title:pt?'O roteiro espera sua aprovação':'The script awaits your approval',detail:pt?'Escolha uma opção de roteiro, edite se quiser e aprove.':'Pick a script option, edit it if needed and approve.'}:undefined;
   const optionsArtifact = content?.scriptOptionsArtifactId
     ? state.artifacts.find((item) => item.id === content.scriptOptionsArtifactId)
     : undefined;
@@ -292,7 +307,7 @@ useEffect(() => {
   };
 
   return (
-    <div className="page content-studio-page">
+    <div className="page content-studio-page v2-studio">
       <header className="page-head">
         <div>
           <p className="eyebrow">{currentWorkspace.name}</p>
@@ -327,7 +342,8 @@ useEffect(() => {
         requestAnimationFrame(()=>{document.querySelector<HTMLTextAreaElement>('.editorial-intake textarea')?.focus();document.querySelector('.editorial-intake')?.scrollIntoView({block:'nearest'});});
       }}/>:view==='calendar'?<PublicationCalendar key={currentWorkspaceId} workspaceId={currentWorkspaceId}/>:<>
 
-<div className="editorial-grid">
+<StudioStageRail workspaceId={currentWorkspaceId} topic={topic} content={content}/>
+<div className="editorial-grid v2-studio-grid">
         <aside className="editorial-rail">
       <form className="editorial-card editorial-intake" aria-label={pt?"Nova pauta":"New topic"} onSubmit={submit}>
             <h2>{pt ? 'Nova pauta' : 'New topic'}</h2>
@@ -444,9 +460,9 @@ useEffect(() => {
             </div><div className="studio-topic-filters" role="group" aria-label={pt?'Filtrar pautas':'Filter topics'}>{(['all','review','researching','approved'] as const).map(filter=><button type="button" key={filter} aria-pressed={topicFilter===filter} onClick={()=>setTopicFilter(filter)}>{({all:pt?'Todas':'All',review:pt?'Para decidir':'Review',researching:pt?'Pesquisando':'Researching',approved:pt?'Aprovadas':'Approved'})[filter]}<span>{filter==='all'?topics.length:topics.filter(item=>item.status===filter).length}</span></button>)}</div>
             {visibleTopics.length ? (
               visibleTopics.map((item) => (
-                <button
+                <div className="studio-topic-row" key={item.id}>
+                <button type="button"
                   className={`editorial-list-item ${topic?.id === item.id ? 'active' : ''}`}
-                  key={item.id}
                   onClick={() => setSelectedTopicId(item.id)}
                 >
                   <span className="editorial-list-title">{item.title}</span>
@@ -455,6 +471,8 @@ useEffect(() => {
                     {pt ? topicStatus[item.status][0] : topicStatus[item.status][1]} · {item.category}
                   </span>
                 </button>
+                <button type="button" className="icon-button studio-topic-delete" disabled={busy||deletingTopic} onClick={()=>beginTopicDeletion(item)} title={pt?'Excluir pauta':'Delete topic'} aria-label={pt?`Excluir pauta: ${item.title}`:`Delete topic: ${item.title}`}><Icon name="trash"/></button>
+                </div>
               ))
             ) : (
               <p className="editorial-empty">
@@ -466,6 +484,8 @@ useEffect(() => {
           </div>
         </aside>
         <main className="editorial-detail">
+          {topic&&<div className="editorial-segment v2-studio-center-tabs" role="group" aria-label={pt?'Visão do conteúdo':'Content view'}><button type="button" aria-pressed={centerView==='conversation'} onClick={()=>chooseCenter('conversation')}>{pt?'Conversa':'Conversation'}</button><button type="button" aria-pressed={centerView==='stages'} onClick={()=>chooseCenter('stages')}>{pt?'Etapas':'Stages'}</button></div>}
+          {topic&&centerView==='conversation'?<StudioConversation workspaceId={currentWorkspaceId} topic={topic} content={content} pendingGate={pendingGate} onReview={()=>{chooseCenter('stages');requestAnimationFrame(()=>document.getElementById(content?'studio-content-card':'studio-topic-card')?.scrollIntoView({block:'start',behavior:'smooth'}));}} onOpenSession={onOpenSession} onShowStages={()=>chooseCenter('stages')}/>:<>
           {!topic ? (
             <div className="editorial-card editorial-empty-large">
               <Icon name="script" />
@@ -983,10 +1003,28 @@ useEffect(() => {
               )}
             </>
           )}
+        </>}
         </main>
+        <StudioContextPanel workspaceId={currentWorkspaceId} state={state} topic={topic} content={content} onOpenSession={onOpenSession}/>
       </div>
       </>}
       {reviewArtifact&&<ScriptDeliveryReview artifact={reviewArtifact} initialDecision="revision-requested" onClose={()=>setReviewArtifact(null)}/>}
+      {topicToDelete&&<FlowDialog title={pt?`Excluir pauta “${topicToDelete.title}”?`:`Delete topic “${topicToDelete.title}”?`} description={pt?'Remove esta pauta e seus registros de pesquisa do Estúdio. Esta ação não pode ser desfeita.':'Removes this topic and its research records from Studio. This cannot be undone.'} onClose={()=>{if(!deletingTopic)setTopicToDelete(null);}}>
+        <div className="content-deletion">
+          {state.contents.some(item=>item.topicId===topicToDelete.id||item.id===topicToDelete.contentId)?<>
+            <p>{pt?'Esta pauta possui um conteúdo vinculado. Exclua o conteúdo primeiro; depois você poderá excluir a pauta.':'This topic has linked content. Delete the content first; then you can delete the topic.'}</p>
+            <button type="button" className="soft-button" onClick={()=>{const linked=state.contents.find(item=>item.topicId===topicToDelete.id||item.id===topicToDelete.contentId);if(linked){setTopicToDelete(null);setContentToDelete({contentId:linked.id,title:linked.title});}}}>{pt?'Revisar exclusão do conteúdo':'Review content deletion'}</button>
+          </>:<p>{pt?'Conversas existentes e arquivos no disco permanecem. Excluir um chat não exclui sua pauta automaticamente.':'Existing conversations and files on disk stay. Deleting a chat does not automatically delete its topic.'}</p>}
+          {topicDeleteError&&<p role="alert">{topicDeleteError}</p>}
+          <footer><button type="button" className="soft-button" data-autofocus disabled={deletingTopic} onClick={()=>setTopicToDelete(null)}>{pt?'Cancelar':'Cancel'}</button>
+          <button type="button" className="danger-button" disabled={deletingTopic||state.contents.some(item=>item.topicId===topicToDelete.id||item.id===topicToDelete.contentId)} onClick={async()=>{
+            setDeletingTopic(true);setTopicDeleteError('');
+            try{await deleteTopic(topicToDelete.id,currentWorkspaceId);setSelectedTopicId(null);setTopicToDelete(null);setFeedback(pt?'Pauta excluída.':'Topic deleted.');}
+            catch(error){setTopicDeleteError(error instanceof Error?error.message:String(error));}
+            finally{setDeletingTopic(false);}
+          }}>{deletingTopic?(pt?'Excluindo…':'Deleting…'):(pt?'Excluir pauta':'Delete topic')}</button></footer>
+        </div>
+      </FlowDialog>}
       {contentToDelete&&<ContentDeletionDialog contentId={contentToDelete.contentId} workspaceId={currentWorkspaceId} fallbackTitle={contentToDelete.title} pt={pt} onClose={()=>setContentToDelete(null)}
         onDeleted={({title,chats})=>{setContentToDelete(null);setFeedback(pt?`“${title}” e ${chats} ${chats===1?'conversa excluídos':'conversas excluídos'} deste computador. A ideia continua na pauta.`:`“${title}” and ${chats} ${chats===1?'chat':'chats'} deleted from this computer. The idea stays in the backlog.`);
           window.requestAnimationFrame(()=>document.querySelector<HTMLElement>('.editorial-alert[role="status"]')?.focus());}}/>}

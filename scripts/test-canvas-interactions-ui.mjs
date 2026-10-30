@@ -22,7 +22,7 @@ const server=createServer(async(request,response)=>{
   return json(response,{revision,state:editorial});
  }
  if(url.pathname.startsWith('/api/'))return json(response,url.pathname.endsWith('/work')?{jobs:[],mediaJobs:[],worker:{running:false}}:url.pathname.endsWith('/jobs')?{jobs:[]}:url.pathname.endsWith('/models')?{models:[]}:url.pathname.endsWith('/calendar')?{sources:[]}:url.pathname.endsWith('/delegations')?{jobs:[],sessions:[],handoffs:[]}:url.pathname.endsWith('/actions')?{actions:[]}:{ready:false,events:[],version:'test'});
- try{const file=resolve(root,'dist',url.pathname==='/'?'app.html':url.pathname.slice(1));assert(file.startsWith(resolve(root,'dist')+sep));response.setHeader('content-type',({'.html':'text/html','.css':'text/css','.js':'application/javascript','.png':'image/png','.svg':'image/svg+xml'})[extname(file)]??'application/octet-stream');response.end(readFileSync(file))}catch{response.statusCode=404;response.end()}
+ try{const dist=resolve(root,process.env.MAINSAGENTS_UI_DIST??'dist'),file=resolve(dist,url.pathname==='/'?'app.html':url.pathname.slice(1));assert(file.startsWith(dist+sep));response.setHeader('content-type',({'.html':'text/html','.css':'text/css','.js':'application/javascript','.png':'image/png','.svg':'image/svg+xml'})[extname(file)]??'application/octet-stream');response.end(readFileSync(file))}catch{response.statusCode=404;response.end()}
 });
 let win;const errors=[];
 const js=code=>win.webContents.executeJavaScript(code);
@@ -97,7 +97,7 @@ app.whenReady().then(async()=>{try{
  win.setSize(1440,1000);await js('document.documentElement.dataset.appearance="light"');await screenshot('07-canvas-light');
  // A reload must preserve resized widths and heights, not just content.
  await js('document.activeElement.blur()');key('s',['control']);await new Promise(r=>setTimeout(r,300));
- const saved=state['canvas-workspaces'][space];assert.equal(saved.nodes.length,9);assert(saved.nodes.find(node=>node.id===resizedId).width>280);
+ const savedWorkspace=state['canvas-workspaces'][space],saved=savedWorkspace.schemaVersion===2?savedWorkspace.boards.find(board=>board.id===savedWorkspace.activeBoardId):savedWorkspace;assert.equal(saved.nodes.length,9);assert(saved.nodes.find(node=>node.id===resizedId).width>280);
  const dimensions=saved.nodes.map(node=>[node.id,node.width,node.height]);
  await win.reload();await until(()=>js('document.querySelectorAll(".react-flow__node").length===9'));
  for(const [id,width,height] of dimensions){const actual=await bounds(`[data-id="${id}"]`);const zoom=await js('Number(document.querySelector(".studio-zoom-controls button:nth-child(3)").textContent.replace("%",""))/100');assert(Math.abs(actual.width/zoom-width)<10,id+' persisted width');assert(height>0)}
@@ -116,7 +116,7 @@ app.whenReady().then(async()=>{try{
  await until(()=>js('Boolean(document.querySelector(".canvas-size-fields input"))'));
  await js('(()=>{const input=document.querySelector(".canvas-size-fields input");input.value="420";input.dispatchEvent(new FocusEvent("focusout",{bubbles:true}))})()');
  await until(()=>js('document.querySelector(".react-flow__node-note").style.width==="420px"'));
- await until(()=>state['canvas-workspaces'][space].nodes.find(n=>n.type==='note').measured?.width===420);
+ await until(()=>{const workspace=state['canvas-workspaces'][space],graph=workspace.schemaVersion===2?workspace.boards.find(board=>board.id===workspace.activeBoardId):workspace;return graph.nodes.find(n=>n.type==='note').measured?.width===420;});
  key('Escape');await until(()=>js('!document.querySelector(".canvas-detail")'));
  await click('.react-flow__node-note .canvas-node-drag-handle');await until(()=>js('Boolean(document.querySelector(".react-flow__node-note .canvas-resize-handle"))'));
  const zoomBefore=await bounds('.react-flow__node-note'),zoomCorner=await bounds('.react-flow__node-note .canvas-resize-handle.bottom.right');
@@ -130,6 +130,7 @@ app.whenReady().then(async()=>{try{
  assert.equal(await js('document.querySelectorAll(".react-flow__edge").length'),1);
  await click('.studio-zoom-controls button:first-child');await screenshot('10-selection-actions');
  assert.deepEqual(errors,[]);console.log('CANVAS_INTERACTIONS_UI_OK: 9 block types, real corner resizing, resize undo, compact toolbar, header-only inspector, object popover, Space pan, 360/600/880/1440px, light/dark, persistence, exact dimensions, zoomed shrinking, connections, multi-selection tidy.');
- win.destroy();server.close();app.exit(0);
- }catch(error){console.error(error);console.error(errors);if(win&&!win.isDestroyed()){await screenshot('failure');win.destroy()}server.close();app.exit(1)}
+ // Force the isolated app to exit before tearing down webview guests (destroy can wait on a blocked navigation).
+ server.close();app.exit(0);
+ }catch(error){console.error(error);console.error(errors);if(win&&!win.isDestroyed())await screenshot('failure');server.close();app.exit(1)}
 });

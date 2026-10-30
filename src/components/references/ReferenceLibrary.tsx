@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
+import { StatusIcon } from '../common/StatusIcon';
 import { Icon } from '../common/Icon';
 import type { EditingReference, ReferenceFolder } from '../../features/references/model';
 import { referenceVideoUrl } from '../../features/references/api';
-import { currentVersion, folderSubtree, formatTime, jobFor, jobPhase, pendingObservations, referenceStatus, statusLabel, type ReferenceStatus } from '../../features/references/viewModel';
+import { currentVersion, folderSubtree, formatRange, formatTime, referenceAnalyses, observationDecision, jobFor, jobPhase, pendingObservations, referenceStatus, statusLabel, type ReferenceStatus } from '../../features/references/viewModel';
 import { errorText, type EditingReferencesApi } from '../../features/references/useEditingReferences';
 import { StatusChip } from './StatusChip';
 
@@ -58,6 +59,7 @@ function Thumb({ api, reference, pt }: { api: EditingReferencesApi; reference: E
 
 export function ReferenceLibrary({ api, pt, locale, onOpen, onAdd, onError, onUndoable }: { api: EditingReferencesApi; pt: boolean; locale: string; onOpen: (id: string) => void; onAdd: () => void; onError: (message: string) => void; onUndoable: (message: string, undo: () => Promise<void>) => void }) {
   const snapshot = api.snapshot!;
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [folder, setFolder] = useState<FolderFilter>(null);
   const [query, setQuery] = useState('');
   const [tag, setTag] = useState<string | null>(null);
@@ -75,6 +77,9 @@ export function ReferenceLibrary({ api, pt, locale, onOpen, onAdd, onError, onUn
     .filter((row) => !tag || row.reference.tags.includes(tag))
     .filter((row) => !needle || `${row.reference.title} ${row.reference.tags.join(' ')} ${row.reference.notes}`.toLocaleLowerCase(locale).includes(needle))
     .sort((a, b) => b.reference.createdAt.localeCompare(a.reference.createdAt));
+  const selected = visible.find(row=>row.reference.id===selectedId) ?? visible[0];
+  const selectedVersion = selected ? currentVersion(selected.reference) : null;
+  const observations = selected ? referenceAnalyses(snapshot, selected.reference.id).filter(analysis=>analysis.versionId===selected.reference.currentVersionId).flatMap(analysis=>analysis.observations) : [];
   const pending = live.filter((row) => row.pending > 0);
   const pendingTotal = pending.reduce((sum, row) => sum + row.pending, 0);
   const attempt = async (work: () => Promise<unknown>) => { try { await work(); } catch (error) { onError(errorText(error, pt)); } };
@@ -130,7 +135,7 @@ export function ReferenceLibrary({ api, pt, locale, onOpen, onAdd, onError, onUn
       </div>
       <span className="er-count" role="status">{visible.length} {pt ? (visible.length === 1 ? 'referência' : 'referências') : (visible.length === 1 ? 'reference' : 'references')}</span>
       {visible.length === 0 ? <p className="er-muted">{pt ? 'Nenhuma referência nesta pasta ou com estes filtros.' : 'No references in this folder or with these filters.'}</p> : <div className="er-grid">
-        {visible.map(({ reference, status: itemStatus }) => <article key={reference.id} className="er-card">
+        {visible.map(({ reference, status: itemStatus }) => <article key={reference.id} className={`er-card ${selected?.reference.id===reference.id?'selected':''}`}>
           <button type="button" className="er-card-open" onClick={() => onOpen(reference.id)} aria-label={`${pt ? 'Abrir' : 'Open'} ${reference.title} · ${statusLabel(itemStatus, pt)}`}>
             <Thumb api={api} reference={reference} pt={pt} />
             <span className="er-card-body">
@@ -139,6 +144,7 @@ export function ReferenceLibrary({ api, pt, locale, onOpen, onAdd, onError, onUn
               <span className="er-card-meta"><StatusChip status={itemStatus} label={statusLabel(itemStatus, pt)} /><time dateTime={reference.createdAt}>{new Date(reference.createdAt).toLocaleDateString(locale, { day: '2-digit', month: 'short' })}</time></span>
             </span>
           </button>
+          <button type="button" className="er-card-inspect" aria-label={pt?`Ver detalhes de ${reference.title}`:`View details for ${reference.title}`} aria-pressed={selected?.reference.id===reference.id} onClick={()=>setSelectedId(reference.id)}><Icon name="search"/></button>
           <label className="er-card-move"><span className="sr-only">{pt ? `Pasta de ${reference.title}` : `Folder of ${reference.title}`}</span>
             <Icon name="folder" />
             <select value={reference.folderId ?? ''} onChange={(event) => void moveTo(reference, event.target.value || null)} disabled={api.busy}>
@@ -149,5 +155,16 @@ export function ReferenceLibrary({ api, pt, locale, onOpen, onAdd, onError, onUn
         </article>)}
       </div>}
     </section>
+    {selected && <aside className="er-library-preview v2-inspector" aria-label={pt?'Referência selecionada':'Selected reference'}>
+      {selectedVersion ? <video className="er-inspector-video" src={referenceVideoUrl(api.scope,selected.reference.id,selectedVersion.id)} controls preload="metadata" aria-label={selected.reference.title}/> : <div className="er-inspector-placeholder"><StatusChip status={selected.status} label={statusLabel(selected.status,pt)}/></div>}
+      <div><h2>{selected.reference.title}</h2><span className="er-muted v2-mono">{new Date(selected.reference.createdAt).toLocaleDateString(locale)}{selectedVersion ? ` · ${formatTime(selectedVersion.duration)}` : ''}</span></div>
+      {selected.reference.notes && <p className="er-note">{selected.reference.notes}</p>}
+      <section className="er-inspector-observations"><h3>{pt?'Observações com evidência':'Evidence observations'}</h3>
+        {observations.length ? observations.map(observation=><div className="er-inspector-observation" key={observation.id}>
+          <span className="v2-mono">{formatRange(observation.start,observation.end)}</span><span>{observation.text}</span><StatusIcon size={12} state={observationDecision(observation,snapshot.guidelines)==='approved'?'done':observationDecision(observation,snapshot.guidelines)?'paused':'waiting'}/>
+        </div>) : <p className="er-note">{pt?'Ainda sem observações. Abra a referência para marcar um trecho e pedir a análise.':'No observations yet. Open the reference to mark a segment and request analysis.'}</p>}
+      </section>
+      <button type="button" className="primary-button" onClick={()=>onOpen(selected.reference.id)}>{pt?'Estudar trecho':'Study segment'}</button>
+    </aside>}
   </div>;
 }

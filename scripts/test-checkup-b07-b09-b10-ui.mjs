@@ -40,6 +40,8 @@ async function shot(name){writeFileSync(join(out,`${name}.png`),await captureRea
 const text=()=>js('document.body.innerText'),run=()=>bridge.production.list(profile)[0];
 const state=()=>{const d=new DatabaseSync(dbPath);try{return JSON.parse(d.prepare('SELECT state_json FROM editorial_state WHERE profile_id=?').get(profile).state_json)}finally{d.close()}};
 async function open(hash){win=new BrowserWindow({show:false,width:1440,height:1000,webPreferences:{preload:resolve(root,'tests/fixtures/assets-ui-preload.cjs'),contextIsolation:true,sandbox:true,offscreen:true,backgroundThrottling:false}});win.webContents.on('console-message',event=>{if(/Uncaught|Maximum update depth|Cannot update a component/.test(event.message))errors.push(event.message)});win.webContents.session.webRequest.onBeforeRequest((details,done)=>{if(!/^(http:\/\/127\.0\.0\.1|file:|devtools:|data:|blob:)/.test(details.url))external.push(details.url);done({cancel:false})});await win.loadURL(`http://127.0.0.1:${server.address().port}/app.html#${hash}`)}
+// The production dialog opens from Create → New production (the Flow area was retired).
+async function openNewProduction(){await click('.global-create');await until(()=>js('Array.from(document.querySelectorAll(".flow-option")).some(b=>b.textContent.includes("Nova produção"))'));await js('Array.from(document.querySelectorAll(".flow-option")).find(b=>b.textContent.includes("Nova produção")).click()');await until(()=>js('Boolean(document.querySelector(\'[aria-label="Produção atual"]\'))'))}
 app.whenReady().then(async()=>{try{
  await runMediaProcess('ffmpeg',['-nostdin','-v','error','-n','-f','lavfi','-i','testsrc2=size=192x108:rate=24','-f','lavfi','-i','sine=frequency=440:sample_rate=48000','-t','1.5','-c:v','libx264','-c:a','aac',input]);
  await runMediaProcess('ffmpeg',['-nostdin','-v','error','-n','-f','lavfi','-i','testsrc2=size=192x108:rate=24','-f','lavfi','-i','sine=frequency=440:sample_rate=48000','-t','6','-c:v','libx264','-c:a','aac',reference]);
@@ -55,8 +57,8 @@ app.whenReady().then(async()=>{try{
  bridge.publishing.prepare(profile,{...pick(),mode:'schedule',provider:'zernio',accountId:'li-fixture'});await bridge.publishing.execute(profile,{...pick(),authorize:true});
  assert.equal(state().publications[0].status,'scheduled');assert.equal(zernio.creates,1);zernio.armed=true;
  // ---------- B07: local mode through the real dialog ----------
- await open('flow');await until(()=>js('Boolean(document.querySelector(".production-flow-page"))'),'flow page');
- await button('Iniciar produção');await click('[aria-label="Ideia da produção"]');await button(topic.title);
+ await open('board');await until(()=>js('Boolean(document.querySelector(".global-create"))'),'app shell');
+ await openNewProduction();await click('[aria-label="Ideia da produção"]');await button(topic.title);
  await until(()=>js('document.querySelector(".production-preflight [role=status]")?.textContent.includes("Nenhum bloqueio")'),'preflight notion');
  await js('document.querySelectorAll("input[name=production-script-mode]")[1].click()');
  await until(()=>js('document.body.textContent.includes("sem Notion")'),'local copy');

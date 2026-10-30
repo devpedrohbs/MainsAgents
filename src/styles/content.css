@@ -23,6 +23,10 @@
 .editorial-list>.editorial-section-head { padding: 12px 14px 7px; }
 .editorial-list-item { display: grid; gap: 6px; width: 100%; padding: 11px 14px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--fg); text-align: left; }
 .editorial-list-item:hover,.editorial-list-item.active { background: color-mix(in oklab,var(--accent) 8%,var(--bg)); }
+.studio-topic-row { display: flex; align-items: center; gap: 4px; }
+.studio-topic-row .editorial-list-item { flex: 1; min-width: 0; }
+.studio-topic-delete { flex: none; margin-right: 4px; }
+.studio-topic-delete:hover { color: var(--danger, #dc5656); }
 .editorial-list-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-sm); font-weight: 600; }
 .editorial-meta,.editorial-provenance,.editorial-hint { color: var(--muted); font-size: var(--text-xs); line-height: 1.5; overflow-wrap: anywhere; }
 .editorial-provenance { padding: 12px 0; border-bottom: 1px solid var(--border); }

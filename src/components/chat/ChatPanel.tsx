@@ -6,10 +6,11 @@ import { useChat } from '../../features/chat/ChatProvider';
 import type { ChatRunState, ReasoningEffort } from '../../features/chat/model/Chat';
 import { Icon } from '../common/Icon';
 import { useCanvas, getNodeContextContent, getNodeContextLabel } from '../canvas/CanvasProvider';
+import {resolveCanvasReference} from '../canvas/canvasBoards';
 import { useWorkspaces } from '../../app/WorkspaceProvider';
 import { useLanguage } from '../../app/LanguageProvider';
 import { AgentAvatar } from '../agents/AgentAvatar';
-import type { ProviderId, ProviderConnectionState } from '../../features/chat/AiProvider';
+import type { ProviderId, ProviderConnectionState, ProviderStatus } from '../../features/chat/AiProvider';
 import { sessionProviderId } from '../../features/chat/AiProvider';
 import { SelectMenu } from '../common/SelectMenu';
 import { draftSlot, readChatDraft, writeChatDraft, useChatDraft } from '../../features/chat/chatDrafts';
@@ -125,6 +126,7 @@ export function ChatPanel({
   const [deleteError,setDeleteError]=useState<{sessionId:string;message:string}|null>(null),[deletingSessionId,setDeletingSessionId]=useState<string|null>(null);
   const [contentToDelete,setContentToDelete]=useState<{contentId:string;workspaceId:string;title:string}|null>(null);
   const [connection, setConnection] = useState<ProviderConnectionState | 'checking'>('checking');
+  const [providerDefaultModel,setProviderDefaultModel]=useState<ProviderStatus['defaultModel']>();
   const [models, setModels] = useState<readonly { id: string; name: string }[]>([]);
   const [modelsLoading, setModelsLoading] = useState(false);
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -219,16 +221,16 @@ export function ChatPanel({
   const selectedSkill = draft.skill;
   const pendingContext = getAgentContext(agent.id);
   const contextNodes = (draft.context ?? []).flatMap(ref => {
-    const node = allNodes.find(item => item.workspaceId === agent.workspaceId && ref.workspaceId === agent.workspaceId && item.node.id === ref.nodeId)?.node;
-    return node ? [{ nodeId: node.id, label: getNodeContextLabel(node), kind: node.type, content: getNodeContextContent(node) }] : [];
+    const entry=resolveCanvasReference(allNodes,agent.workspaceId,ref),node=entry?.node;
+    return node ? [{ nodeId: node.id,boardId:entry!.boardId, label: getNodeContextLabel(node), kind: node.type, content: getNodeContextContent(node) }] : [];
   });
-  const missingContext = (draft.context ?? []).filter(ref => !contextNodes.some(item => item.nodeId === ref.nodeId));
-  const pendingContextKey = pendingContext.map(item => item.nodeId).join('\n');
+  const missingContext = (draft.context ?? []).filter(ref => !resolveCanvasReference(allNodes,agent.workspaceId,ref));
+  const pendingContextKey = JSON.stringify(pendingContext.map(item => [item.boardId,item.nodeId]));
   useEffect(() => {
     if (!pendingContext.length) return;
     const latest = readChatDraft(agent.id, slot);
-    const refs = new Map((latest.context ?? []).map(ref => [ref.nodeId, ref]));
-    pendingContext.forEach(item => refs.set(item.nodeId, { nodeId: item.nodeId, label: item.label, workspaceId: agent.workspaceId }));
+    const refs = new Map((latest.context ?? []).map(ref => [JSON.stringify([ref.boardId,ref.nodeId]), ref]));
+    pendingContext.forEach(item => refs.set(JSON.stringify([item.boardId,item.nodeId]), { nodeId: item.nodeId,boardId:item.boardId, label: item.label, workspaceId: agent.workspaceId }));
     writeChatDraft(agent.id, slot, { ...latest, context: [...refs.values()] });
     clearAgentContext(agent.id);
   }, [agent.id, agent.workspaceId, activeSession?.id, scope, pendingContextKey, clearAgentContext]);
@@ -241,7 +243,7 @@ export function ChatPanel({
     if(connection!=='connected'||!activeSession?.id||!activeSession.codexThreadId)return;
     void refreshSessionImages(activeSession.id).catch(()=>{/* Existing local images and messages remain available offline. */});
   },[connection,activeSession?.id,activeSession?.codexThreadId,refreshSessionImages]);
-  const selectedModelId = activeSession?.modelId ?? '';
+  const selectedModelId = activeSession ? activeSession.modelId ?? '' : agent.modelId ?? '';
   // Provider of THIS chat vs who directs the edit of its production: two separate choices, each read from its own record.
   const editRun=linkedProduction??(binding.kind==='content'?binding.mainRun:undefined);
   const [workspaceDirector,setWorkspaceDirector]=useState<EditDirector>();
@@ -260,12 +262,13 @@ export function ChatPanel({
   useEffect(() => {
     let mounted = true;
     setConnection('checking');
+    setProviderDefaultModel(undefined);
     const check = async () => {
       try {
         const status = await getProviderStatus(providerId);
-        if (mounted) setConnection(status.state);
+        if (mounted) { setConnection(status.state); setProviderDefaultModel(status.defaultModel); }
       } catch {
-        if (mounted) setConnection('error');
+        if (mounted) { setConnection('error'); setProviderDefaultModel(undefined); }
       }
     };
     void check();
@@ -694,7 +697,7 @@ export function ChatPanel({
                     <span>{locale === 'pt-BR' ? 'Contexto usado' : 'Used context'}</span>
                     <div>
                       {item.contextNodes.filter(context=>!messageFiles([context]).length).map((context) => (
-                        <i key={context.nodeId}>{context.label}</i>
+                        <i key={JSON.stringify([context.boardId,context.nodeId])}>{context.label}</i>
                       ))}
                     </div>
                   </div>
@@ -1025,13 +1028,13 @@ export function ChatPanel({
                 <div>
                   {contextNodes.map((context) => (
                     <button
-                      key={context.nodeId}
+                      key={JSON.stringify([context.boardId,context.nodeId])}
                       aria-label={
                         locale === 'pt-BR'
                           ? `Remover ${context.label} do contexto`
                           : `Remove ${context.label} from context`
                       }
-                      onClick={() => writeChatDraft(agent.id, slot, { ...draft, context: draft.context?.filter(ref => ref.nodeId !== context.nodeId) })}
+                      onClick={() => writeChatDraft(agent.id, slot, { ...draft, context: draft.context?.filter(ref => ref.nodeId!==context.nodeId||resolveCanvasReference(allNodes,agent.workspaceId,ref)?.boardId!==context.boardId) })}
                     >
                       {context.label}
                       <b aria-hidden="true">×</b>
@@ -1066,7 +1069,7 @@ export function ChatPanel({
             {gate&&<div className="composer-provider-wait" role="status" data-od-id="composer-provider-wait">{providerGateNotice(gate,pt,locale)}</div>}
             {missingContext.length > 0 && <div className="composer-draft-warning" role="status">
               <span>{locale === 'pt-BR' ? 'Contexto indisponível: ' : 'Unavailable context: '}{missingContext.map(ref => ref.label).join(', ')}. {locale === 'pt-BR' ? 'Não será enviado.' : 'Will not be sent.'}</span>
-              <button type="button" className="text-link" onClick={() => writeChatDraft(agent.id, slot, { ...draft, context: draft.context?.filter(ref => contextNodes.some(item => item.nodeId === ref.nodeId)) })}>{locale === 'pt-BR' ? 'Remover referências' : 'Remove references'}</button>
+              <button type="button" className="text-link" onClick={() => writeChatDraft(agent.id, slot, { ...draft, context: draft.context?.filter(ref => resolveCanvasReference(allNodes,agent.workspaceId,ref)) })}>{locale === 'pt-BR' ? 'Remover referências' : 'Remove references'}</button>
             </div>}
             <textarea
               onPaste={event=>{if(event.clipboardData.files.length)void pasteFiles(event);}}
@@ -1109,7 +1112,7 @@ export function ChatPanel({
                   {native.files.selectAttachments&&<button type="button" role="menuitem" onClick={()=>void pickAttachments('folder')}><span aria-hidden="true">▥</span><span><b>{pt?'Pasta inteira':'Whole folder'}</b><small>{pt?'O agente lê os arquivos da pasta':'The agent reads the folder files'}</small></span></button>}
                 </div>
               </div>}
-              <ModelPicker providerId={providerId} models={models} modelsLoading={modelsLoading} modelId={selectedModelId} effort={selectedEffort} connection={connection}
+              <ModelPicker providerId={providerId} defaultModel={providerDefaultModel} models={models} modelsLoading={modelsLoading} modelId={selectedModelId} effort={selectedEffort} connection={connection}
                 locked={comparisonModelLocked} busy={busy} providerReadOnly={!!sessionId||comparisonMode} providerBusy={switchBusy}
                 onModel={changeModel} onEffort={changeEffort} onProvider={()=>setProviderChoiceOpen(true)}
                 onSkill={()=>{setSkillsPickerOpen(true);composerRef.current?.focus();}} onCanvas={onOpenCanvas}/>

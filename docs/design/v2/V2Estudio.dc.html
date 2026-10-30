@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>MainsAgents V2 — Estúdio</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0b0b0d}
+a{color:#8aa8ff}a:hover{color:#b3c6ff}
+button{font:inherit;cursor:pointer}
+textarea{font:inherit}
+@media (max-width: 900px){.v2-side{display:none !important}}
+</style>
+</helmet>
+<div style="width: 100%; height: 900px; box-sizing: border-box; display: flex; background: #0b0b0d; color: #ececef; font-family: Inter, -apple-system, system-ui, sans-serif; font-size: 13px; line-height: 20px; font-feature-settings: 'cv11' 1, 'ss01' 1; overflow: hidden">
+  <div class="v2-side" style="flex: 0 0 220px">
+    <dc-import name="V2Sidebar" active="studio" hint-size="220px,900px"></dc-import>
+  </div>
+
+  <div style="flex: 1 1 auto; min-width: 0; display: flex; padding: 8px 8px 8px 0">
+    <div style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; background: #111113; border: 1px solid #1f1f24; border-radius: 10px; overflow: hidden">
+
+      <header style="flex: 0 0 auto; min-height: 44px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 6px 12px 6px 20px; border-bottom: 1px solid #1f1f24; box-sizing: border-box">
+        <nav aria-label="Trilha" style="display: flex; align-items: center; gap: 8px; color: #85858f; min-width: 0">
+          <a href="#" style="color: #a4a4ad; text-decoration: none">Estúdio</a>
+          <span aria-hidden="true">/</span>
+          <b style="color: #ececef; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Tutorial de automação no Excel</b>
+        </nav>
+        <div style="flex-grow: 1"></div>
+        <a href="V2Execucao.dc.html" style="display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 10px; border: 1px solid #2a2a31; border-radius: 6px; background: #16161a; color: #ececef; text-decoration: none; font-size: 12px">
+          <span style="font-family: 'JetBrains Mono', monospace; color: #85858f">RUN-284</span>Ver execução
+        </a>
+      </header>
+
+      <!-- Stage rail -->
+      <nav aria-label="Etapas do conteúdo" style="flex: 0 0 auto; display: flex; align-items: center; gap: 4px; padding: 8px 16px; border-bottom: 1px solid #1f1f24; overflow-x: auto">
+        <sc-for list="{{stages}}" as="s" hint-placeholder-count="6">
+          <a href="#" aria-current="{{s.cur}}" style="display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 10px; border-radius: 6px; background: {{s.bg}}; color: {{s.fg}}; text-decoration: none; white-space: nowrap; font-size: 12px">
+            <dc-import name="V2Status" state="{{s.st}}" sz="{{ 12 }}" hint-size="12px,12px"></dc-import>{{s.label}}<span style="color: #85858f">{{s.meta}}</span>
+          </a>
+          <sc-if value="{{s.sep}}" hint-placeholder-val="{{ true }}"><span aria-hidden="true" style="width: 14px; height: 1px; background: #2a2a31; flex: 0 0 14px"></span></sc-if>
+        </sc-for>
+      </nav>
+
+      <div style="flex: 1 1 auto; min-height: 0; display: flex; flex-wrap: wrap; overflow: auto">
+
+        <!-- Conversation -->
+        <main style="flex: 999 1 520px; min-width: 0; display: flex; flex-direction: column; height: 100%">
+          <div role="tablist" aria-label="Agentes deste conteúdo" style="flex: 0 0 auto; display: flex; gap: 4px; padding: 10px 20px 0; overflow-x: auto">
+            <sc-for list="{{agents}}" as="a" hint-placeholder-count="4">
+              <button type="button" role="tab" aria-selected="{{a.on}}" style="display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 10px 0 6px; border: 1px solid {{a.bd}}; border-radius: 6px; background: {{a.bg}}; color: {{a.fg}}; font-size: 12px; white-space: nowrap">
+                <span aria-hidden="true" style="width: 16px; height: 16px; border-radius: 4px; background: {{a.c}}"></span>{{a.n}}
+                <sc-if value="{{a.busy}}" hint-placeholder-val="{{ false }}"><dc-import name="V2Status" state="{{a.st}}" sz="{{ 12 }}" hint-size="12px,12px"></dc-import></sc-if>
+              </button>
+            </sc-for>
+          </div>
+
+          <div style="flex: 1 1 auto; min-height: 0; overflow: auto">
+            <div style="max-width: 720px; margin: 0 auto; padding: 18px 24px 12px; display: flex; flex-direction: column; gap: 18px">
+
+              <div style="display: flex; align-items: center; gap: 10px; font-size: 12px; color: #85858f"><i aria-hidden="true" style="flex: 1; height: 1px; background: #1f1f24"></i>Hoje · 14:15<i aria-hidden="true" style="flex: 1; height: 1px; background: #1f1f24"></i></div>
+
+              <!-- User -->
+              <article style="display: flex; gap: 12px">
+                <span aria-hidden="true" style="flex: 0 0 24px; height: 24px; border-radius: 6px; background: #2a2a31; color: #ececef; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center">VC</span>
+                <div style="display: flex; flex-direction: column; gap: 4px; min-width: 0">
+                  <span style="font-size: 12px; color: #85858f"><b style="color: #ececef; font-weight: 500">Você</b> · 14:15</span>
+                  <p style="margin: 0; line-height: 21px">Corta as pausas longas do começo e deixa a legenda no estilo da última entrega.</p>
+                </div>
+              </article>
+
+              <!-- Agent: plan -->
+              <article style="display: flex; gap: 12px">
+                <span aria-hidden="true" style="flex: 0 0 24px; height: 24px; border-radius: 6px; background: #2dd4bf; color: #0b0b0d; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center">ED</span>
+                <div style="flex: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0">
+                  <span style="font-size: 12px; color: #85858f"><b style="color: #ececef; font-weight: 500">Editor de vídeo</b> · 14:16</span>
+                  <p style="margin: 0; line-height: 21px">Vou fazer em três passos. Pode ajustar a ordem ou tirar algum antes de eu começar.</p>
+                  <section aria-label="Plano" style="border: 1px solid #1f1f24; border-radius: 8px; background: #16161a">
+                    <div style="display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px; border-bottom: 1px solid #1f1f24">
+                      <b style="font-weight: 500">Plano</b>
+                      <span style="display: flex; align-items: center; gap: 6px; margin-left: auto; font-size: 12px; color: #85858f"><dc-import name="V2Status" state="feito" sz="{{ 12 }}" hint-size="12px,12px"></dc-import>aprovado por você · 14:17</span>
+                    </div>
+                    <ol style="margin: 0; padding: 4px; list-style: none">
+                      <li style="display: flex; align-items: center; gap: 10px; min-height: 32px; padding: 0 8px"><span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #85858f">1</span><span style="flex: 1">Cortar 9 pausas acima de 1,2 s e o falso início em 00:14</span><span style="font-size: 12px; color: #f0b03f">espera você</span></li>
+                      <li style="display: flex; align-items: center; gap: 10px; min-height: 32px; padding: 0 8px"><span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #85858f">2</span><span style="flex: 1">Aplicar o preset de legenda da entrega de 21/10</span><span style="font-size: 12px; color: #85858f">depois</span></li>
+                      <li style="display: flex; align-items: center; gap: 10px; min-height: 32px; padding: 0 8px"><span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #85858f">3</span><span style="flex: 1">Gerar prévia 9:16 para você revisar antes do render</span><span style="font-size: 12px; color: #85858f">depois</span></li>
+                    </ol>
+                  </section>
+
+                  <!-- Tool calls -->
+                  <div style="border: 1px solid #1f1f24; border-radius: 8px">
+                    <button type="button" aria-expanded="{{tools.exp}}" onClick="{{tools.toggle}}" style="width: 100%; display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 12px; border: 0; background: transparent; color: #a4a4ad; font-size: 12px; text-align: left">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" style="transform: rotate({{tools.rot}}deg)"><path d="M9 6l6 6-6 6"></path></svg>
+                      3 ações · <span style="font-family: 'JetBrains Mono', monospace">4m 12s</span>
+                      <span style="margin-left: auto; font-family: 'JetBrains Mono', monospace; color: #85858f">whisper · ffmpeg · llm</span>
+                    </button>
+                    <sc-if value="{{tools.open}}" hint-placeholder-val="{{ false }}">
+                      <div style="border-top: 1px solid #1f1f24; padding: 4px">
+                        <sc-for list="{{tools.rows}}" as="t" hint-placeholder-count="3">
+                          <div style="display: flex; align-items: center; gap: 10px; height: 30px; padding: 0 8px; font-size: 12px">
+                            <dc-import name="V2Status" state="feito" sz="{{ 12 }}" hint-size="12px,12px"></dc-import>
+                            <span style="font-family: 'JetBrains Mono', monospace">{{t.name}}</span>
+                            <span style="flex: 1; color: #85858f; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{t.res}}</span>
+                            <span style="font-family: 'JetBrains Mono', monospace; color: #85858f">{{t.dur}}</span>
+                          </div>
+                        </sc-for>
+                      </div>
+                    </sc-if>
+                  </div>
+                </div>
+              </article>
+
+              <!-- Agent: approval -->
+              <article style="display: flex; gap: 12px">
+                <span aria-hidden="true" style="flex: 0 0 24px; height: 24px; border-radius: 6px; background: #2dd4bf; color: #0b0b0d; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center">ED</span>
+                <div style="flex: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0">
+                  <span style="font-size: 12px; color: #85858f"><b style="color: #ececef; font-weight: 500">Editor de vídeo</b> · 14:24</span>
+                  <p style="margin: 0; line-height: 21px">Encontrei 10 trechos para cortar. O vídeo cai de 12:48 para 10:56. Marquei cada um na linha do tempo abaixo.</p>
+                  <section aria-label="Cortes propostos" style="border: 1px solid {{gate.bd}}; border-radius: 8px; background: {{gate.bg}}; padding: 12px; display: flex; flex-direction: column; gap: 10px">
+                    <div style="display: flex; align-items: center; gap: 8px">
+                      <dc-import name="V2Status" state="{{gate.st}}" hint-size="14px,14px"></dc-import>
+                      <b style="font-weight: 500">{{gate.title}}</b>
+                      <span style="margin-left: auto; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #a4a4ad">12:48 → 10:56</span>
+                    </div>
+                    <div role="img" aria-label="Linha do tempo com 10 cortes marcados" style="position: relative; height: 28px; border-radius: 4px; background: #1f1f24; overflow: hidden">
+                      <sc-for list="{{cuts}}" as="c" hint-placeholder-count="10"><i style="position: absolute; top: 0; bottom: 0; left: {{c.l}}%; width: {{c.w}}%; min-width: 3px; background: {{gate.cut}}"></i></sc-for>
+                      <i style="position: absolute; top: 0; bottom: 0; left: 31%; width: 2px; background: #ececef"></i>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #85858f"><span>00:00</span><span>04:00</span><span>08:00</span><span>12:48</span></div>
+                    <sc-if value="{{gate.pending}}" hint-placeholder-val="{{ true }}">
+                      <div style="display: flex; flex-wrap: wrap; gap: 8px">
+                        <button type="button" onClick="{{approve}}" style="display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px; border: 0; border-radius: 6px; background: #ececef; color: #0b0b0d; font-weight: 500">Aprovar cortes <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #55555e">A</span></button>
+                        <button type="button" style="height: 30px; padding: 0 12px; border: 1px solid #2a2a31; border-radius: 6px; background: #16161a; color: #ececef">Ver um por um</button>
+                        <button type="button" style="height: 30px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: #a4a4ad">Pedir ajuste</button>
+                      </div>
+                    </sc-if>
+                  </section>
+                </div>
+              </article>
+
+              <sc-if value="{{gate.done}}" hint-placeholder-val="{{ false }}">
+                <div style="display: flex; align-items: center; gap: 10px; padding-left: 36px; font-size: 12px; color: #a4a4ad">
+                  <dc-import name="V2Status" state="rodando" sz="{{ 12 }}" hint-size="12px,12px"></dc-import>
+                  <b style="color: #ececef; font-weight: 500">Editor de vídeo</b> está aplicando a legenda · passo 2 de 3
+                </div>
+              </sc-if>
+
+              <div style="display: flex; align-items: center; gap: 10px; padding-left: 36px; font-size: 12px; color: #a4a4ad">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg>
+                Pediu ao <b style="color: #ececef; font-weight: 500">Designer de capa</b>: 3 opções de capa · <a href="#" style="text-decoration: none">abrir conversa</a>
+              </div>
+            </div>
+          </div>
+
+          <!-- Composer -->
+          <form style="flex: 0 0 auto; width: calc(100% - 48px); max-width: 720px; margin: 0 auto 16px; box-sizing: border-box; border: 1px solid #2a2a31; border-radius: 10px; background: #16161a; display: flex; flex-direction: column">
+            <div style="display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 10px 0">
+              <span style="display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 4px 0 8px; border: 1px solid #2a2a31; border-radius: 4px; font-size: 12px; color: #a4a4ad">Alvo: <span style="font-family: 'JetBrains Mono', monospace; color: #ececef">corte 3 · 04:05</span>
+                <button type="button" aria-label="Remover alvo" style="width: 18px; height: 18px; border: 0; border-radius: 3px; background: transparent; color: #85858f; padding: 0; line-height: 18px">×</button>
+              </span>
+              <span style="display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border: 1px solid #2a2a31; border-radius: 4px; font-size: 12px; color: #a4a4ad">Roteiro v2</span>
+            </div>
+            <label style="display: block; padding: 6px 12px 0"><span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Mensagem para o Editor de vídeo</span>
+              <textarea rows="2" placeholder="Peça um ajuste ao Editor de vídeo…" style="width: 100%; box-sizing: border-box; border: 0; outline: 0; resize: none; background: transparent; color: #ececef; font-size: 13px; line-height: 20px; padding: 0"></textarea>
+            </label>
+            <div style="display: flex; align-items: center; gap: 6px; padding: 6px 8px 8px 8px">
+              <button type="button" aria-label="Anexar arquivo" style="width: 28px; height: 28px; border: 0; border-radius: 6px; background: transparent; color: #a4a4ad; display: flex; align-items: center; justify-content: center; padding: 0"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M20 11.5l-8.2 8.2a5 5 0 0 1-7-7L13 4.5a3.3 3.3 0 0 1 4.7 4.7l-8.3 8.3a1.7 1.7 0 0 1-2.3-2.4L14.5 7.7"></path></svg></button>
+              <button type="button" style="height: 28px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent; color: #a4a4ad; font-family: 'JetBrains Mono', monospace; font-size: 12px">/ skills</button>
+              <span style="font-size: 12px; color: #85858f">Enter envia · Shift+Enter quebra linha</span>
+              <div style="flex-grow: 1"></div>
+              <button type="button" style="display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent; color: #a4a4ad; font-size: 12px">Claude Sonnet 5.5 · Alto
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>
+              </button>
+              <button type="submit" aria-label="Enviar" style="width: 28px; height: 28px; border: 0; border-radius: 6px; background: #ececef; color: #0b0b0d; display: flex; align-items: center; justify-content: center; padding: 0"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"></path></svg></button>
+            </div>
+          </form>
+        </main>
+
+        <!-- Context panel -->
+        <aside aria-label="Entregas e contexto" style="flex: 1 1 320px; max-width: 360px; min-width: 300px; border-left: 1px solid #1f1f24; display: flex; flex-direction: column; gap: 18px; padding: 14px 16px; box-sizing: border-box; overflow: auto">
+          <section aria-labelledby="st-prev" style="display: flex; flex-direction: column; gap: 8px">
+            <div style="display: flex; align-items: center; gap: 8px">
+              <h2 id="st-prev" style="margin: 0; font-size: 13px; font-weight: 600">Prévia</h2>
+              <button type="button" style="margin-left: auto; display: flex; align-items: center; gap: 6px; height: 24px; padding: 0 8px; border: 1px solid #2a2a31; border-radius: 5px; background: #16161a; color: #ececef; font-size: 12px">v3 · atual
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg>
+              </button>
+            </div>
+            <div style="position: relative; aspect-ratio: 16 / 9; border-radius: 8px; background: #1c1c21; border: 1px solid #1f1f24; display: flex; align-items: center; justify-content: center; color: #85858f; font-size: 12px">[PRÉVIA DO VÍDEO]
+              <span style="position: absolute; left: 8px; bottom: 8px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #ececef; background: rgba(11,11,13,0.8); padding: 0 6px; border-radius: 4px">04:05 / 12:48</span>
+            </div>
+          </section>
+
+          <section aria-labelledby="st-ver" style="display: flex; flex-direction: column; gap: 6px">
+            <h2 id="st-ver" style="margin: 0; font-size: 13px; font-weight: 600">Versões</h2>
+            <sc-for list="{{versions}}" as="v" hint-placeholder-count="3">
+              <div style="display: flex; align-items: center; gap: 10px; min-height: 32px">
+                <dc-import name="V2Status" state="{{v.st}}" sz="{{ 12 }}" hint-size="12px,12px"></dc-import>
+                <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; width: 22px">{{v.v}}</span>
+                <span style="flex: 1; min-width: 0; font-size: 12px; color: #a4a4ad; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{v.what}}</span>
+                <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #85858f">{{v.t}}</span>
+              </div>
+            </sc-for>
+          </section>
+
+          <section aria-labelledby="st-cov" style="display: flex; flex-direction: column; gap: 8px">
+            <div style="display: flex; align-items: center"><h2 id="st-cov" style="margin: 0; font-size: 13px; font-weight: 600">Capas</h2><span style="margin-left: auto; font-size: 12px; color: #85858f">2 de 3 prontas</span></div>
+            <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px">
+              <span style="aspect-ratio: 16 / 9; border-radius: 6px; background: #1c1c21; border: 1px solid #2a2a31; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #85858f">[CAPA 1]</span>
+              <span style="aspect-ratio: 16 / 9; border-radius: 6px; background: #1c1c21; border: 1px solid #2a2a31; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #85858f">[CAPA 2]</span>
+              <span style="aspect-ratio: 16 / 9; border-radius: 6px; border: 1px dashed #33333b; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 11px; color: #85858f"><dc-import name="V2Status" state="rodando" sz="{{ 12 }}" hint-size="12px,12px"></dc-import>gerando</span>
+            </div>
+          </section>
+
+          <section aria-labelledby="st-ctx" style="display: flex; flex-direction: column; gap: 8px">
+            <h2 id="st-ctx" style="margin: 0; font-size: 13px; font-weight: 600">O que o agente está usando</h2>
+            <span style="font-size: 12px; line-height: 16px; color: #85858f">Tire um item para ele parar de considerar.</span>
+            <sc-for list="{{ctx}}" as="c" hint-placeholder-count="4">
+              <div style="display: flex; align-items: center; gap: 10px; min-height: 32px; padding: 0 4px 0 10px; border: 1px solid #1f1f24; border-radius: 6px">
+                <span style="font-size: 12px; color: #85858f; width: 70px">{{c.k}}</span>
+                <span style="flex: 1; min-width: 0; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{c.v}}</span>
+                <button type="button" aria-label="Remover {{c.v}}" style="width: 24px; height: 24px; border: 0; border-radius: 4px; background: transparent; color: #85858f; padding: 0">×</button>
+              </div>
+            </sc-for>
+          </section>
+        </aside>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { tools: false, approved: false }; }
+  renderVals() {
+    var self = this, ok = this.state.approved;
+    var stages = [
+      { label: 'Pauta', st: 'feito', meta: '' },
+      { label: 'Roteiro', st: 'feito', meta: 'v2' },
+      { label: 'Gravação', st: 'feito', meta: '12:48' },
+      { label: 'Edição', st: ok ? 'rodando' : 'aguardando', meta: ok ? '2 de 3' : 'espera você', cur: true },
+      { label: 'Capa', st: 'rodando', meta: '2 de 3' },
+      { label: 'Publicação', st: 'fila', meta: 'sex 18:00' }
+    ].map(function (s, i, arr) {
+      return Object.assign({}, s, { cur: s.cur ? 'step' : 'false', bg: s.cur ? '#1c1c21' : 'transparent', fg: s.st === 'fila' ? '#a4a4ad' : '#ececef', sep: i < arr.length - 1 });
+    });
+    var agents = [
+      { n: 'Roteirista', c: '#f5b544', st: 'feito', busy: false },
+      { n: 'Editor de vídeo', c: '#2dd4bf', st: ok ? 'rodando' : 'aguardando', busy: true, on: true },
+      { n: 'Designer de capa', c: '#f472b6', st: 'rodando', busy: true },
+      { n: 'Publicador', c: '#9aa8ff', st: 'fila', busy: false }
+    ].map(function (a) {
+      return Object.assign({}, a, { on: a.on ? 'true' : 'false', bg: a.on ? '#1c1c21' : 'transparent', bd: a.on ? '#33333b' : 'transparent', fg: a.on ? '#ececef' : '#a4a4ad' });
+    });
+    var len = 768;
+    var cuts = [[0, 14], [82, 85], [161, 163], [245, 247], [301, 303], [371, 373], [471, 473], [530, 532], [611, 613], [702, 705]].map(function (c) {
+      return { l: (c[0] / len * 100).toFixed(2), w: ((c[1] - c[0]) / len * 100).toFixed(2) };
+    });
+    return {
+      stages: stages, agents: agents, cuts: cuts,
+      tools: {
+        open: this.state.tools, exp: this.state.tools ? 'true' : 'false', rot: this.state.tools ? 90 : 0,
+        toggle: function () { self.setState({ tools: !self.state.tools }); },
+        rows: [
+          { name: 'whisper.transcribe', res: '1.942 palavras · pt-BR', dur: '2m 54s' },
+          { name: 'ffmpeg.silencedetect', res: '9 pausas acima de 1,2 s', dur: '54s' },
+          { name: 'llm.plan_cuts', res: '10 cortes · −1m 52s', dur: '24s' }
+        ]
+      },
+      gate: ok
+        ? { st: 'feito', title: '10 cortes aprovados', bd: '#1d3a2c', bg: '#0f1a15', cut: 'rgba(62,207,142,0.7)', pending: false, done: true }
+        : { st: 'aguardando', title: '10 cortes esperam sua aprovação', bd: '#3d3220', bg: '#17140e', cut: 'rgba(240,176,63,0.8)', pending: true, done: false },
+      approve: function () { self.setState({ approved: true }); },
+      versions: [
+        { v: 'v3', what: ok ? 'Cortes aplicados · legenda em andamento' : 'Proposta de cortes', st: ok ? 'rodando' : 'aguardando', t: '14:24' },
+        { v: 'v2', what: 'Bruto sincronizado com o roteiro', st: 'feito', t: '14:18' },
+        { v: 'v1', what: 'Gravação original', st: 'feito', t: '13:50' }
+      ],
+      ctx: [
+        { k: 'Roteiro', v: 'v2 · aprovado 14:20' },
+        { k: 'Estilo', v: 'Meu estilo · Capa clara' },
+        { k: 'Legenda', v: 'Preset da entrega 21/10' },
+        { k: 'Referência', v: 'Diagrama animado · trecho 0:12–0:40' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -17,22 +17,22 @@ export function resolveCanvasChat(node:Pick<CanvasFlowNode,'data'>,workspaceId:s
   return {agent,session};
 }
 
-export function pendingCanvasNodeIds(pending:CanvasPendingContexts,workspaceId:string,agent:Agent|undefined,nodes:readonly CanvasFlowNode[]):string[] {
+export function pendingCanvasNodeIds(pending:CanvasPendingContexts,scopeId:string,agent:Agent|undefined,nodes:readonly CanvasFlowNode[],workspaceId=scopeId):string[] {
   if(!agent||agent.workspaceId!==workspaceId)return [];
   const available=new Set(nodes.filter(node=>belongsToCanvas(node,workspaceId)).map(node=>node.id));
-  return (pending[workspaceId]?.[agent.id]??[]).filter(id=>available.has(id));
+  return (pending[scopeId]?.[agent.id]??[]).filter(id=>available.has(id));
 }
 
-export function attachCanvasContext(pending:CanvasPendingContexts,workspaceId:string,agent:Agent|undefined,nodeIds:readonly string[],nodes:readonly CanvasFlowNode[]):CanvasPendingContexts {
+export function attachCanvasContext(pending:CanvasPendingContexts,scopeId:string,agent:Agent|undefined,nodeIds:readonly string[],nodes:readonly CanvasFlowNode[],workspaceId=scopeId):CanvasPendingContexts {
   if(!agent||agent.workspaceId!==workspaceId)return pending;
   const available=new Set(nodes.filter(node=>belongsToCanvas(node,workspaceId)).map(node=>node.id));
-  const ids=[...new Set([...(pending[workspaceId]?.[agent.id]??[]),...nodeIds])].filter(id=>available.has(id));
+  const ids=[...new Set([...(pending[scopeId]?.[agent.id]??[]),...nodeIds])].filter(id=>available.has(id));
   if(!ids.length)return pending;
-  return {...pending,[workspaceId]:{...pending[workspaceId],[agent.id]:ids}};
+  return {...pending,[scopeId]:{...pending[scopeId],[agent.id]:ids}};
 }
 
-export function pruneCanvasContext(pending:CanvasPendingContexts,workspaceId:string,nodes:readonly CanvasFlowNode[]):CanvasPendingContexts {
-  const entries=pending[workspaceId];if(!entries)return pending;
+export function pruneCanvasContext(pending:CanvasPendingContexts,scopeId:string,nodes:readonly CanvasFlowNode[],workspaceId=scopeId):CanvasPendingContexts {
+  const entries=pending[scopeId];if(!entries)return pending;
   const available=new Set(nodes.filter(node=>belongsToCanvas(node,workspaceId)).map(node=>node.id));
   let changed=false;
   const cleaned=Object.fromEntries(Object.entries(entries).flatMap(([agentId,ids])=>{
@@ -40,7 +40,7 @@ export function pruneCanvasContext(pending:CanvasPendingContexts,workspaceId:str
     if(next.length!==ids.length)changed=true;
     return next.length?[[agentId,next]]:[];
   }));
-  return changed?{...pending,[workspaceId]:cleaned}:pending;
+  return changed?{...pending,[scopeId]:cleaned}:pending;
 }
 
 export function reconcileCanvasGraph(graph:CanvasGraph):CanvasGraph {

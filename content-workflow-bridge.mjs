@@ -275,6 +275,9 @@ export function createContentWorkflowBridge({ dbPath, getConnector, getPublicati
       if(url.pathname==='/api/content/approve'&&request.method==='POST'){send(response,200,jobs.approve(profileId,await readBody(request)));return true;}
       const action=url.pathname.match(/^\/api\/content\/jobs\/([^/]+)\/(retry|cancel)$/);
       if(action&&request.method==='POST'){jobs[action[2]](profileId,decodeURIComponent(action[1]));send(response,200,{});return true;}
+      if(url.pathname==='/api/content/topics/delete'&&request.method==='POST'){
+        try{send(response,200,deletion.removeTopic(profileId,await readBody(request)));}catch(error){send(response,error.status??500,{error:error.message,code:error.code});}return true;
+      }
       if(url.pathname!=='/api/content/state'){send(response,404,{error:'Editorial operation not found.'});return true;}
       if (request.method === 'GET') {
         const row = read.get(profileId);

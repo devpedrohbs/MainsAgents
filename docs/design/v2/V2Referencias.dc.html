@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>MainsAgents V2 — Referências</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0b0b0d}
+a{color:#8aa8ff}a:hover{color:#b3c6ff}
+button{font:inherit;cursor:pointer}
+.v2card:hover{border-color:#3a3a44}
+@media (max-width: 900px){.v2-side{display:none !important}}
+</style>
+</helmet>
+<div style="width: 100%; height: 900px; box-sizing: border-box; display: flex; background: #0b0b0d; color: #ececef; font-family: Inter, -apple-system, system-ui, sans-serif; font-size: 13px; line-height: 20px; font-feature-settings: 'cv11' 1, 'ss01' 1; overflow: hidden">
+  <div class="v2-side" style="flex: 0 0 220px">
+    <dc-import name="V2Sidebar" active="refs" hint-size="220px,900px"></dc-import>
+  </div>
+
+  <div style="flex: 1 1 auto; min-width: 0; display: flex; padding: 8px 8px 8px 0">
+    <div style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; background: #111113; border: 1px solid #1f1f24; border-radius: 10px; overflow: hidden">
+
+      <header style="flex: 0 0 auto; min-height: 44px; display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 0 12px 0 20px; border-bottom: 1px solid #1f1f24; box-sizing: border-box">
+        <h1 style="margin: 0; font-size: 13px; font-weight: 600">Referências</h1>
+        <div role="tablist" aria-label="Seções" style="display: flex; gap: 18px; align-self: stretch">
+          <sc-for list="{{tabs}}" as="t" hint-placeholder-count="3">
+            <button type="button" role="tab" aria-selected="{{t.on}}" onClick="{{t.pick}}" style="height: 44px; padding: 0; border: 0; border-bottom: 2px solid {{t.line}}; background: transparent; color: {{t.fg}}; font-size: 13px">{{t.label}} <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #85858f">{{t.n}}</span></button>
+          </sc-for>
+        </div>
+        <div style="flex-grow: 1"></div>
+        <button type="button" style="display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px; border: 0; border-radius: 6px; background: #ececef; color: #0b0b0d; font-weight: 500">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Adicionar vídeo
+        </button>
+      </header>
+
+      <div style="flex: 1 1 auto; min-height: 0; display: flex; flex-wrap: wrap; overflow: auto">
+
+        <sc-if value="{{is.lib}}" hint-placeholder-val="{{ true }}">
+          <section aria-label="Biblioteca" style="flex: 999 1 560px; min-width: 0; padding: 16px 20px; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px">
+            <div style="display: flex; flex-wrap: wrap; gap: 6px">
+              <sc-for list="{{chips}}" as="c" hint-placeholder-count="5"><span style="display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border: 1px solid {{c.bd}}; border-radius: 6px; font-size: 12px; color: {{c.fg}}; background: {{c.bg}}">{{c.label}}</span></sc-for>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px">
+              <sc-for list="{{refs}}" as="r" hint-placeholder-count="6">
+                <button type="button" class="v2card" onClick="{{r.pick}}" aria-pressed="{{r.on}}" style="display: flex; flex-direction: column; gap: 0; padding: 0; border: 1px solid {{r.bd}}; border-radius: 8px; background: #16161a; color: #ececef; text-align: left; overflow: hidden; box-shadow: {{r.ring}}">
+                  <span style="position: relative; aspect-ratio: 16 / 9; width: 100%; background: #1c1c21; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #85858f">[QUADRO]
+                    <span style="position: absolute; right: 6px; bottom: 6px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #ececef; background: rgba(11,11,13,0.8); padding: 0 5px; border-radius: 4px">{{r.dur}}</span>
+                  </span>
+                  <span style="display: flex; flex-direction: column; gap: 4px; padding: 10px 12px 12px">
+                    <b style="font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{r.title}}</b>
+                    <span style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: #85858f"><dc-import name="V2Status" state="{{r.st}}" sz="{{ 12 }}" hint-size="12px,12px"></dc-import>{{r.stLabel}}<span style="margin-left: auto">{{r.obs}}</span></span>
+                  </span>
+                </button>
+              </sc-for>
+            </div>
+          </section>
+
+          <aside aria-label="Referência selecionada" style="flex: 1 1 340px; max-width: 400px; min-width: 300px; border-left: 1px solid #1f1f24; display: flex; flex-direction: column; gap: 16px; padding: 16px; box-sizing: border-box">
+            <div style="aspect-ratio: 16 / 9; border-radius: 8px; background: #1c1c21; border: 1px solid #1f1f24; display: flex; align-items: center; justify-content: center; font-size: 12px; color: #85858f">[PLAYER DA REFERÊNCIA]</div>
+            <div style="display: flex; flex-direction: column; gap: 2px">
+              <h2 style="margin: 0; font-size: 15px; line-height: 22px; font-weight: 600">{{sel.title}}</h2>
+              <span style="font-size: 12px; color: #85858f">{{sel.meta}}</span>
+            </div>
+            <section aria-labelledby="rf-obs" style="display: flex; flex-direction: column; gap: 6px">
+              <h3 id="rf-obs" style="margin: 0; font-size: 13px; font-weight: 600">Observações com evidência</h3>
+              <sc-for list="{{sel.notes}}" as="n" hint-placeholder-count="3">
+                <div style="display: flex; gap: 10px; padding: 8px 10px; border: 1px solid #1f1f24; border-radius: 6px">
+                  <span style="flex: 0 0 auto; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #8aa8ff">{{n.t}}</span>
+                  <span style="flex: 1; font-size: 12px; line-height: 18px">{{n.o}}</span>
+                  <dc-import name="V2Status" state="{{n.st}}" sz="{{ 12 }}" hint-size="12px,12px"></dc-import>
+                </div>
+              </sc-for>
+              <sc-if value="{{sel.empty}}" hint-placeholder-val="{{ false }}"><span style="font-size: 12px; color: #85858f">Ainda não estudada. Marque um trecho e peça a análise.</span></sc-if>
+            </section>
+            <div style="margin-top: auto; display: flex; gap: 8px">
+              <button type="button" style="flex: 1; height: 32px; border: 0; border-radius: 6px; background: #ececef; color: #0b0b0d; font-weight: 500">Estudar trecho</button>
+              <button type="button" style="flex: 1; height: 32px; border: 1px solid #2a2a31; border-radius: 6px; background: #16161a; color: #ececef">Aprovar para Meu estilo</button>
+            </div>
+          </aside>
+        </sc-if>
+
+        <sc-if value="{{is.style}}" hint-placeholder-val="{{ false }}">
+          <section aria-label="Meu estilo" style="flex: 1 1 auto; min-width: 0; padding: 20px; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; max-width: 900px">
+            <p style="margin: 0; color: #a4a4ad">Regras aprovadas por você. Os agentes de edição e capa usam isto em toda produção.</p>
+            <div style="border: 1px solid #1f1f24; border-radius: 8px; overflow: hidden">
+              <sc-for list="{{rules}}" as="r" hint-placeholder-count="6">
+                <div style="display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 6px 14px; border-top: {{r.bt}}">
+                  <span style="flex: 0 0 76px"><span style="display: inline-flex; height: 20px; align-items: center; padding: 0 6px; border: 1px solid #2a2a31; border-radius: 4px; font-size: 11px; color: #a4a4ad">{{r.area}}</span></span>
+                  <span style="flex: 1; min-width: 0">{{r.rule}}</span>
+                  <span style="font-size: 12px; color: #85858f; white-space: nowrap">{{r.from}}</span>
+                  <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #85858f; width: 60px; text-align: right">usado {{r.used}}×</span>
+                </div>
+              </sc-for>
+            </div>
+          </section>
+        </sc-if>
+
+        <sc-if value="{{is.motion}}" hint-placeholder-val="{{ false }}">
+          <section aria-label="Kit de motion" style="flex: 1 1 auto; min-width: 0; padding: 20px; box-sizing: border-box; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; align-content: start">
+            <sc-for list="{{motions}}" as="m" hint-placeholder-count="4">
+              <div style="border: 1px solid #1f1f24; border-radius: 8px; background: #16161a; overflow: hidden">
+                <div style="aspect-ratio: 16 / 9; background: #1c1c21; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #85858f">[ESTUDO DE MOTION]</div>
+                <div style="padding: 10px 12px; display: flex; flex-direction: column; gap: 2px"><b style="font-weight: 500">{{m.n}}</b><span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #85858f">{{m.spec}}</span></div>
+              </div>
+            </sc-for>
+          </section>
+        </sc-if>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { tab: 'lib', sel: 'f1' }; }
+  renderVals() {
+    var self = this, st = this.state;
+    var refs = [
+      { id: 'f1', title: 'Diagrama animado · explicação de fluxo', dur: '2:14', st: 'feito', stLabel: 'Estudada', obs: '6 observações', meta: 'YouTube · adicionada em 21/10 · 4 regras aprovadas',
+        notes: [['0:12–0:18', 'Setas entram em 6 quadros com ease-out; nunca piscam.', 'feito'], ['0:40', 'Texto na tela tem no máximo 4 palavras por vez.', 'feito'], ['1:05–1:20', 'Zoom lento (2%/s) no detalhe enquanto a voz explica.', 'aguardando']] },
+      { id: 'f2', title: 'Abertura com corte seco e título grande', dur: '0:48', st: 'rodando', stLabel: 'Em análise', obs: '2 de ~5', meta: 'Arquivo local · trecho 0:00–0:20 em análise',
+        notes: [['0:00–0:03', 'Primeira frase já é a promessa do vídeo, sem logo.', 'aguardando']] },
+      { id: 'f3', title: 'Legenda palavra a palavra', dur: '1:32', st: 'feito', stLabel: 'Estudada', obs: '4 observações', meta: 'Instagram · 3 regras aprovadas',
+        notes: [['0:05', 'Palavra-chave destacada em cor, o resto em branco.', 'feito'], ['0:22', 'Legenda fica no terço inferior, nunca sobre o rosto.', 'feito']] },
+      { id: 'f4', title: 'Transição por máscara de tela', dur: '0:36', st: 'fila', stLabel: 'Nova', obs: '—', meta: 'YouTube · adicionada hoje', notes: [] },
+      { id: 'f5', title: 'Gráfico que cresce com a fala', dur: '1:10', st: 'falhou', stLabel: 'Sem vídeo no link', obs: '—', meta: 'Link sem vídeo acessível · envie o arquivo', notes: [] },
+      { id: 'f6', title: 'Encerramento com chamada curta', dur: '0:22', st: 'feito', stLabel: 'Estudada', obs: '2 observações', meta: 'YouTube · 1 regra aprovada', notes: [['0:15', 'Chamada final em uma linha, sem música alta.', 'feito']] }
+    ];
+    var cur = refs.filter(function (r) { return r.id === st.sel; })[0] || refs[0];
+    var tabs = [['lib', 'Biblioteca', 6], ['style', 'Meu estilo', 11], ['motion', 'Kit de motion', 4]].map(function (t) {
+      var on = st.tab === t[0];
+      return { label: t[1], n: t[2], on: on ? 'true' : 'false', fg: on ? '#ececef' : '#a4a4ad', line: on ? '#ececef' : 'transparent', pick: function () { self.setState({ tab: t[0] }); } };
+    });
+    var rules = [
+      ['Ritmo', 'Corte pausas acima de 1,2 s, exceto antes de uma revelação.', 'Abertura com corte seco', 14],
+      ['Texto', 'No máximo 4 palavras por vez na tela.', 'Diagrama animado', 11],
+      ['Legenda', 'Palavra-chave em destaque, resto em branco, terço inferior.', 'Legenda palavra a palavra', 18],
+      ['Motion', 'Entradas com ease-out em 6 quadros; nada pisca.', 'Diagrama animado', 9],
+      ['Câmera', 'Zoom lento de 2%/s em detalhes explicados pela voz.', 'Diagrama animado', 5],
+      ['Capa', 'Título com até 5 palavras e fundo claro.', 'Aprovado por você', 12]
+    ].map(function (r, i) { return { area: r[0], rule: r[1], from: r[2], used: r[3], bt: i ? '1px solid #1f1f24' : '0' }; });
+    return {
+      tabs: tabs, rules: rules,
+      is: { lib: st.tab === 'lib', style: st.tab === 'style', motion: st.tab === 'motion' },
+      chips: ['Todas', 'Estudadas', 'Em análise', 'Novas', 'Com problema'].map(function (c, i) { return { label: c, bd: i ? '#2a2a31' : '#33333b', bg: i ? 'transparent' : '#1c1c21', fg: i ? '#a4a4ad' : '#ececef' }; }),
+      refs: refs.map(function (r) {
+        var on = r.id === st.sel;
+        return Object.assign({}, r, { bd: on ? '#5b8cff' : '#1f1f24', ring: on ? '0 0 0 3px rgba(91,140,255,0.18)' : 'none', on: on ? 'true' : 'false', pick: function () { self.setState({ sel: r.id }); } });
+      }),
+      sel: { title: cur.title, meta: cur.meta, empty: !cur.notes.length, notes: cur.notes.map(function (n) { return { t: n[0], o: n[1], st: n[2] }; }) },
+      motions: [{ n: 'Entrada de seta', spec: 'ease-out · 6f · 120 px' }, { n: 'Zoom de detalhe', spec: 'linear · 2%/s' }, { n: 'Destaque de palavra', spec: 'cor + 4f' }, { n: 'Máscara de transição', spec: 'wipe · 10f' }]
+    };
+  }
+}
+</script>
+</body>
+</html>

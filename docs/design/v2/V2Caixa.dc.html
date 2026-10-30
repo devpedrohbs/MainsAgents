@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>MainsAgents V2 — Caixa de entrada</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0b0b0d}
+a{color:#8aa8ff}a:hover{color:#b3c6ff}
+button{font:inherit;cursor:pointer}
+textarea{font:inherit}
+.v2row:hover{background:#16161a}
+@media (max-width: 900px){.v2-side{display:none !important}}
+</style>
+</helmet>
+<div style="width: 100%; height: 900px; box-sizing: border-box; display: flex; background: #0b0b0d; color: #ececef; font-family: Inter, -apple-system, system-ui, sans-serif; font-size: 13px; line-height: 20px; font-feature-settings: 'cv11' 1, 'ss01' 1; overflow: hidden">
+  <div class="v2-side" style="flex: 0 0 220px">
+    <dc-import name="V2Sidebar" active="inbox" hint-size="220px,900px"></dc-import>
+  </div>
+
+  <div style="flex: 1 1 auto; min-width: 0; display: flex; padding: 8px 8px 8px 0">
+    <div style="flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: wrap; background: #111113; border: 1px solid #1f1f24; border-radius: 10px; overflow: auto">
+
+      <!-- List -->
+      <section aria-labelledby="ib-title" style="flex: 1 1 380px; max-width: 420px; min-width: 300px; height: 100%; border-right: 1px solid #1f1f24; display: flex; flex-direction: column">
+        <header style="flex: 0 0 44px; display: flex; align-items: center; gap: 8px; padding: 0 12px 0 16px; border-bottom: 1px solid #1f1f24">
+          <h1 id="ib-title" style="margin: 0; font-size: 13px; font-weight: 600">Caixa de entrada</h1>
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; height: 18px; line-height: 18px; padding: 0 6px; border-radius: 4px; background: #2a2416; color: #f0b03f">4</span>
+          <div style="flex-grow: 1"></div>
+          <div role="group" aria-label="Filtro" style="display: flex; padding: 2px; border: 1px solid #2a2a31; border-radius: 7px; background: #0b0b0d">
+            <sc-for list="{{filters}}" as="f" hint-placeholder-count="3">
+              <button type="button" aria-pressed="{{f.on}}" onClick="{{f.pick}}" style="height: 22px; padding: 0 8px; border: 0; border-radius: 5px; background: {{f.bg}}; color: {{f.fg}}; font-size: 12px">{{f.label}}</button>
+            </sc-for>
+          </div>
+        </header>
+        <div style="flex: 1 1 auto; min-height: 0; overflow: auto">
+          <sc-for list="{{groups}}" as="g" hint-placeholder-count="2">
+            <p style="margin: 0; padding: 12px 16px 4px; font-size: 11px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: #85858f">{{g.label}}</p>
+            <sc-for list="{{g.items}}" as="it" hint-placeholder-count="3">
+              <button type="button" class="v2row" onClick="{{it.pick}}" aria-pressed="{{it.on}}" style="width: 100%; display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px 10px 16px; border: 0; background: {{it.bg}}; color: #ececef; text-align: left">
+                <span style="flex: 0 0 6px; height: 6px; margin-top: 7px; border-radius: 50%; background: {{it.dot}}"></span>
+                <span aria-hidden="true" style="flex: 0 0 22px; height: 22px; border-radius: 6px; background: {{it.c}}; color: #0b0b0d; font-size: 9px; font-weight: 700; display: flex; align-items: center; justify-content: center">{{it.i}}</span>
+                <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+                  <span style="display: flex; align-items: center; gap: 8px"><b style="font-weight: {{it.w}}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{it.title}}</b><span style="margin-left: auto; flex: 0 0 auto; font-size: 12px; color: #85858f">{{it.t}}</span></span>
+                  <span style="font-size: 12px; line-height: 17px; color: #a4a4ad; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{it.sub}}</span>
+                  <span style="display: flex; align-items: center; gap: 6px; font-size: 11px; color: {{it.kc}}"><dc-import name="V2Status" state="{{it.st}}" sz="{{ 11 }}" hint-size="11px,11px"></dc-import>{{it.kind}} <span style="font-family: 'JetBrains Mono', monospace; color: #85858f">· {{it.run}}</span></span>
+                </span>
+              </button>
+            </sc-for>
+          </sc-for>
+        </div>
+        <footer style="flex: 0 0 auto; display: flex; gap: 14px; padding: 8px 16px; border-top: 1px solid #1f1f24; font-size: 11px; color: #85858f">
+          <span><span style="font-family: 'JetBrains Mono', monospace; color: #a4a4ad">J K</span> navegar</span>
+          <span><span style="font-family: 'JetBrains Mono', monospace; color: #a4a4ad">A</span> aprovar</span>
+          <span><span style="font-family: 'JetBrains Mono', monospace; color: #a4a4ad">E</span> arquivar</span>
+          <span><span style="font-family: 'JetBrains Mono', monospace; color: #a4a4ad">H</span> adiar</span>
+        </footer>
+      </section>
+
+      <!-- Detail -->
+      <section aria-label="Detalhe" style="flex: 999 1 480px; min-width: 0; height: 100%; display: flex; flex-direction: column">
+        <header style="flex: 0 0 44px; display: flex; align-items: center; gap: 10px; padding: 0 12px 0 20px; border-bottom: 1px solid #1f1f24">
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #85858f">{{sel.run}}</span>
+          <span style="font-size: 12px; color: #a4a4ad; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{sel.content}}</span>
+          <div style="flex-grow: 1"></div>
+          <button type="button" style="height: 28px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: #a4a4ad; font-size: 12px">Adiar <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #85858f">H</span></button>
+          <button type="button" style="height: 28px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: #a4a4ad; font-size: 12px">Arquivar <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #85858f">E</span></button>
+          <a href="V2Execucao.dc.html" style="height: 28px; line-height: 28px; padding: 0 10px; border: 1px solid #2a2a31; border-radius: 6px; background: #16161a; color: #ececef; text-decoration: none; font-size: 12px">Abrir execução</a>
+        </header>
+
+        <div style="flex: 1 1 auto; min-height: 0; overflow: auto">
+          <div style="max-width: 680px; padding: 24px 28px; display: flex; flex-direction: column; gap: 18px">
+            <div style="display: flex; align-items: center; gap: 12px">
+              <span aria-hidden="true" style="flex: 0 0 32px; height: 32px; border-radius: 8px; background: {{sel.c}}; color: #0b0b0d; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center">{{sel.i}}</span>
+              <div style="display: flex; flex-direction: column">
+                <h2 style="margin: 0; font-size: 20px; line-height: 28px; font-weight: 600; letter-spacing: -0.01em">{{sel.title}}</h2>
+                <span style="font-size: 12px; color: #85858f">{{sel.who}} · {{sel.t}}</span>
+              </div>
+            </div>
+            <p style="margin: 0; color: #c9c9d1; line-height: 22px">{{sel.body}}</p>
+
+            <sc-if value="{{is.approve}}" hint-placeholder-val="{{ true }}">
+              <div style="display: flex; flex-direction: column; gap: 12px">
+                <dl style="margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: #1f1f24; border: 1px solid #1f1f24; border-radius: 8px; overflow: hidden">
+                  <sc-for list="{{sel.facts}}" as="f" hint-placeholder-count="3">
+                    <div style="background: #111113; padding: 10px 12px"><dt style="font-size: 12px; color: #85858f">{{f.k}}</dt><dd style="margin: 0; font-weight: 500">{{f.v}}</dd></div>
+                  </sc-for>
+                </dl>
+                <div style="display: flex; flex-wrap: wrap; gap: 8px">
+                  <button type="button" style="display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 14px; border: 0; border-radius: 6px; background: #ececef; color: #0b0b0d; font-weight: 500">{{sel.cta}} <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #55555e">A</span></button>
+                  <a href="V2Execucao.dc.html" style="height: 32px; line-height: 32px; padding: 0 12px; border: 1px solid #2a2a31; border-radius: 6px; background: #16161a; color: #ececef; text-decoration: none">Revisar em detalhe</a>
+                  <button type="button" style="height: 32px; padding: 0 12px; border: 0; border-radius: 6px; background: transparent; color: #a4a4ad">Pedir ajuste</button>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{is.choose}}" hint-placeholder-val="{{ false }}">
+              <div style="display: flex; flex-direction: column; gap: 12px">
+                <div role="radiogroup" aria-label="Opções de capa" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px">
+                  <sc-for list="{{covers}}" as="o" hint-placeholder-count="3">
+                    <button type="button" role="radio" aria-checked="{{o.on}}" onClick="{{o.pick}}" style="display: flex; flex-direction: column; gap: 8px; padding: 6px; border: 1px solid {{o.bd}}; border-radius: 8px; background: {{o.bg}}; color: #ececef; text-align: left">
+                      <span style="aspect-ratio: 16 / 9; border-radius: 5px; background: #1c1c21; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #85858f">[CAPA {{o.n}}]</span>
+                      <span style="display: flex; align-items: center; gap: 6px; padding: 0 4px 2px; font-size: 12px"><b style="font-weight: 500">Opção {{o.n}}</b><span style="margin-left: auto; color: #85858f">{{o.note}}</span></span>
+                    </button>
+                  </sc-for>
+                </div>
+                <div style="display: flex; gap: 8px">
+                  <button type="button" style="display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 14px; border: 0; border-radius: 6px; background: #ececef; color: #0b0b0d; font-weight: 500">Usar opção {{coverSel}} <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #55555e">↵</span></button>
+                  <button type="button" style="height: 32px; padding: 0 12px; border: 1px solid #2a2a31; border-radius: 6px; background: #16161a; color: #ececef">Gerar outras 3</button>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{is.ask}}" hint-placeholder-val="{{ false }}">
+              <div style="display: flex; flex-direction: column; gap: 10px">
+                <span style="font-size: 12px; color: #85858f">Respostas rápidas</span>
+                <div style="display: flex; flex-wrap: wrap; gap: 8px">
+                  <button type="button" style="height: 30px; padding: 0 12px; border: 1px solid #2a2a31; border-radius: 6px; background: #16161a; color: #ececef">Os dois, PROCX primeiro</button>
+                  <button type="button" style="height: 30px; padding: 0 12px; border: 1px solid #2a2a31; border-radius: 6px; background: #16161a; color: #ececef">Só PROCX</button>
+                  <button type="button" style="height: 30px; padding: 0 12px; border: 1px solid #2a2a31; border-radius: 6px; background: #16161a; color: #ececef">Só PROCV</button>
+                </div>
+                <label style="display: flex; flex-direction: column; gap: 6px"><span style="font-size: 12px; color: #85858f">Ou responda com suas palavras</span>
+                  <textarea rows="3" placeholder="Responder ao Roteirista…" style="padding: 10px 12px; border: 1px solid #2a2a31; border-radius: 8px; background: #0b0b0d; color: #ececef; font-size: 13px; resize: vertical"></textarea>
+                </label>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{is.fail}}" hint-placeholder-val="{{ false }}">
+              <div style="display: flex; flex-direction: column; gap: 12px">
+                <pre style="margin: 0; padding: 12px; border: 1px solid #4a2326; border-radius: 8px; background: #160f10; color: #ffb3b5; font-family: 'JetBrains Mono', monospace; font-size: 12px; line-height: 18px; white-space: pre-wrap">youtube.upload → 401 Unauthorized
+A sessão do YouTube expirou em 29/10 às 13:52.
+Passo 6 de 7 · o vídeo final já está salvo (corte-v4.mp4).</pre>
+                <div style="display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: #a4a4ad">
+                  <span style="display: flex; align-items: center; gap: 8px"><dc-import name="V2Status" state="feito" sz="{{ 12 }}" hint-size="12px,12px"></dc-import>Nada foi perdido: os 5 passos anteriores continuam salvos.</span>
+                  <span style="display: flex; align-items: center; gap: 8px"><dc-import name="V2Status" state="fila" sz="{{ 12 }}" hint-size="12px,12px"></dc-import>Depois de reconectar, a execução continua do upload.</span>
+                </div>
+                <div style="display: flex; gap: 8px">
+                  <button type="button" style="height: 32px; padding: 0 14px; border: 0; border-radius: 6px; background: #ececef; color: #0b0b0d; font-weight: 500">Reconectar YouTube</button>
+                  <button type="button" style="display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px; border: 1px solid #2a2a31; border-radius: 6px; background: #16161a; color: #ececef">Tentar de novo daqui <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #85858f">R</span></button>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{is.info}}" hint-placeholder-val="{{ false }}">
+              <a href="V2Radar.dc.html" style="align-self: flex-start; height: 32px; line-height: 32px; padding: 0 12px; border: 1px solid #2a2a31; border-radius: 6px; background: #16161a; color: #ececef; text-decoration: none">Abrir o Radar</a>
+            </sc-if>
+
+            <section aria-label="Histórico do item" style="display: flex; flex-direction: column; gap: 6px; padding-top: 14px; border-top: 1px solid #1f1f24">
+              <span style="font-size: 12px; color: #85858f">Linha do tempo</span>
+              <sc-for list="{{sel.trail}}" as="l" hint-placeholder-count="3">
+                <div style="display: flex; gap: 10px; font-size: 12px"><span style="flex: 0 0 38px; font-family: 'JetBrains Mono', monospace; color: #85858f">{{l.t}}</span><span style="color: #a4a4ad">{{l.e}}</span></div>
+              </sc-for>
+            </section>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { sel: 'i1', filter: 'all', cover: 2 }; }
+  renderVals() {
+    var self = this, st = this.state;
+    var items = [
+      { id: 'i1', g: 'Hoje', type: 'approve', kind: 'Aprovação', st: 'aguardando', unread: true, i: 'ED', c: '#2dd4bf', who: 'Editor de vídeo', title: 'Aprovar 10 cortes', sub: 'Tutorial de automação no Excel · −1m 52s', run: 'RUN-284', content: 'Tutorial de automação no Excel', t: '8 min',
+        body: 'Removi 9 pausas acima de 1,2 s e o falso início em 00:14. O vídeo cai de 12:48 para 10:56. A legenda só entra depois da sua aprovação.', cta: 'Aprovar cortes',
+        facts: [['Cortes', '10'], ['Economia', '1m 52s'], ['Nova duração', '10:56']], trail: [['14:24', 'Editor de vídeo pausou para aprovação'], ['14:20', 'Você aprovou o roteiro v2'], ['14:12', 'Execução começou pelo pipeline Produção semanal']] },
+      { id: 'i4', g: 'Hoje', type: 'fail', kind: 'Falha', st: 'falhou', unread: true, i: 'PB', c: '#9aa8ff', who: 'Publicador', title: 'Upload no YouTube falhou', sub: 'YouTube · fórmulas dinâmicas · sessão expirada', run: 'RUN-280', content: 'YouTube · fórmulas dinâmicas', t: '41 min',
+        body: 'O upload parou porque a conexão com o YouTube expirou. O vídeo final está pronto e salvo.', facts: [], trail: [['13:52', 'Upload recusado pelo YouTube (401)'], ['13:51', 'Tentou de novo 2×'], ['13:40', 'Você aprovou a entrega']] },
+      { id: 'i2', g: 'Hoje', type: 'choose', kind: 'Escolha', st: 'aguardando', unread: true, i: 'DC', c: '#f472b6', who: 'Designer de capa', title: 'Escolher capa', sub: 'Carrossel · 5 erros no Power BI · 3 opções', run: 'RUN-281', content: 'Carrossel · 5 erros no Power BI', t: '2 h',
+        body: 'Fiz 3 capas no estilo Capa clara. A opção 2 segue mais de perto a referência que você aprovou na semana passada.', facts: [], trail: [['12:31', 'Designer de capa gerou 3 opções'], ['12:10', 'Roteiro do carrossel aprovado']] },
+      { id: 'i3', g: 'Hoje', type: 'ask', kind: 'Pergunta', st: 'aguardando', unread: false, i: 'RO', c: '#f5b544', who: 'Roteirista', title: 'Incluir PROCX ou só PROCV?', sub: 'Reels · atalhos do VS Code', run: 'RUN-279', content: 'Reels · atalhos do VS Code', t: '3 h',
+        body: 'A pauta fala de buscas no Excel. PROCX é mais atual, mas parte do público ainda usa versões sem ela. Quer as duas no roteiro?', facts: [], trail: [['11:40', 'Roteirista parou com uma pergunta'], ['11:32', 'Execução começou']] },
+      { id: 'i5', g: 'Ontem', type: 'approve', kind: 'Aprovação', st: 'aguardando', unread: false, i: 'PB', c: '#9aa8ff', who: 'Publicador', title: 'Confirmar agendamento', sub: 'LinkedIn · automação de relatórios · seg 02/11 09:00', run: 'RUN-276', content: 'LinkedIn · automação de relatórios', t: 'ontem',
+        body: 'Escolhi segunda às 09:00, o horário com mais alcance nas últimas 4 semanas. O texto e a imagem já estão prontos.', cta: 'Confirmar agendamento',
+        facts: [['Rede', 'LinkedIn'], ['Quando', 'seg 02/11 · 09:00'], ['Formato', 'Imagem + texto']], trail: [['ontem 17:20', 'Publicador sugeriu horário']] },
+      { id: 'i6', g: 'Ontem', type: 'info', kind: 'Aviso', st: 'feito', unread: false, i: 'PE', c: '#fb923c', who: 'Pesquisador', title: 'Radar trouxe 4 sinais novos', sub: 'YouTube e notícias · 2 com nota acima de 80', run: 'RUN-282', content: 'Coleta diária do Radar', t: 'ontem',
+        body: 'Dois sinais têm nota alta e combinam com seus temas: “Copilot no Excel” e “Power BI gratuito acabou?”.', facts: [], trail: [['ontem 06:00', 'Coleta agendada concluída']] }
+    ];
+    var f = st.filter;
+    var shown = items.filter(function (x) { return f === 'all' || (f === 'unread' ? x.unread : x.type !== 'info'); });
+    var cur = items.filter(function (x) { return x.id === st.sel; })[0] || items[0];
+    var mk = function (x) {
+      var on = x.id === st.sel;
+      return Object.assign({}, x, { on: on ? 'true' : 'false', bg: on ? '#1c1c21' : 'transparent', dot: x.unread ? '#5b8cff' : 'transparent', w: x.unread ? 600 : 500,
+        kc: x.st === 'falhou' ? '#ff8a8e' : x.st === 'aguardando' ? '#f0b03f' : '#85858f', pick: function () { self.setState({ sel: x.id }); } });
+    };
+    var groups = ['Hoje', 'Ontem'].map(function (g) { return { label: g, items: shown.filter(function (x) { return x.g === g; }).map(mk) }; }).filter(function (g) { return g.items.length; });
+    var filters = [['all', 'Tudo'], ['unread', 'Não lidas'], ['action', 'Pedem ação']].map(function (x) {
+      var on = f === x[0];
+      return { label: x[1], on: on ? 'true' : 'false', bg: on ? '#1c1c21' : 'transparent', fg: on ? '#ececef' : '#a4a4ad', pick: function () { self.setState({ filter: x[0] }); } };
+    });
+    var covers = [[1, ''], [2, 'mais perto do estilo'], [3, '']].map(function (o) {
+      var on = st.cover === o[0];
+      return { n: o[0], note: o[1], on: on ? 'true' : 'false', bd: on ? '#5b8cff' : '#2a2a31', bg: on ? '#16182a' : '#16161a', pick: function () { self.setState({ cover: o[0] }); } };
+    });
+    return {
+      groups: groups, filters: filters, covers: covers, coverSel: st.cover,
+      sel: Object.assign({}, cur, { facts: cur.facts.map(function (x) { return { k: x[0], v: x[1] }; }), trail: cur.trail.map(function (x) { return { t: x[0], e: x[1] }; }) }),
+      is: { approve: cur.type === 'approve', choose: cur.type === 'choose', ask: cur.type === 'ask', fail: cur.type === 'fail', info: cur.type === 'info' }
+    };
+  }
+}
+</script>
+</body>
+</html>

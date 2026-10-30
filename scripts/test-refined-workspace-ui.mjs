@@ -35,7 +35,7 @@ app.whenReady().then(async()=>{try{
  win.webContents.on('console-message',event=>{if(/Uncaught|Maximum update depth|Cannot update a component/.test(event.message))errors.push(event.message)});
  await win.loadURL(`http://127.0.0.1:${server.address().port}/app.html#home`);
  await until(()=>js('Boolean(document.querySelector(".ov-needs"))'));
- assert.equal(await js('getComputedStyle(document.querySelector(".sidebar")).width'),'244px');
+ assert.equal(await js('getComputedStyle(document.querySelector(".sidebar")).width'),'220px');
  // Dark Studio: dark is the default appearance; light keeps the cobalt accent.
  assert.equal(await js('document.documentElement.dataset.appearance'),'dark');
  assert.equal(await js('getComputedStyle(document.documentElement).getPropertyValue("--accent").trim()'),'#5b8cff');

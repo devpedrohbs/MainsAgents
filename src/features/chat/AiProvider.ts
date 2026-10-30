@@ -23,6 +23,9 @@ export interface ProviderStatus {
   authMode: ProviderAuthMode;
   billingDescription: string;
   capabilities: ProviderCapabilities;
+  connectionName?: string;
+  /** Configured CLI choice; aliases do not assert a specific runtime model version. */
+  defaultModel?: {id:string;name:string;source:string};
   message?: string;
 }
 

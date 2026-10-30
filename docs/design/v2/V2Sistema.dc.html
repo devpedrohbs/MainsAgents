@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>MainsAgents V2 — Sistema</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0b0b0d}
+button{font:inherit;cursor:pointer}
+input{font:inherit}
+</style>
+</helmet>
+<div style="width: 1440px; height: 1320px; box-sizing: border-box; padding: 56px 64px; background: #0b0b0d; color: #ececef; font-family: Inter, -apple-system, system-ui, sans-serif; font-size: 13px; line-height: 20px; font-feature-settings: 'cv11' 1, 'ss01' 1; display: flex; flex-direction: column; gap: 28px; overflow: hidden">
+
+  <!-- Header -->
+  <header style="display: flex; align-items: flex-end; gap: 48px">
+    <div style="display: flex; flex-direction: column; gap: 10px; flex: 1 1 auto">
+      <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #85858f">MAINSAGENTS · SISTEMA V2 · 0.4</span>
+      <h1 style="margin: 0; font-size: 32px; line-height: 38px; font-weight: 600; letter-spacing: -0.02em">Denso, calmo e sempre mostrando o estado.</h1>
+      <p style="margin: 0; max-width: 640px; color: #a4a4ad; font-size: 14px; line-height: 22px">Uma base para operar agentes: cada tela responde “o que está rodando, o que precisa de mim, o que já saiu”. Cor é sinal, não decoração.</p>
+    </div>
+    <div style="flex: 0 0 640px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px">
+      <div style="padding: 12px; border: 1px solid #1f1f24; border-radius: 8px; background: #111113; display: flex; flex-direction: column; gap: 4px"><b style="font-weight: 600">Estado visível</b><span style="font-size: 12px; line-height: 17px; color: #a4a4ad">Toda execução mostra etapa, tempo e quem age.</span></div>
+      <div style="padding: 12px; border: 1px solid #1f1f24; border-radius: 8px; background: #111113; display: flex; flex-direction: column; gap: 4px"><b style="font-weight: 600">Humano no circuito</b><span style="font-size: 12px; line-height: 17px; color: #a4a4ad">Aprovar, editar ou retomar de um passo.</span></div>
+      <div style="padding: 12px; border: 1px solid #1f1f24; border-radius: 8px; background: #111113; display: flex; flex-direction: column; gap: 4px"><b style="font-weight: 600">Teclado primeiro</b><span style="font-size: 12px; line-height: 17px; color: #a4a4ad">Atalho visível em toda ação frequente.</span></div>
+      <div style="padding: 12px; border: 1px solid #1f1f24; border-radius: 8px; background: #111113; display: flex; flex-direction: column; gap: 4px"><b style="font-weight: 600">Uma camada só</b><span style="font-size: 12px; line-height: 17px; color: #a4a4ad">Borda fina em vez de sombra; sombra só no que flutua.</span></div>
+    </div>
+  </header>
+
+  <!-- Row A -->
+  <div style="display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 16px">
+
+    <section aria-label="Superfícies e texto" style="grid-column: span 5; border: 1px solid #1f1f24; border-radius: 10px; background: #111113; padding: 18px; display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; align-items: baseline; gap: 8px"><h2 style="margin: 0; font-size: 15px; font-weight: 600">Cores · superfícies e texto</h2><span style="margin-left: auto; font-size: 12px; color: #85858f">escuro padrão · claro</span></div>
+      <div style="display: grid; grid-template-columns: 1fr 108px 108px; gap: 0 10px; font-size: 12px">
+        <span style="color: #85858f; padding-bottom: 6px">Token</span><span style="color: #85858f">Escuro</span><span style="color: #85858f">Claro</span>
+        <sc-for list="{{tokens}}" as="t" hint-placeholder-count="10">
+          <span style="display: flex; flex-direction: column; justify-content: center; height: 34px; border-top: 1px solid #1f1f24"><span style="font-family: 'JetBrains Mono', monospace; color: #ececef">{{t.tok}}</span></span>
+          <span style="display: flex; align-items: center; gap: 8px; border-top: 1px solid #1f1f24"><i aria-hidden="true" style="width: 22px; height: 18px; border-radius: 4px; border: 1px solid #33333b; background: {{t.d}}"></i><span style="font-family: 'JetBrains Mono', monospace; color: #a4a4ad">{{t.d}}</span></span>
+          <span style="display: flex; align-items: center; gap: 8px; border-top: 1px solid #1f1f24"><i aria-hidden="true" style="width: 22px; height: 18px; border-radius: 4px; border: 1px solid #33333b; background: {{t.l}}"></i><span style="font-family: 'JetBrains Mono', monospace; color: #a4a4ad">{{t.l}}</span></span>
+        </sc-for>
+      </div>
+    </section>
+
+    <section aria-label="Estados de execução" style="grid-column: span 4; border: 1px solid #1f1f24; border-radius: 10px; background: #111113; padding: 18px; display: flex; flex-direction: column; gap: 12px">
+      <h2 style="margin: 0; font-size: 15px; font-weight: 600">Estados de execução</h2>
+      <p style="margin: 0; font-size: 12px; line-height: 17px; color: #a4a4ad">Seis estados, um ícone para cada. A forma muda junto com a cor, então dá para ler sem distinguir tons.</p>
+      <div style="display: flex; flex-direction: column">
+        <sc-for list="{{states}}" as="s" hint-placeholder-count="6">
+          <div style="display: flex; align-items: center; gap: 10px; height: 44px; border-top: 1px solid #1f1f24">
+            <dc-import name="V2Status" state="{{s.k}}" sz="{{ 16 }}" hint-size="16px,16px"></dc-import>
+            <div style="display: flex; flex-direction: column; min-width: 0; flex: 1">
+              <b style="font-weight: 500">{{s.name}}</b>
+              <span style="font-size: 12px; line-height: 16px; color: #85858f">{{s.desc}}</span>
+            </div>
+            <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #85858f">{{s.hex}}</span>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+    <section aria-label="Identidade dos agentes" style="grid-column: span 3; border: 1px solid #1f1f24; border-radius: 10px; background: #111113; padding: 18px; display: flex; flex-direction: column; gap: 12px">
+      <h2 style="margin: 0; font-size: 15px; font-weight: 600">Agentes</h2>
+      <p style="margin: 0; font-size: 12px; line-height: 17px; color: #a4a4ad">A cor do agente aparece só no avatar e na barra do rastro. Botões e links nunca usam essas cores.</p>
+      <sc-for list="{{agents}}" as="a" hint-placeholder-count="4">
+        <div style="display: flex; align-items: center; gap: 10px">
+          <span aria-hidden="true" style="flex: 0 0 28px; height: 28px; border-radius: 7px; background: {{a.c}}; color: #0b0b0d; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center">{{a.i}}</span>
+          <div style="display: flex; flex-direction: column; min-width: 0"><b style="font-weight: 500">{{a.n}}</b><span style="font-size: 12px; line-height: 16px; color: #85858f">{{a.r}}</span></div>
+        </div>
+      </sc-for>
+      <div style="margin-top: auto; display: flex; align-items: center; gap: 12px; padding-top: 12px; border-top: 1px solid #1f1f24">
+        <span style="display: flex">
+          <span aria-hidden="true" style="width: 20px; height: 20px; border-radius: 6px; background: #f5b544; border: 2px solid #111113"></span>
+          <span aria-hidden="true" style="width: 20px; height: 20px; border-radius: 6px; background: #2dd4bf; border: 2px solid #111113; margin-left: -6px"></span>
+          <span aria-hidden="true" style="width: 20px; height: 20px; border-radius: 6px; background: #f472b6; border: 2px solid #111113; margin-left: -6px"></span>
+        </span>
+        <span style="font-size: 12px; color: #a4a4ad">Pilha · 16 / 20 / 28 px</span>
+      </div>
+    </section>
+  </div>
+
+  <!-- Row B -->
+  <div style="display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 16px">
+    <section aria-label="Tipografia" style="grid-column: span 5; border: 1px solid #1f1f24; border-radius: 10px; background: #111113; padding: 18px; display: flex; flex-direction: column; gap: 4px">
+      <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px"><h2 style="margin: 0; font-size: 15px; font-weight: 600">Tipografia</h2><span style="margin-left: auto; font-size: 12px; color: #85858f">Inter · JetBrains Mono</span></div>
+      <div style="display: flex; align-items: baseline; gap: 12px; height: 44px; border-top: 1px solid #1f1f24"><span style="font-size: 32px; line-height: 40px; font-weight: 600; letter-spacing: -0.02em; flex: 1">Display</span><span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #85858f">32 / 40 · 600 · −2%</span></div>
+      <div style="display: flex; align-items: baseline; gap: 12px; height: 34px; border-top: 1px solid #1f1f24; padding-top: 6px"><span style="font-size: 20px; line-height: 28px; font-weight: 600; letter-spacing: -0.01em; flex: 1">Título de tela</span><span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #85858f">20 / 28 · 600</span></div>
+      <div style="display: flex; align-items: baseline; gap: 12px; height: 30px; border-top: 1px solid #1f1f24; padding-top: 6px"><span style="font-size: 15px; font-weight: 600; flex: 1">Título de seção</span><span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #85858f">15 / 22 · 600</span></div>
+      <div style="display: flex; align-items: baseline; gap: 12px; height: 30px; border-top: 1px solid #1f1f24; padding-top: 6px"><span style="flex: 1">Corpo — mensagens, descrições, linhas</span><span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #85858f">13 / 20 · 400</span></div>
+      <div style="display: flex; align-items: baseline; gap: 12px; height: 30px; border-top: 1px solid #1f1f24; padding-top: 6px"><span style="font-size: 12px; color: #a4a4ad; flex: 1">Meta — horários, contagens, ajuda</span><span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #85858f">12 / 16 · 400</span></div>
+      <div style="display: flex; align-items: baseline; gap: 12px; height: 30px; border-top: 1px solid #1f1f24; padding-top: 6px"><span style="font-size: 11px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: #85858f; flex: 1">Rótulo de grupo</span><span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #85858f">11 · 500 · +6%</span></div>
+      <div style="display: flex; align-items: baseline; gap: 12px; height: 30px; border-top: 1px solid #1f1f24; padding-top: 6px"><span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; flex: 1">RUN-284 · 04:12 · 18,2k tokens</span><span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #85858f">Mono 12 · IDs e números</span></div>
+    </section>
+
+    <section aria-label="Espaço, raio e elevação" style="grid-column: span 7; border: 1px solid #1f1f24; border-radius: 10px; background: #111113; padding: 18px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px">
+      <div style="display: flex; flex-direction: column; gap: 10px">
+        <h2 style="margin: 0; font-size: 15px; font-weight: 600">Espaço · grade de 4</h2>
+        <sc-for list="{{space}}" as="p" hint-placeholder-count="7">
+          <div style="display: flex; align-items: center; gap: 10px"><span style="width: 24px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #85858f">{{p.v}}</span><i aria-hidden="true" style="height: 10px; width: {{p.v}}px; border-radius: 2px; background: #5b8cff"></i><span style="font-size: 12px; color: #a4a4ad">{{p.use}}</span></div>
+        </sc-for>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 10px">
+        <h2 style="margin: 0; font-size: 15px; font-weight: 600">Raio</h2>
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+          <div style="display: flex; flex-direction: column; gap: 6px"><span aria-hidden="true" style="height: 44px; border: 1px solid #33333b; background: #16161a; border-radius: 4px"></span><span style="font-size: 12px; color: #a4a4ad">4 · rótulo, kbd</span></div>
+          <div style="display: flex; flex-direction: column; gap: 6px"><span aria-hidden="true" style="height: 44px; border: 1px solid #33333b; background: #16161a; border-radius: 6px"></span><span style="font-size: 12px; color: #a4a4ad">6 · controle</span></div>
+          <div style="display: flex; flex-direction: column; gap: 6px"><span aria-hidden="true" style="height: 44px; border: 1px solid #33333b; background: #16161a; border-radius: 8px"></span><span style="font-size: 12px; color: #a4a4ad">8 · cartão, nó</span></div>
+          <div style="display: flex; flex-direction: column; gap: 6px"><span aria-hidden="true" style="height: 44px; border: 1px solid #33333b; background: #16161a; border-radius: 10px"></span><span style="font-size: 12px; color: #a4a4ad">10 · painel</span></div>
+        </div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 10px">
+        <h2 style="margin: 0; font-size: 15px; font-weight: 600">Elevação e densidade</h2>
+        <div style="display: flex; flex-direction: column; gap: 8px">
+          <div style="height: 38px; border: 1px solid #2a2a31; border-radius: 8px; background: #16161a; display: flex; align-items: center; padding: 0 12px; font-size: 12px; color: #a4a4ad">0 · borda, sem sombra</div>
+          <div style="height: 38px; border: 1px solid #33333b; border-radius: 8px; background: #1c1c21; display: flex; align-items: center; padding: 0 12px; font-size: 12px; color: #a4a4ad; box-shadow: 0 8px 24px rgba(0,0,0,0.45)">1 · menu, popover, toast</div>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 12px; font-size: 12px; color: #a4a4ad; margin-top: 4px">
+          <span>Linha <b style="color: #ececef; font-weight: 500">32</b></span><span>Cabeçalho <b style="color: #ececef; font-weight: 500">44</b></span>
+          <span>Controle <b style="color: #ececef; font-weight: 500">28 / 32</b></span><span>Inspetor <b style="color: #ececef; font-weight: 500">360</b></span>
+          <span>Lateral <b style="color: #ececef; font-weight: 500">220</b></span><span>Alvo de toque <b style="color: #ececef; font-weight: 500">44</b></span>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Row C: components -->
+  <section aria-label="Componentes" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px">
+
+    <div style="border: 1px solid #1f1f24; border-radius: 10px; background: #111113; padding: 18px; display: flex; flex-direction: column; gap: 14px">
+      <span style="font-size: 11px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: #85858f">Botões e campos</span>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center">
+        <button type="button" style="display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px; border: 0; border-radius: 6px; background: #ececef; color: #0b0b0d; font-weight: 500">Executar <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #55555e">⌘↵</span></button>
+        <button type="button" style="height: 32px; padding: 0 12px; border: 1px solid #2a2a31; border-radius: 6px; background: #16161a; color: #ececef">Secundário</button>
+        <button type="button" style="height: 32px; padding: 0 12px; border: 0; border-radius: 6px; background: transparent; color: #a4a4ad">Fantasma</button>
+        <button type="button" style="height: 32px; padding: 0 12px; border: 1px solid #4a2326; border-radius: 6px; background: transparent; color: #ff8a8e">Interromper</button>
+      </div>
+      <label style="display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 10px; border: 1px solid #2a2a31; border-radius: 6px; background: #0b0b0d; color: #85858f">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="M20 20l-4-4"></path></svg>
+        <input type="text" placeholder="Buscar execuções, agentes, conteúdos" aria-label="Buscar" style="flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: #ececef; font-size: 13px">
+        <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; border: 1px solid #2a2a31; border-radius: 4px; padding: 0 5px; line-height: 18px; color: #a4a4ad">⌘K</span>
+      </label>
+      <div style="display: flex; gap: 8px; align-items: center">
+        <div role="group" aria-label="Visualização" style="display: flex; padding: 2px; border: 1px solid #2a2a31; border-radius: 7px; background: #0b0b0d">
+          <button type="button" aria-pressed="true" style="height: 26px; padding: 0 10px; border: 0; border-radius: 5px; background: #1c1c21; color: #ececef; font-size: 12px">Lista</button>
+          <button type="button" aria-pressed="false" style="height: 26px; padding: 0 10px; border: 0; border-radius: 5px; background: transparent; color: #a4a4ad; font-size: 12px">Quadro</button>
+          <button type="button" aria-pressed="false" style="height: 26px; padding: 0 10px; border: 0; border-radius: 5px; background: transparent; color: #a4a4ad; font-size: 12px">Linha do tempo</button>
+        </div>
+        <span style="display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 8px; border: 1px solid #2a2a31; border-radius: 4px; font-size: 12px; color: #a4a4ad"><i aria-hidden="true" style="width: 6px; height: 6px; border-radius: 50%; background: #2dd4bf"></i>Edição</span>
+      </div>
+      <div role="tablist" aria-label="Abas" style="display: flex; gap: 18px; border-bottom: 1px solid #1f1f24">
+        <button type="button" role="tab" aria-selected="true" style="height: 32px; padding: 0; border: 0; border-bottom: 2px solid #ececef; margin-bottom: -1px; background: transparent; color: #ececef; font-weight: 500">Rastro</button>
+        <button type="button" role="tab" aria-selected="false" style="height: 32px; padding: 0; border: 0; background: transparent; color: #a4a4ad">Estado</button>
+        <button type="button" role="tab" aria-selected="false" style="height: 32px; padding: 0; border: 0; background: transparent; color: #a4a4ad">Arquivos <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #85858f">4</span></button>
+      </div>
+    </div>
+
+    <div style="border: 1px solid #1f1f24; border-radius: 10px; background: #111113; padding: 18px; display: flex; flex-direction: column; gap: 12px">
+      <span style="font-size: 11px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: #85858f">Linha de lista e passo do plano</span>
+      <div style="border: 1px solid #1f1f24; border-radius: 8px; overflow: hidden">
+        <div style="display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 12px; background: #16161a">
+          <dc-import name="V2Status" state="rodando" hint-size="14px,14px"></dc-import>
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #85858f">RUN-284</span>
+          <span style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Tutorial de automação no Excel</span>
+          <span style="display: grid; grid-template-columns: repeat(6, 10px); gap: 2px" aria-label="Etapa 3 de 6"><i style="height: 4px; border-radius: 2px; background: #3ecf8e"></i><i style="height: 4px; border-radius: 2px; background: #3ecf8e"></i><i style="height: 4px; border-radius: 2px; background: #5b8cff"></i><i style="height: 4px; border-radius: 2px; background: #2a2a31"></i><i style="height: 4px; border-radius: 2px; background: #2a2a31"></i><i style="height: 4px; border-radius: 2px; background: #2a2a31"></i></span>
+          <span aria-hidden="true" style="width: 18px; height: 18px; border-radius: 5px; background: #2dd4bf"></span>
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #85858f">12m</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 12px; border-top: 1px solid #1f1f24">
+          <dc-import name="V2Status" state="aguardando" hint-size="14px,14px"></dc-import>
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #85858f">RUN-281</span>
+          <span style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Carrossel · 5 erros no Power BI</span>
+          <span style="font-size: 12px; color: #f0b03f">Escolher capa</span>
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #85858f">2h</span>
+        </div>
+      </div>
+      <div style="display: flex; flex-direction: column; border: 1px solid #1f1f24; border-radius: 8px; padding: 6px">
+        <div style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 8px; border-radius: 6px">
+          <dc-import name="V2Status" state="feito" hint-size="14px,14px"></dc-import>
+          <span style="flex: 1">Transcrever o bruto</span>
+          <span aria-hidden="true" style="width: 16px; height: 16px; border-radius: 4px; background: #2dd4bf"></span>
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #85858f">2m 50s</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 8px; border-radius: 6px; background: #1c1c21; outline: 1px solid #33333b">
+          <dc-import name="V2Status" state="aguardando" hint-size="14px,14px"></dc-import>
+          <span style="flex: 1; font-weight: 500">Propor cortes</span>
+          <span aria-hidden="true" style="width: 16px; height: 16px; border-radius: 4px; background: #2dd4bf"></span>
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #f0b03f">8m</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 8px; border-radius: 6px; color: #a4a4ad">
+          <dc-import name="V2Status" state="fila" hint-size="14px,14px"></dc-import>
+          <span style="flex: 1">Aplicar legenda</span>
+          <span aria-hidden="true" style="width: 16px; height: 16px; border-radius: 4px; background: #2dd4bf"></span>
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #85858f">—</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="border: 1px solid #1f1f24; border-radius: 10px; background: #111113; padding: 18px; display: flex; flex-direction: column; gap: 12px">
+      <span style="font-size: 11px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: #85858f">Portão de aprovação e avisos</span>
+      <div style="border: 1px solid #3d3220; border-radius: 8px; background: #17140e; padding: 14px; display: flex; flex-direction: column; gap: 10px">
+        <div style="display: flex; align-items: center; gap: 8px">
+          <dc-import name="V2Status" state="aguardando" sz="{{ 16 }}" hint-size="16px,16px"></dc-import>
+          <b style="font-weight: 600">Aprovação necessária</b>
+          <span style="margin-left: auto; font-size: 12px; color: #a4a4ad">há 8 min</span>
+        </div>
+        <span style="color: #c9c9d1">O Editor quer remover 9 pausas acima de 1,2 s e o falso início em 00:14.</span>
+        <div style="display: flex; gap: 8px">
+          <button type="button" style="display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px; border: 0; border-radius: 6px; background: #ececef; color: #0b0b0d; font-weight: 500">Aprovar <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #55555e">A</span></button>
+          <button type="button" style="height: 30px; padding: 0 12px; border: 1px solid #2a2a31; border-radius: 6px; background: #16161a; color: #ececef">Editar antes</button>
+          <button type="button" style="height: 30px; padding: 0 12px; border: 0; border-radius: 6px; background: transparent; color: #a4a4ad">Recusar</button>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 12px; border: 1px solid #33333b; border-radius: 8px; background: #1c1c21; box-shadow: 0 8px 24px rgba(0,0,0,0.45)">
+        <dc-import name="V2Status" state="rodando" hint-size="14px,14px"></dc-import>
+        <span style="flex: 1">Execução retomada a partir do passo 4</span>
+        <button type="button" style="height: 26px; padding: 0 8px; border: 0; border-radius: 5px; background: transparent; color: #8aa8ff">Desfazer</button>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px">
+        <span style="display: inline-flex; align-items: center; gap: 8px; height: 28px; padding: 0 10px; border: 1px solid #33333b; border-radius: 6px; background: #1c1c21; font-size: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.45)">Retomar daqui <span style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #85858f">R</span></span>
+        <span style="font-size: 12px; color: #85858f">Dica com atalho</span>
+      </div>
+    </div>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1320}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      tokens: [
+        { tok: 'bg.app', d: '#0b0b0d', l: '#f4f4f5' },
+        { tok: 'bg.panel', d: '#111113', l: '#ffffff' },
+        { tok: 'bg.surface', d: '#16161a', l: '#fafafa' },
+        { tok: 'bg.raised', d: '#1c1c21', l: '#f1f1f3' },
+        { tok: 'line.subtle', d: '#1f1f24', l: '#ececef' },
+        { tok: 'line', d: '#2a2a31', l: '#dedee3' },
+        { tok: 'text', d: '#ececef', l: '#111113' },
+        { tok: 'text.2', d: '#a4a4ad', l: '#55555e' },
+        { tok: 'text.3', d: '#85858f', l: '#6b6b75' },
+        { tok: 'accent', d: '#5b8cff', l: '#2f6feb' }
+      ],
+      states: [
+        { k: 'fila', name: 'Na fila', desc: 'Espera a etapa anterior', hex: '#85858f' },
+        { k: 'rodando', name: 'Executando', desc: 'Um agente está trabalhando agora', hex: '#5b8cff' },
+        { k: 'aguardando', name: 'Aguardando você', desc: 'Precisa de aprovação ou resposta', hex: '#f0b03f' },
+        { k: 'pausado', name: 'Pausado', desc: 'Parado por você ou pela política', hex: '#a78bfa' },
+        { k: 'feito', name: 'Concluído', desc: 'Entregou e registrou o resultado', hex: '#3ecf8e' },
+        { k: 'falhou', name: 'Falhou', desc: 'Mostra o motivo e de onde retomar', hex: '#f2555a' }
+      ],
+      agents: [
+        { i: 'RO', n: 'Roteirista', r: 'Pauta e roteiro', c: '#f5b544' },
+        { i: 'ED', n: 'Editor de vídeo', r: 'Cortes, legenda, render', c: '#2dd4bf' },
+        { i: 'DC', n: 'Designer de capa', r: 'Capas e carrosséis', c: '#f472b6' },
+        { i: 'PB', n: 'Publicador', r: 'Agenda e redes', c: '#9aa8ff' }
+      ],
+      space: [
+        { v: 4, use: 'ícone ↔ texto' },
+        { v: 8, use: 'dentro de controles' },
+        { v: 12, use: 'linhas, listas' },
+        { v: 16, use: 'cartões' },
+        { v: 24, use: 'seções' },
+        { v: 32, use: 'blocos de tela' },
+        { v: 48, use: 'margem de página' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

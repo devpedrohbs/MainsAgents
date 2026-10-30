@@ -4,6 +4,7 @@ import type { CSSProperties } from 'react';
 import { useChat } from '../../features/chat/ChatProvider';
 import { defaultMascot } from '../../features/agents/mascot';
 import { useLanguage } from '../../app/LanguageProvider';
+import { StatusIcon } from '../common/StatusIcon';
 import { Icon } from '../common/Icon';
 import { agentToolDetails } from '../../features/agents/model/Agent';
 
@@ -24,10 +25,11 @@ export function AgentRow({agent,compact=false,selected=false,onSelect,onChat,onC
   const last=own.map(session=>session.updatedAt).sort().at(-1);
   const color=(agent.avatarMascot??defaultMascot({name:agent.name,role:agent.role})).color;
   const line=busy?(pt?'Pensando…':'Thinking…'):agent.status==='review'?t('Needs review'):last?(pt?'Livre · ativo em ':'Free · active ')+new Intl.DateTimeFormat(locale,{day:'numeric',month:'short'}).format(new Date(last)):(pt?'Livre':'Free');
-  return <article className={`specialist-tile ${selected?'selected':''} ${busy?'busy':''} ${agent.status==='review'?'review':''}`} data-od-id={'agent-row-'+agent.id} style={{'--agent-color':color} as CSSProperties}>
+  return <article className={`specialist-tile v2-row ${selected?'selected':''} ${busy?'busy':''} ${agent.status==='review'?'review':''}`} data-od-id={'agent-row-'+agent.id} style={{'--agent-color':color} as CSSProperties}>
     <button className="specialist-open" onClick={()=>onSelect(agent.id)} aria-expanded={selected} aria-label={`${pt?'Ver detalhes de':'View details for'} ${agent.name}`}>
-      <div className="specialist-identity"><AgentAvatar name={agent.name} image={agent.avatarImage} mascot={agent.avatarMascot} role={agent.role} thinking={busy}/><div><h2>{agent.name}<small title={provider}>{agent.providerId==='claude'?'Claude':agent.providerId==='gemini'?'Gemini':'Codex'}</small></h2><span className="specialist-role">{agent.role}</span><span className="specialist-state"><i/><span className={busy?'ov-shimmer':''}>{line}</span></span></div></div>
-      <span className="specialist-stats"><span><b>{scopes}</b>{pt?'escopos':'scopes'}</span><span><b>{own.length}</b>{pt?'conversas':'chats'}</span><span><b>{agent.skills?.length??0}</b>skills</span></span>
+      <div className="specialist-identity"><AgentAvatar name={agent.name} image={agent.avatarImage} mascot={agent.avatarMascot} role={agent.role} thinking={busy}/><div><h2>{agent.name}<small title={provider}>{agent.providerId==='claude'?'Claude':agent.providerId==='gemini'?'Gemini':'Codex'}</small></h2><span className="specialist-role">{agent.role}</span><span className="specialist-state"><StatusIcon state={busy?'running':agent.status==='review'?'waiting':'queued'}/><span className={busy?'ov-shimmer':''}>{line}</span></span></div></div>
+      <span className="specialist-model v2-mono" title={agent.modelId || provider}>{agent.modelId || provider}</span>
+      <span className="specialist-stats"><span><b className="v2-mono">{scopes}</b>{pt?'escopos':'scopes'}</span><span><b className="v2-mono">{own.length}</b>{pt?'conversas':'chats'}</span><span><b className="v2-mono">{agent.skills?.length??0}</b>skills</span></span>
       <span className="specialist-chips">{agent.tools.slice(0,4).map(tool=><span key={tool}>{t(agentToolDetails[tool].label)}</span>)}</span>
     </button>
     <div className="precision-agent-actions">{onChat&&<button className="specialist-chat" onClick={()=>onChat(agent.id)} aria-label={`${pt?'Conversar com':'Chat with'} ${agent.name}`}><Icon name="message"/><span>{pt?'Conversar':'Chat'}</span></button>}<button className="soft-button specialist-configure" onClick={()=> (onConfigure??onSelect)(agent.id)} aria-label={`${pt?'Configurar':'Configure'} ${agent.name}`}>{pt?'Configurar':'Configure'}</button></div>

@@ -1,0 +1,84 @@
+/* V2 rules for Home, Studio and Radar (owned by Claude). */
+
+/* Page heads read as one 44px band across the inset panel (Home, Studio, Radar). */
+.studio-shell :is(.ov-head,.content-studio-page>.page-head,.radar-head){margin:0;padding:8px 16px 8px 20px;min-height:var(--header-h);border-bottom:1px solid var(--border);align-items:center;box-sizing:border-box}
+.studio-shell :is(.ov-head,.content-studio-page>.page-head,.radar-head) h1{font:600 15px/22px var(--font-body);letter-spacing:-.005em;margin:0}
+.studio-shell :is(.ov-head,.content-studio-page>.page-head,.radar-head) :is(p,.ov-lede){margin:0;font-size:var(--text-xs);color:var(--meta);max-width:none}
+.studio-shell .ov-date{margin:0;font:500 12px/16px var(--font-body);text-transform:none;color:var(--meta)}
+
+/* Home: Mission Control — dense rows, state glyphs, step bars. */
+.studio-shell .overview-page{padding:0;gap:0}
+.studio-shell .ov-grid{padding:16px 20px 24px;gap:16px}
+.studio-shell .ov-card{border:1px solid var(--border);border-radius:var(--radius-md);background:var(--bg);padding:0;box-shadow:none;overflow:hidden}
+.studio-shell .ov-card-head{min-height:40px;padding:0 12px 0 14px;border-bottom:1px solid var(--border);margin:0}
+.studio-shell .ov-card-head h2{font:600 13px/20px var(--font-body);display:flex;align-items:center;gap:8px}
+.studio-shell .ov-card-head .text-link{font-size:var(--text-xs);color:var(--muted)}
+.studio-shell .ov-card-head .text-link:hover{color:var(--fg)}
+.studio-shell .ov-sub{font:400 12px/16px var(--font-body);color:var(--meta)}
+.studio-shell .ov-needs-count{font:500 11px/18px var(--font-mono);height:18px;padding:0 6px;border-radius:var(--radius-xs);background:var(--warn-soft);color:var(--warn)}
+.studio-shell .ov-list{gap:0}
+.studio-shell .ov-row{min-height:44px;padding:6px 14px;border:0;border-top:1px solid var(--border);border-radius:0;background:transparent;gap:12px}
+.studio-shell .ov-list>.ov-row:first-child{border-top:0}
+.studio-shell .ov-row:hover{background:var(--surface)}
+.studio-shell .ov-row-copy b{font-weight:500;font-size:13px}
+.studio-shell .ov-row-copy small{font-size:12px;color:var(--meta)}
+.studio-shell .ov-tone{display:inline-flex;align-items:center;gap:6px;padding:0;border:0;background:transparent!important;font-size:12px;color:var(--muted)}
+.studio-shell .ov-action{font-size:12px;color:var(--fg-2);border:1px solid var(--line);border-radius:var(--radius-sm);padding:3px 9px;background:var(--surface)}
+.studio-shell .ov-row:hover .ov-action{border-color:var(--line-strong)}
+.studio-shell .ov-need-icon{width:24px;height:24px;border-radius:var(--radius-sm);background:var(--surface-2);color:var(--meta)}
+.studio-shell .ov-bars{gap:2px}
+.studio-shell .ov-bars i{height:4px;border-radius:2px;background:var(--line)}
+.studio-shell .ov-bars i.done{background:var(--state-done)}
+.studio-shell .ov-bars i.current{background:var(--state-running)}
+.studio-shell .ov-prod-labels{padding:6px 14px;border-bottom:1px solid var(--border);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--meta)}
+.studio-shell .ov-provider{font:500 11px/16px var(--font-mono);color:var(--meta)}
+.studio-shell .ov-empty{padding:20px 14px;color:var(--muted)}
+.studio-shell .ov-more{border-top:1px solid var(--border);width:100%;padding:8px;font-size:12px;color:var(--muted);background:transparent}
+.studio-shell .ov-task-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;margin:0;padding:0;border:0;border-radius:0;background:var(--border)}
+.studio-shell .ov-task-stats button{background:var(--bg);border:0;border-radius:0;padding:12px 14px;align-items:flex-start;text-align:left}
+.studio-shell .ov-task-stats b{font:600 20px/26px var(--font-body);font-variant-numeric:tabular-nums}
+.studio-shell .ov-task-stats span{font-size:12px;color:var(--muted);white-space:nowrap}
+.studio-shell .ov-task-stats button{min-width:0;padding:12px 10px 12px 14px}
+.studio-shell .ov-team-pill{height:30px;border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--surface);font-size:12px}
+.studio-shell .ov-alert{margin:10px 14px;border:1px solid color-mix(in srgb,var(--danger) 30%,transparent);border-radius:var(--radius-sm);background:var(--danger-soft);color:var(--danger-text)}
+
+/* Studio: flatter lists and panels, same structure. */
+.studio-shell .content-studio-page{padding:0}
+.studio-shell .content-studio-page>:not(.page-head){margin-left:20px;margin-right:20px}
+.studio-shell .content-studio-page>.page-head+*{margin-top:16px}
+.studio-shell .content-studio-page :is(.editorial-card,.work-panel,.editorial-inbox,.summary-card){border-color:var(--border);border-radius:var(--radius-md);background:var(--bg)}
+.studio-shell .content-studio-page .editorial-progress li{font-size:12px}
+
+/* Radar: sections become bordered lists; metrics in mono. */
+.studio-shell .radar-page{gap:0;padding:0;font-size:13px}
+.studio-shell .radar-page>:not(.radar-head){margin-left:20px;margin-right:20px}
+.studio-shell .radar-page>.radar-head+*{margin-top:16px}
+.studio-shell .radar-page>*+*:not(.radar-head){margin-top:16px}
+.studio-shell .radar-page>:last-child{margin-bottom:24px}
+.studio-shell .radar-section{background:var(--bg);border-color:var(--border);border-radius:var(--radius-md);padding:14px 16px}
+.studio-shell .radar-page h2{font-size:13px;font-weight:600;line-height:20px}
+.studio-shell .radar-page h3{font-size:12px;font-weight:600}
+.studio-shell .radar-page a{color:var(--link)}
+.studio-shell .radar-page summary{font-size:13px}
+.studio-shell .radar-page :is(.primary-button,.soft-button){min-height:var(--control-h-sm);padding:4px 11px;font-size:12px;border-radius:var(--radius-sm)}
+.studio-shell .radar-page :is(input:not([type=checkbox]),select){min-height:var(--control-h);border-color:var(--line);background:var(--surface)}
+.studio-shell .radar-tabs{gap:18px;border-bottom:1px solid var(--border)}
+.studio-shell .radar-tabs button{padding:8px 0;font-size:12px;margin-bottom:-1px}
+.studio-shell .radar-tabs button[aria-current=page]{border-bottom-color:var(--fg);color:var(--fg)}
+.studio-shell .radar-items>li{padding:14px 0}
+.studio-shell .radar-items>li:first-child{margin-top:8px}
+.studio-shell .radar-item-title h2{font-size:14px;font-weight:600}
+.studio-shell .radar-page .radar-item-open{font-size:14px;line-height:20px;font-weight:600}
+.studio-shell .radar-facts{gap:10px 16px}
+.studio-shell .radar-page table{font-family:var(--font-mono);font-size:11.5px}
+.studio-shell .radar-page th{font-family:var(--font-body);font-size:11px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--meta)}
+.studio-shell .radar-status{border-radius:var(--radius-xs);background:var(--surface-2);font-size:11px}
+.studio-shell .radar-status.ok{background:var(--success-soft);color:var(--success)}
+.studio-shell .radar-muted{color:var(--meta);font-size:12px}
+.studio-shell :is(.radar-error,.radar-gap,.radar-notice){border:1px solid var(--line);border-left-width:3px;border-radius:var(--radius-sm);background:var(--surface)}
+.studio-shell .radar-error{border-color:color-mix(in srgb,var(--danger) 35%,transparent);border-left-color:var(--danger);color:var(--danger-text);background:var(--danger-soft)}
+.studio-shell .radar-add-source{background:var(--surface);border:1px solid var(--border)}
+.studio-shell .content-studio-page .editorial-card:not(.editorial-list):not(.editorial-intake){padding:18px 20px}
+.studio-shell .content-studio-page :is(h2,h3){letter-spacing:-.005em}
+.studio-shell .publishing-day.selected,.studio-shell .publishing-day.today{background:var(--surface)}
+.studio-shell .publishing-day:hover{background:var(--surface)}

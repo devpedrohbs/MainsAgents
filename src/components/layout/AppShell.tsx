@@ -24,6 +24,9 @@ interface AppShellProps extends PropsWithChildren {
   onCreate: () => void;
   onProviderSettings: () => void;
   onToast: (message: string) => void;
+  inboxCount: number;
+  activeRuns: number;
+  waitingAgentIds: ReadonlySet<string>;
 }
 export function AppShell({
   page,
@@ -41,6 +44,9 @@ export function AppShell({
   onCreate,
   onProviderSettings,
   onToast,
+  inboxCount,
+  activeRuns,
+  waitingAgentIds,
   children,
 }: AppShellProps) {
   const { locale } = useLanguage();
@@ -97,6 +103,7 @@ export function AppShell({
         navOpen ? 'mobile-nav-open' : '',
       ].join(' ')}
       data-od-id="app-shell"
+      data-page={page}
     >
       <a
         className="skip-link"
@@ -119,6 +126,16 @@ export function AppShell({
       <Sidebar
         currentPage={page}
         agents={agents}
+        inboxCount={inboxCount}
+        activeRuns={activeRuns}
+        waitingAgentIds={waitingAgentIds}
+        panelOpen={showPanel}
+        hasAgent={Boolean(activeAgent)}
+        onCreate={() => {
+          closeNav();
+          onCreate();
+        }}
+        onTogglePanel={onTogglePanel}
         onNavigate={(next) => {
           onNavigate(next);
           closeNav();
@@ -133,16 +150,7 @@ export function AppShell({
           onOpenCommand();
         }}
       />
-        <Topbar
-          onCreate={onCreate}
-          page={page}
-          onNavigate={onNavigate}
-          onOpenCommand={onOpenCommand}
-          onTogglePanel={onTogglePanel}
-          onToggleNav={() => setNavOpen(true)}
-          panelOpen={showPanel}
-          hasAgent={Boolean(activeAgent)}
-        />
+        <Topbar page={page} onNavigate={onNavigate} onToggleNav={() => setNavOpen(true)} />
       <main className="main" inert={navOpen} data-od-id="main-region">
         <div className="view" id="main-content" tabIndex={-1}>
           {children}

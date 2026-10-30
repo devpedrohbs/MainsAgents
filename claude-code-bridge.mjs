@@ -3,6 +3,7 @@ import { createClaudeLimitSnapshot } from './provider-usage.mjs';
 import { createClaudeAccountUsage } from './claude-account-usage.mjs';
 import { createClaudeLimitObserver, limitFailure } from './provider-limits.mjs';
 import { subscriptionOnlyEnv } from './subscription-env.mjs';
+import { readClaudeDefaults } from './claude-runtime-defaults.mjs';
 import { execFileSync, spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import { randomUUID, timingSafeEqual } from 'node:crypto';
@@ -182,6 +183,7 @@ export function createClaudeCodeBridge({
   editorAuthoring = createEditorAuthoring(),
   inspectPaper = inspectPaperDesktop,
   readAccountUsage = createClaudeAccountUsage(),
+  readDefaults = readClaudeDefaults,
 } = {}) {
   const executions = new Map();
   // Stream snapshots remain available to observers; the Usage route reads the account on demand.
@@ -273,18 +275,19 @@ export function createClaudeCodeBridge({
     if (terminalEvents.has(event.type)) record.done = true;
   };
   const status = async () => {
+    const defaults = readDefaults();
     const resolved = resolveCli();
     const installCommand = platform === 'win32' ? 'irm https://claude.ai/install.ps1 | iex' : 'curl -fsSL https://claude.ai/install.sh | bash';
-    if (!resolved) return { providerId: 'claude', state: 'not-installed', authMode: 'cli', billingDescription: 'Uses the account authenticated by Claude Code CLI.', installCommand, loginCommand: 'claude auth login', message: 'Claude Code CLI not found.' };
+    if (!resolved) return { ...defaults, providerId: 'claude', state: 'not-installed', authMode: 'cli', billingDescription: 'Uses the account authenticated by Claude Code CLI.', installCommand, loginCommand: 'claude auth login', message: 'Claude Code CLI not found.' };
     try {
       const result = await capture(resolved, ['auth', 'status']);
       let auth = {};
       try { auth = JSON.parse(result.output); } catch { const start=result.output.indexOf('{'),end=result.output.lastIndexOf('}');if(start>=0&&end>start){try{auth=JSON.parse(result.output.slice(start,end+1))}catch{}} }
       const explicitLogin = typeof auth.loggedIn === 'boolean' ? auth.loggedIn : typeof auth.isLoggedIn === 'boolean' ? auth.isLoggedIn : undefined;
       const loggedIn = explicitLogin ?? result.code === 0;
-      return { providerId: 'claude', state: loggedIn ? 'connected' : 'login-required', authMode: 'cli', billingDescription: 'Uses your Claude Code CLI account and its billing terms.', loginCommand: 'claude auth login', message: loggedIn ? '' : 'Sign in to Claude Code CLI.' };
+      return { ...defaults, providerId: 'claude', state: loggedIn ? 'connected' : 'login-required', authMode: 'cli', billingDescription: 'Uses your Claude Code CLI account and its billing terms.', loginCommand: 'claude auth login', message: loggedIn ? '' : 'Sign in to Claude Code CLI.' };
     } catch {
-      return { providerId: 'claude', state: 'error', authMode: 'cli', billingDescription: 'Uses the account authenticated by Claude Code CLI.', loginCommand: 'claude auth login', message: 'Could not check Claude Code CLI authentication.' };
+      return { ...defaults, providerId: 'claude', state: 'error', authMode: 'cli', billingDescription: 'Uses the account authenticated by Claude Code CLI.', loginCommand: 'claude auth login', message: 'Could not check Claude Code CLI authentication.' };
     }
   };
   const workspaceFor = (workspaceId) => {

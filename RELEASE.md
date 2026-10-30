@@ -1,6 +1,55 @@
 # Publicação e recuperação do MainsAgents (Windows)
 
-## Atualização local atual — 0.3.80 (28/10/2026)
+## Atualização local atual — 0.3.87 (30/10/2026)
+
+Conexão Claude Code e modelo configurado identificados no chat, sem inferência para descobrir a configuração. Modelos explícitos continuam preservados. Menu de modelos usa a camada superior do navegador para não ser cortado; Esc fecha somente o menu. Instalada sobre a 0.3.86 por NSIS silencioso, retorno 0. Nove bancos, arquivos e skills idênticos antes/depois. [Validação e limites](docs/analysis/local-update-0.3.87-2026-10-30.md).
+
+- Instalador: `release/r87c-20261030/MainsAgents-Setup-0.3.87.exe`, SHA-256 `b010564e4023610b904d3da60cd977ad1e028b3319d126e9e5bed42a2ea8db67`.
+- ASAR instalado igual ao pacote: `31ee1524515ff0a32df753061d6e625bafcef997ebee3393249a91ca1350d3eb`; FileVersion `0.3.87`, ProductVersion `0.3.87.0`.
+- Suíte: 925 testes, 923 aprovados, 2 condicionais ignorados. UI focada e persistência do ASAR aprovadas; limite preexistente da comparação em janela estreita documentado no relatório. Sem commit ou publicação pública.
+
+## Atualização local anterior — 0.3.86 (30/10/2026)
+
+V2 completa: Caixa de entrada em duas colunas, Estúdio com abas Conversa/Etapas, Radar com lista de sinais e detalhe, link de execução no Calendário, aba Execuções no agente, "Execuções que mais consumiram" em Uso, correções de layout. `npm test`: 918 aprovados, 2 ignorados. Instalada com NSIS silencioso, retorno 0; snapshots idênticos. Detalhes: `docs/analysis/local-update-0.3.86-2026-10-30.md`.
+
+- Instalador: `release/r86b-20261030/MainsAgents-Setup-0.3.86.exe`, SHA-256 `19ac80fab781c5ae3d0bf3abac46e09b36afba18dd8ddad093939f5d628ca2c8`.
+- ASAR do pacote: `6b22ad7b195e54f48d0f148bfa2de354ddbe1c7a72f5d4aacf58c3c7275a33ab`.
+
+## Atualização local anterior — 0.3.85 (29/10/2026)
+
+V2 estrutural, conforme `docs/design/v2/`: barra lateral nova (Caixa de entrada, Mission Control, Execuções; grupos Conteúdo, Workspace e Equipe com estado de cada agente), Home como Mission Control, páginas novas Caixa de entrada, Execuções (lista + detalhe com plano, cascata, registros e inspetor) e Pipelines (diagrama da produção ativa com estados da última execução), Estúdio com trilha de etapas e painel de contexto. Canvas sem mudança. Typecheck aprovado; suíte de 920 testes: 918 aprovados, 2 ignorados. Instalada por NSIS silencioso por usuário, retorno 0; snapshots antes/depois idênticos (`compare --strict-leases`). Backup em `~/.mainsagents/backups/local-update-0.3.85-2026-10-29/final`. Detalhes: `docs/analysis/local-update-0.3.85-2026-10-29.md`.
+
+- Instalador: `release/r85-20261029/MainsAgents-Setup-0.3.85.exe`, SHA-256 `224e6278b9ee657394918c2e452d62aae970a522b14bd61768d0b5d03f20ca59`.
+- ASAR do pacote: `3696b0f4b455124d5ad777e4179a22357b12f518dbe47e1e8e6ac4fc7278636d`.
+
+## Atualização local — 0.3.84 (29/10/2026)
+
+Pacote do design V2 validado: base, páginas da equipe, Home, Estúdio, Radar e ícones de estado compartilhados; Canvas mantém o visual anterior. Typecheck, suíte de 920 testes (918 aprovados, 2 ignorados, zero falhas), os cinco testes de UI do dist e persistência do ASAR aprovados. Instalada sobre a 0.3.83 por NSIS silencioso por usuário, retorno 0, após o usuário fechar o app normalmente (salvamento verificado); FileVersion `0.3.84`, ProductVersion `0.3.84.0`, ASAR instalado idêntico ao pacote. Nove bancos, arquivos locais e skills idênticos antes/depois. [Validação e andamento](docs/analysis/local-update-0.3.84-2026-10-29.md).
+
+- Instalador: `release/r84-20261029/MainsAgents-Setup-0.3.84.exe`, SHA-256 `9e9dc1c4aa9ac1719efb41af1547a8487cfc1aabd1fcaf066a526224a07bde6f`.
+- ASAR do pacote: `7db76f6dd8492395b32f437c4d2d68b145ee4c8016906fde361014d7a0d17ad4`.
+
+## Atualização local — 0.3.83 (29/10/2026)
+
+Instalada sobre a 0.3.82 por NSIS silencioso por usuário, retorno 0. Adiciona espaços independentes no Canvas, migração compatível do Canvas anterior, isolamento de contexto automático por perfil/workspace/espaço e backup de todos os espaços. Remove a página Fluxo e mantém a configuração dos agentes em **Criar → Nova produção**, preservando o modelo de produção existente. [Validação, limites e preservação](docs/analysis/local-update-0.3.83-2026-10-29.md).
+
+- Instalador: `release/r83-20261029/MainsAgents-Setup-0.3.83.exe`, SHA-256 `09a190925c6717cc08898dcc562010bb4bdbd25428e067a3558c073fd4759658`.
+- ASAR instalado idêntico ao pacote: `ef4207737e7929c421c62f0069fcd51b7b58684534cd04a23667aa998e16abde`; FileVersion `0.3.83`, ProductVersion `0.3.83.0`.
+- Suíte: 920 testes, 918 aprovados, 2 ignorados, zero falhas. UI de Canvas, produção, edição por etapas e persistência do pacote aprovadas; limites de duas fixtures antigas registrados no relatório. Nove bancos, 146 arquivos locais e 15 raízes de skills preservados por comparação completa antes/depois. Sem publicação pública ou commit nesta rodada.
+
+## Atualização local anterior — 0.3.82 (29/10/2026)
+
+Instalada sobre a 0.3.81 por NSIS silencioso por usuário, retorno 0. Remove os dois guias iniciais e sua reabertura em Configurações; adiciona exclusão de pautas no Estúdio com confirmação, isolamento, proteção de pesquisas/conteúdos vinculados e prevenção de restauração por escritas antigas. Corrige também a confirmação de exclusão de conteúdo recarregando a cada atualização do pai. [Validação e preservação](docs/analysis/local-update-0.3.82-2026-10-29.md).
+
+- Instalador: `release/r82-20261029/MainsAgents-Setup-0.3.82.exe`, SHA-256 `670601c39f908adedba2181ea6e094c4b264fad4f0abb847f26402e5523b3902`.
+- ASAR instalado idêntico ao pacote: `49362d761ea33f400e57aa4a352ea8ecfd4f06a8537e3af2f6472af3cacd39d6`; FileVersion `0.3.82`, ProductVersion `0.3.82.0`.
+- Suíte: 912 testes, 910 aprovados, 2 ignorados, zero falhas; três smokes de UI e persistência do pacote aprovados. Nove bancos, 145 arquivos locais e 15 raízes de skills preservados por comparação antes/depois. Sem publicação pública ou commit nesta rodada.
+
+## Atualização local anterior — 0.3.81 (29/10/2026)
+
+Radar editorial instalado localmente sobre a 0.3.80, com dados preservados. [Validação e pacote](docs/analysis/local-update-0.3.81-2026-10-29.md).
+
+## Atualização local anterior — 0.3.80 (28/10/2026)
 
 Instalada sobre a 0.3.79 por NSIS silencioso com retorno 0. Rodada 8: Referências de edição (biblioteca, estudo com player, análise com aprovação explícita, Meu estilo, Kit de motion) e motor HyperFrames 0.8.212 local real, comprovado no host empacotado. FileVersion `0.3.80`, ProductVersion `0.3.80.0`; ASAR instalado igual ao pacote; nove bancos, 143 arquivos locais, 15 pastas de skills e mídias de referências idênticos antes/depois. [Validação, motor e backup](docs/analysis/local-update-0.3.80-2026-10-28.md).
 

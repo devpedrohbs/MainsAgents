@@ -8,6 +8,7 @@ import {validatePublications} from '../../publication-model.mjs';
 import {validateProductionFlows,mergeProductionFlows} from '../features/flows/flowModel.ts';
 import {validateContentScopes,mergeContentScopes} from '../features/chat/contentScopes.ts';
 import {validDraftKey} from '../features/chat/chatDraftModel.ts';
+import {mergeCanvasWorkspaces,validCanvasWorkspace} from '../components/canvas/canvasBoards.ts';
 export const dataKeys = ['workspaces', 'current-workspace', 'agents', 'sessions', 'active-sessions', 'tasks', 'canvas-workspaces', 'production-flows', 'language', 'focus-mode', 'text-scale', 'reduced-motion', 'welcome-dismissed', 'sidebar-width', 'inspector-width', 'default-codex-model', 'chat-presentation', 'chat-drafts', 'studio-drafts', 'agent-drafts', 'chat-inbox', 'studio-view', 'content-scopes'] as const;
 const collectionKeys = new Set(['workspaces', 'agents', 'sessions', 'tasks']);
 export interface BackupFile { format:'mainsagents-backup'; version:1; exportedAt:string; data:Record<string, unknown>; editorial?:Record<string,unknown>; execution?:Record<string,unknown>; recovery?:boolean; fileManifest?:Array<{agentId:string;directory?:string;skills:unknown}> }
@@ -36,6 +37,7 @@ export function parseBackup(text:string):BackupFile {
   const sessions=parsed.data.sessions;if(Array.isArray(sessions)&&sessions.some((session)=>!isObject(session)||typeof session.agentId!=='string'||typeof session.title!=='string'||!Array.isArray(session.messages)))throw new Error('Invalid sessions in backup.');
   const tasks=parsed.data.tasks;if(Array.isArray(tasks)&&tasks.some((task)=>!isObject(task)||typeof task.agentId!=='string'||typeof task.workspaceId!=='string'||typeof task.title!=='string'))throw new Error('Invalid tasks in backup.');
   for(const key of ['active-sessions','canvas-workspaces'])if(key in parsed.data && !isObject(parsed.data[key]))throw new Error(`Invalid ${key} data in backup.`);
+  if(isObject(parsed.data['canvas-workspaces']))for(const value of Object.values(parsed.data['canvas-workspaces']))if(isObject(value)&&value.schemaVersion===2&&!validCanvasWorkspace(value))throw new Error('Invalid Canvas spaces in backup.');
   if('content-scopes' in parsed.data&&!validateContentScopes(parsed.data['content-scopes']))throw new Error('Invalid content spaces in backup.');
   if ('studio-drafts' in parsed.data&&!validateStudioDrafts(parsed.data['studio-drafts']))throw new Error('Invalid Studio drafts in backup.');
   if (agentDraftStorageKey in parsed.data){const problem=agentDraftsProblem(parsed.data[agentDraftStorageKey]);if(problem)throw new Error(`Invalid agent drafts in backup: ${problem}.`);}
@@ -84,6 +86,7 @@ function mergeCanvas(current:unknown,incoming:unknown):unknown {
   for(const [workspaceId,remote] of Object.entries(incoming)) {
     const local=current[workspaceId];
     if(!isObject(local)||!isObject(remote)){if(!(workspaceId in current))merged[workspaceId]=remote;continue}
+    if(local.schemaVersion===2||remote.schemaVersion===2){merged[workspaceId]=mergeCanvasWorkspaces(local,remote);continue;}
     merged[workspaceId]={...remote,...local,nodes:mergeRows(local.nodes,remote.nodes),edges:mergeRows(local.edges,remote.edges)};
   }
   return merged;

@@ -47,8 +47,8 @@ export function EditingReferences({ onOpenStudio }: { onOpenStudio: (contentId?:
     return <ReferenceLibrary api={api} pt={pt} locale={locale} onOpen={open} onAdd={() => setAdding(true)} onError={onError} onUndoable={(message, undo) => show({ message, tone: 'info', undo })} />;
   };
 
-  return <div className="page er-page" data-od-id="editing-references">
-    <header className="er-head">
+  return <div className="page er-page v2-team v2-page" data-od-id="editing-references">
+    <header className="er-head v2-header">
       <div className="er-head-title"><h1>{pt ? 'Referências de edição' : 'Editing references'}</h1><p>{pt ? 'Ensine aos agentes como você edita: estude vídeos, aprove orientações e monte seu kit de motion.' : 'Teach agents how you edit: study videos, approve guidance and build your motion kit.'}</p></div>
       <nav className="er-views" aria-label={pt ? 'Seções' : 'Sections'}>
         {views.map(([id, label, hint]) => <button type="button" key={id} aria-current={view === id && !(id === 'library' && openId) ? 'page' : undefined} className={view === id ? 'active' : ''} title={hint} onClick={() => { setView(id); setOpenId(null); }}>

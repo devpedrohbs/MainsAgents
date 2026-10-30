@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>MainsAgents V2 — Barra lateral</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<aside aria-label="Navegação principal" style="width: 220px; height: 900px; box-sizing: border-box; display: flex; flex-direction: column; gap: 2px; padding: 10px 8px; background: #0b0b0d; color: #ececef; font-family: Inter, -apple-system, system-ui, sans-serif; font-size: 13px; line-height: 20px; font-feature-settings: 'cv11' 1, 'ss01' 1">
+
+  <div style="display: flex; align-items: center; gap: 4px; padding: 0 0 8px">
+    <button type="button" aria-label="Trocar workspace: Mains Studio" style="flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 6px; border: 0; border-radius: 6px; background: transparent; color: #ececef; font: inherit; cursor: pointer">
+      <span aria-hidden="true" style="flex: 0 0 22px; height: 22px; border-radius: 6px; background: #1c1c21; border: 1px solid #2a2a31; display: flex; align-items: center; justify-content: center">
+        <svg viewBox="0 0 64 64" width="16" height="16"><path d="M14 30 A18 18 0 0 1 50 30 V46 Q50 54 41 57 L32 49 L23 57 Q14 54 14 46 Z" fill="#ececef"></path><ellipse cx="26" cy="29" rx="2.6" ry="3.6" fill="#1c1c21"></ellipse><ellipse cx="38" cy="29" rx="2.6" ry="3.6" fill="#1c1c21"></ellipse></svg>
+      </span>
+      <span style="font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Mains Studio</span>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#85858f" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M7 10l5 5 5-5"></path></svg>
+    </button>
+    <button type="button" aria-label="Criar (C)" title="Criar · C" style="flex: 0 0 30px; height: 30px; border: 1px solid #2a2a31; border-radius: 6px; background: #16161a; color: #ececef; display: flex; align-items: center; justify-content: center; padding: 0; cursor: pointer">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h8"></path><path d="M16.5 4.5a2.1 2.1 0 0 1 3 3L8 19l-4 1 1-4z"></path></svg>
+    </button>
+  </div>
+
+  <button type="button" style="display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 8px; margin-bottom: 6px; border: 1px solid #1f1f24; border-radius: 6px; background: #111113; color: #85858f; font: inherit; cursor: pointer">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="M20 20l-4-4"></path></svg>
+    Buscar ou executar
+    <span style="margin-left: auto; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #85858f">⌘K</span>
+  </button>
+
+  <a href="V2Caixa.dc.html" aria-current="{{a.inbox.cur}}" style="display: flex; align-items: center; gap: 10px; height: 30px; padding: 0 8px; border-radius: 6px; text-decoration: none; color: {{a.inbox.fg}}; background: {{a.inbox.bg}}">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="{{a.inbox.ic}}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 13l2.5-7h11L20 13v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"></path><path d="M4 13h4.5l1 2h5l1-2H20"></path></svg>
+    Caixa de entrada
+    <span style="margin-left: auto; min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box; border-radius: 9px; background: #f0b03f; color: #0b0b0d; font-size: 11px; font-weight: 600; line-height: 18px; text-align: center">4</span>
+  </a>
+  <a href="V2Inicio.dc.html" aria-current="{{a.home.cur}}" style="display: flex; align-items: center; gap: 10px; height: 30px; padding: 0 8px; border-radius: 6px; text-decoration: none; color: {{a.home.fg}}; background: {{a.home.bg}}">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="{{a.home.ic}}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 16a8 8 0 1 1 16 0"></path><path d="M12 16l4-4.5"></path><circle cx="12" cy="16" r="1.2"></circle></svg>
+    Mission Control
+  </a>
+  <a href="V2Execucao.dc.html" aria-current="{{a.runs.cur}}" style="display: flex; align-items: center; gap: 10px; height: 30px; padding: 0 8px; border-radius: 6px; text-decoration: none; color: {{a.runs.fg}}; background: {{a.runs.bg}}">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="{{a.runs.ic}}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M10.5 9l4.5 3-4.5 3z"></path></svg>
+    Execuções
+    <span style="margin-left: auto; display: flex; align-items: center; gap: 6px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #8aa8ff"><i aria-hidden="true" style="width: 6px; height: 6px; border-radius: 50%; background: #5b8cff"></i>3</span>
+  </a>
+
+  <p style="margin: 14px 8px 2px; font-size: 11px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: #85858f">Conteúdo</p>
+  <a href="V2Estudio.dc.html" aria-current="{{a.studio.cur}}" style="display: flex; align-items: center; gap: 10px; height: 30px; padding: 0 8px; border-radius: 6px; text-decoration: none; color: {{a.studio.fg}}; background: {{a.studio.bg}}">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="{{a.studio.ic}}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="8" width="17" height="11.5" rx="2"></rect><path d="M3.5 8l2-3.5h13l2 3.5M9.5 4.5L8 8M15.5 4.5L14 8"></path></svg>
+    Estúdio
+  </a>
+  <a href="V2Radar.dc.html" aria-current="{{a.radar.cur}}" style="display: flex; align-items: center; gap: 10px; height: 30px; padding: 0 8px; border-radius: 6px; text-decoration: none; color: {{a.radar.fg}}; background: {{a.radar.bg}}">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="{{a.radar.ic}}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><circle cx="12" cy="12" r="4.5"></circle><path d="M12 12l5.5-5.5"></path></svg>
+    Radar
+    <span style="margin-left: auto; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #85858f">12</span>
+  </a>
+  <a href="V2Referencias.dc.html" aria-current="{{a.refs.cur}}" style="display: flex; align-items: center; gap: 10px; height: 30px; padding: 0 8px; border-radius: 6px; text-decoration: none; color: {{a.refs.fg}}; background: {{a.refs.bg}}">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="{{a.refs.ic}}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4h10v16l-5-3.5L7 20z"></path></svg>
+    Referências
+  </a>
+  <a href="V2Calendario.dc.html" aria-current="{{a.calendar.cur}}" style="display: flex; align-items: center; gap: 10px; height: 30px; padding: 0 8px; border-radius: 6px; text-decoration: none; color: {{a.calendar.fg}}; background: {{a.calendar.bg}}">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="{{a.calendar.ic}}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="5.5" width="16" height="14" rx="2"></rect><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4"></path></svg>
+    Calendário
+  </a>
+
+  <p style="margin: 14px 8px 2px; font-size: 11px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: #85858f">Workspace</p>
+  <a href="V2Quadro.dc.html" aria-current="{{a.board.cur}}" style="display: flex; align-items: center; gap: 10px; height: 30px; padding: 0 8px; border-radius: 6px; text-decoration: none; color: {{a.board.fg}}; background: {{a.board.bg}}">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="{{a.board.ic}}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4.5" width="16" height="15" rx="2"></rect><path d="M9.5 4.5v15M14.5 4.5v15"></path></svg>
+    Quadro
+  </a>
+  <a href="V2Canvas.dc.html" aria-current="{{a.canvas.cur}}" style="display: flex; align-items: center; gap: 10px; height: 30px; padding: 0 8px; border-radius: 6px; text-decoration: none; color: {{a.canvas.fg}}; background: {{a.canvas.bg}}">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="{{a.canvas.ic}}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1.5"></rect><rect x="14" y="14" width="6" height="6" rx="1.5"></rect><path d="M10 7h4a3 3 0 0 1 3 3v4"></path></svg>
+    Canvas
+  </a>
+  <a href="V2Pipeline.dc.html" aria-current="{{a.pipeline.cur}}" style="display: flex; align-items: center; gap: 10px; height: 30px; padding: 0 8px; border-radius: 6px; text-decoration: none; color: {{a.pipeline.fg}}; background: {{a.pipeline.bg}}">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="{{a.pipeline.ic}}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="2"></circle><circle cx="6" cy="18" r="2"></circle><circle cx="18" cy="12" r="2"></circle><path d="M8 6c5 0 4 6 8 6M8 18c5 0 4-6 8-6"></path></svg>
+    Pipelines
+  </a>
+  <a href="V2Escopos.dc.html" aria-current="{{a.scopes.cur}}" style="display: flex; align-items: center; gap: 10px; height: 30px; padding: 0 8px; border-radius: 6px; text-decoration: none; color: {{a.scopes.fg}}; background: {{a.scopes.bg}}">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="{{a.scopes.ic}}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4l8 4-8 4-8-4z"></path><path d="M4 12l8 4 8-4M4 16l8 4 8-4"></path></svg>
+    Escopos
+  </a>
+  <a href="V2Historico.dc.html" aria-current="{{a.history.cur}}" style="display: flex; align-items: center; gap: 10px; height: 30px; padding: 0 8px; border-radius: 6px; text-decoration: none; color: {{a.history.fg}}; background: {{a.history.bg}}">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="{{a.history.ic}}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 7.5V12l3 2"></path></svg>
+    Histórico
+  </a>
+
+  <div style="display: flex; align-items: center; margin: 14px 4px 2px 8px">
+    <span style="font-size: 11px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: #85858f">Equipe</span>
+    <a href="V2Agentes.dc.html" style="margin-left: auto; font-size: 12px; color: {{a.agents.link}}; text-decoration: none; padding: 0 4px">Ver todos</a>
+  </div>
+  <sc-for list="{{agents}}" as="g" hint-placeholder-count="4">
+    <a href="V2Agentes.dc.html" style="display: flex; align-items: center; gap: 10px; height: 30px; padding: 0 8px; border-radius: 6px; text-decoration: none; color: #ececef">
+      <span aria-hidden="true" style="position: relative; flex: 0 0 18px; height: 18px; border-radius: 5px; background: {{g.c}}; color: #0b0b0d; font-size: 9px; font-weight: 700; display: flex; align-items: center; justify-content: center">{{g.i}}<i style="position: absolute; right: -3px; bottom: -3px; width: 8px; height: 8px; border-radius: 50%; border: 2px solid #0b0b0d; background: {{g.dot}}"></i></span>
+      <span style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{g.n}}</span>
+      <span style="font-size: 12px; color: #85858f">{{g.s}}</span>
+    </a>
+  </sc-for>
+
+  <div style="flex-grow: 1"></div>
+
+  <section aria-label="Uso dos provedores" style="display: flex; flex-direction: column; gap: 2px; padding: 6px 0; border-top: 1px solid #1f1f24">
+    <a href="V2Uso.dc.html" title="Uso do Claude · janela de 5 horas" aria-current="{{a.claude.cur}}" style="display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 8px; border-radius: 6px; text-decoration: none; color: #ececef; background: {{a.claude.bg}}">
+      <svg width="24" height="24" viewBox="0 0 26 26" aria-hidden="true"><circle cx="13" cy="13" r="11" fill="none" stroke="#2a2a31" stroke-width="2.5"></circle><circle cx="13" cy="13" r="11" fill="none" stroke="#e8875f" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="{{claudeDash}}" transform="rotate(-90 13 13)"></circle><path d="M13 8.5v9M8.5 13h9M9.8 9.8l6.4 6.4M16.2 9.8l-6.4 6.4" stroke="#e8875f" stroke-width="1.6" stroke-linecap="round"></path></svg>
+      <span style="flex: 1">Claude</span>
+      <b style="font-weight: 600; font-variant-numeric: tabular-nums">18%</b>
+    </a>
+    <a href="V2Uso.dc.html" title="Uso do Codex · janela de 5 horas" aria-current="{{a.codex.cur}}" style="display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 8px; border-radius: 6px; text-decoration: none; color: #ececef; background: {{a.codex.bg}}">
+      <svg width="24" height="24" viewBox="0 0 26 26" aria-hidden="true"><circle cx="13" cy="13" r="11" fill="none" stroke="#2a2a31" stroke-width="2.5"></circle><circle cx="13" cy="13" r="11" fill="none" stroke="#ececef" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="{{codexDash}}" transform="rotate(-90 13 13)"></circle><path d="M9 10l3 3-3 3M13.5 16h4" fill="none" stroke="#ececef" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+      <span style="flex: 1">Codex</span>
+      <b style="font-weight: 600; font-variant-numeric: tabular-nums">42%</b>
+    </a>
+  </section>
+  <a href="V2Config.dc.html" aria-current="{{a.settings.cur}}" style="display: flex; align-items: center; gap: 10px; height: 30px; padding: 0 8px; border-radius: 6px; text-decoration: none; color: {{a.settings.fg}}; background: {{a.settings.bg}}">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="{{a.settings.ic}}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"></path><circle cx="16" cy="7" r="2"></circle><circle cx="10" cy="17" r="2"></circle></svg>
+    Configurações
+  </a>
+</aside>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"active":{"editor":"enum","options":["inbox","home","runs","studio","radar","refs","calendar","board","canvas","pipeline","scopes","history","agents","settings","claude","codex"],"default":"home"},"$preview":{"width":220,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var active = this.props.active ?? 'home';
+    var keys = ['inbox', 'home', 'runs', 'studio', 'radar', 'refs', 'calendar', 'board', 'canvas', 'pipeline', 'scopes', 'history', 'agents', 'settings', 'claude', 'codex'];
+    var ring = function (pct) { var c = 2 * Math.PI * 11; return (c * pct / 100).toFixed(1) + ' ' + c.toFixed(1); };
+    var a = {};
+    keys.forEach(function (k) {
+      var on = k === active;
+      a[k] = { cur: on ? 'page' : 'false', fg: on ? '#ececef' : '#a4a4ad', bg: on ? '#1c1c21' : 'transparent', ic: on ? '#ececef' : '#85858f', link: on ? '#ececef' : '#8aa8ff' };
+    });
+    return {
+      a: a,
+      claudeDash: ring(18),
+      codexDash: ring(42),
+      agents: [
+        { i: 'RO', n: 'Roteirista', c: '#f5b544', dot: '#3ecf8e', s: '' },
+        { i: 'ED', n: 'Editor de vídeo', c: '#2dd4bf', dot: '#f0b03f', s: 'espera você' },
+        { i: 'DC', n: 'Designer de capa', c: '#f472b6', dot: '#5b8cff', s: 'gerando' },
+        { i: 'PB', n: 'Publicador', c: '#9aa8ff', dot: '#3ecf8e', s: '' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

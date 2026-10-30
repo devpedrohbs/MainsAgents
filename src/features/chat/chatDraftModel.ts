@@ -1,4 +1,4 @@
-export interface DraftContext { workspaceId: string; nodeId: string; label: string }
+export interface DraftContext { workspaceId: string; nodeId: string; label: string; boardId?:string }
 export interface ChatDraft { text: string; skill: string | null; context?: DraftContext[] }
 export type ChatDraftMap = Record<string, ChatDraft>;
 export const emptyChatDraft: ChatDraft = { text: '', skill: null, context: [] };
@@ -27,7 +27,7 @@ export function normalizeChatDraft(value: unknown): ChatDraft {
   const item = value && typeof value === 'object' ? value as Record<string, unknown> : {};
   const context = Array.isArray(item.context) ? item.context.filter((ref): ref is DraftContext =>
     !!ref && typeof ref === 'object' && typeof ref.workspaceId === 'string' && typeof ref.nodeId === 'string' && typeof ref.label === 'string',
-  ).map(({ workspaceId, nodeId, label }) => ({ workspaceId, nodeId, label })) : [];
+  ).map(({ workspaceId, nodeId, label,boardId }) => ({ workspaceId, nodeId, label,...(typeof boardId==='string'&&boardId?{boardId}:{}) })) : [];
   return { text: typeof item.text === 'string' ? item.text : '', skill: typeof item.skill === 'string' ? item.skill : null, context };
 }
 

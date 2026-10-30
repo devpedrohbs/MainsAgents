@@ -1,33 +1,18 @@
-﻿import type { PageId } from '../../app/types';
+import type { PageId } from '../../app/types';
 import { Icon } from '../common/Icon';
 import { Breadcrumbs } from './Breadcrumbs';
 import { useLanguage } from '../../app/LanguageProvider';
-import { WorkspaceSwitcher } from './WorkspaceSwitcher';
-import { SaveIndicator } from './SaveIndicator';
 
 interface TopbarProps {
   page: PageId;
   onNavigate: (page: PageId) => void;
-  onOpenCommand: () => void;
-  onCreate: () => void;
-  onTogglePanel: () => void;
   onToggleNav: () => void;
-  panelOpen: boolean;
-  hasAgent: boolean;
 }
-export function Topbar({
-  page,
-  onNavigate,
-  onOpenCommand,
-  onCreate,
-  onTogglePanel,
-  onToggleNav,
-  panelOpen,
-  hasAgent,
-}: TopbarProps) {
-  const { locale, t, appearance, setAppearance } = useLanguage();
+/** V2 has no top bar on desktop: pages own their 44px header. This strip only opens the navigation on narrow windows. */
+export function Topbar({ page, onNavigate, onToggleNav }: TopbarProps) {
+  const { locale } = useLanguage();
   return (
-    <header className="topbar" data-od-id="topbar">
+    <header className="topbar v2-mobile-bar" data-od-id="topbar">
       <button
         className="icon-button mobile-menu-button"
         onClick={onToggleNav}
@@ -36,52 +21,7 @@ export function Topbar({
       >
         <Icon name="menu" />
       </button>
-      <div className="studio-project"><WorkspaceSwitcher /><Breadcrumbs page={page} onNavigate={onNavigate} /></div>
-      <div className="top-actions">
-        <div className="precision-theme-picker" role="group" aria-label={locale==='pt-BR'?'Aparência':'Appearance'}><button type="button" aria-pressed={appearance==='light'} onClick={()=>setAppearance('light')}>{locale==='pt-BR'?'Claro':'Light'}</button><button type="button" aria-pressed={appearance==='dark'} onClick={()=>setAppearance('dark')}>{locale==='pt-BR'?'Escuro':'Dark'}</button></div>
-        <SaveIndicator />
-        <button className="soft-button codex-usage-trigger" aria-current={page==='usage'?'page':undefined} onClick={() => onNavigate('usage')} title={locale === 'pt-BR' ? 'Uso do Claude e do Codex' : 'Claude and Codex usage'}>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 18a9 9 0 1 1 16 0M12 12l4-4"/><circle cx="12" cy="12" r="1"/></svg><span>{locale === 'pt-BR' ? 'Uso' : 'Usage'}</span>
-        </button>
-        <button
-          className="soft-button global-search"
-          onClick={onOpenCommand}
-          data-od-id="global-search"
-          aria-label={
-            locale === 'pt-BR' ? 'Buscar agentes, tarefas e sessões' : 'Search agents, tasks and sessions'
-          }
-        >
-          <Icon name="search" />
-          <span>{locale === 'pt-BR' ? 'Buscar no workspace…' : 'Search workspace…'}</span>
-          <span className="kbd">Ctrl K</span>
-        </button>
-        <button
-          className="soft-button chat-toggle"
-          onClick={onTogglePanel}
-          aria-label={t('Toggle chat panel')}
-          aria-pressed={panelOpen}
-          disabled={!hasAgent}
-          title={
-            !hasAgent
-              ? locale === 'pt-BR'
-                ? 'Crie um agente para conversar'
-                : 'Create an agent to start chatting'
-              : t('Toggle chat panel')
-          }
-          data-od-id="toggle-chat"
-        >
-          <Icon name="message" />
-          <span>{t('Chat')}</span>
-        </button>
-        <button
-          className="primary-button global-create"
-          onClick={onCreate}
-          aria-label={locale === 'pt-BR' ? 'Criar' : 'Create'}
-        >
-          <Icon name="plus" />
-          <span>{locale === 'pt-BR' ? 'Criar' : 'Create'}</span>
-        </button>
-      </div>
+      <div className="studio-project"><Breadcrumbs page={page} onNavigate={onNavigate} /></div>
     </header>
   );
 }

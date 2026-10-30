@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAgents } from '../features/agents/AgentsProvider';
 import { useChat } from '../features/chat/ChatProvider';
+import { StatusIcon } from '../components/common/StatusIcon';
 import { Icon } from '../components/common/Icon';
 import { AgentAvatar } from '../components/agents/AgentAvatar';
 import { useWorkspaces } from '../app/WorkspaceProvider';
@@ -93,7 +94,7 @@ export function Sessions({
     const busy = ['thinking', 'searching', 'using-tool'].includes(getRunState(session.id));
     const isSelected = selected?.id === session.id;
     return (
-      <article className={`conversation-row${isSelected ? ' selected' : ''}`} key={session.id}>
+      <article className={`conversation-row v2-row${isSelected ? ' selected' : ''}`} key={session.id}>
         {editingId === session.id ? (
           <form className="conversation-rename" onSubmit={(event) => { event.preventDefault(); saveTitle(); }}>
             <input autoFocus aria-label={pt ? 'Título da conversa' : 'Conversation title'} value={title} onChange={(event) => setTitle(event.target.value)} onKeyDown={(event) => { if (event.key === 'Escape') setEditingId(null); }} />
@@ -105,7 +106,7 @@ export function Sessions({
           <button className="conversation-open" aria-current={isSelected} onClick={() => setSelectedId(session.id)} onDoubleClick={() => openChat(session)}>
             <AgentAvatar name={agent?.name ?? t('Deleted agent')} image={agent?.avatarImage} mascot={agent?.avatarMascot} role={agent?.role} thinking={busy} />
             <span className="conversation-copy">
-              <span className="conversation-line"><b>{session.title}</b><small>{busy ? t('Running') : shortDate(session.updatedAt)}</small></span>
+              <span className="conversation-line"><StatusIcon state={busy?'running':getRunState(session.id)==='error'?'failed':getRunState(session.id)==='finished'?'done':'queued'}/><b>{session.title}</b><small className="v2-mono">{busy ? t('Running') : shortDate(session.updatedAt)}</small></span>
               <span className="conversation-snippet">{agent?.name ?? t('Deleted agent')}: {last?.type === 'message' ? last.content : pt ? 'conversa ainda sem mensagens' : 'no messages yet'}</span>
             </span>
           </button>
@@ -186,16 +187,16 @@ export function Sessions({
   const previewMessages = selected ? selected.messages.filter((item) => item.type === 'message').slice(-6) : [];
   const previewBusy = selected ? ['thinking', 'searching', 'using-tool'].includes(getRunState(selected.id)) : false;
   return (
-    <div className="page sessions-page hs">
-      <section className="hs-list" aria-labelledby="history-heading">
-        <div className="hs-head">
-          <div className="hs-title">
+    <div className="page sessions-page hs v2-team v2-page">
+          <div className="hs-title v2-header">
             <div>
               <h1 id="history-heading">{pt ? 'Histórico de conversas' : 'Conversation history'}</h1>
               <p>{[pt ? `${projectSessions.length} conversas` : `${projectSessions.length} chats`, runningCount ? (pt ? `${runningCount} em execução` : `${runningCount} running`) : '', pt ? `${weekMessages} mensagens esta semana` : `${weekMessages} messages this week`].filter(Boolean).join(' · ')}</p>
             </div>
             <button className="icon-button" onClick={onNewSession} title={t('New session')} aria-label={t('New session')}><Icon name="plus" /></button>
           </div>
+      <section className="hs-list" aria-labelledby="history-heading">
+        <div className="hs-head">
           <label className="search-field">
             <Icon name="search" />
             <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={pt ? 'Buscar conversas…' : 'Search conversations…'} aria-label={pt ? 'Buscar conversas' : 'Search conversations'} />
@@ -216,7 +217,7 @@ export function Sessions({
               <div className={`content-space-cell${open ? ' open' : ''}`} key={space.scope}>
                 <div className="hs-group-head">
                   <button type="button" className={`content-space-box kind-${space.kind}`} aria-pressed={open} aria-expanded={open} onClick={() => pick(space.scope)}>
-                    <i className="hs-dot" aria-hidden="true" />
+                    <StatusIcon state={busySpaces.has(space.scope)?'running':space.kind==='recovery'?'waiting':'queued'}/>
                     <span className="content-space-title"><b>{space.title}</b>{busySpaces.has(space.scope) && <i>{t('Running')}</i>}</span>
                     <small>
                       {space.kind === 'general' ? (pt ? 'Ideias sem conteúdo' : 'Ideas without content') : space.kind === 'recovery' ? (pt ? 'Vínculo inválido · nada foi apagado' : 'Invalid link · nothing was deleted') : space.stage}
@@ -227,7 +228,7 @@ export function Sessions({
                     <ContentActionsMenu title={space.title} pt={pt} disabled={!editorialReady} onDelete={() => setContentToDelete({ contentId: space.content!.id, title: space.title })} />
                   )}
                 </div>
-                {open && <div className="conversation-list">{ordered.length ? ordered.map(renderRow) : emptyGroup}</div>}
+                {open && <div className="conversation-list v2-list">{ordered.length ? ordered.map(renderRow) : emptyGroup}</div>}
               </div>
             );
           })}
@@ -238,7 +239,7 @@ export function Sessions({
           )}
         </div>
       </section>
-      <section className="hs-preview" aria-label={pt ? 'Prévia da conversa' : 'Conversation preview'}>
+      <section className="hs-preview v2-inspector" aria-label={pt ? 'Prévia da conversa' : 'Conversation preview'}>
         {selected ? <>
           <header className="hs-preview-head">
             <AgentAvatar name={previewAgent?.name ?? t('Deleted agent')} image={previewAgent?.avatarImage} mascot={previewAgent?.avatarMascot} role={previewAgent?.role} thinking={previewBusy} />
@@ -250,7 +251,7 @@ export function Sessions({
           </header>
           <div className="hs-chips">
             <span className="hs-scope">{sessionListLabel(contentBinding(selected, scopeCtx), pt) || currentSpace?.title}</span>
-            {previewBusy && <span className="hs-running">{t('Running')}</span>}
+            {previewBusy && <span className="hs-running"><StatusIcon state="running"/>{t('Running')}</span>}
           </div>
           <div className="hs-thread">
             {previewMessages.length ? previewMessages.map((item) => item.type === 'message' && (

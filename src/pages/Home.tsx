@@ -1,279 +1,247 @@
-﻿import { useState } from 'react';
-import type { Task, PageId } from '../app/types';
+﻿import type { PageId } from '../app/types';
 import { useChat } from '../features/chat/ChatProvider';
 import { useAgents } from '../features/agents/AgentsProvider';
 import type { Agent } from '../features/agents/model/Agent';
 import { AgentAvatar } from '../components/agents/AgentAvatar';
 import { Icon } from '../components/common/Icon';
+import { StatusIcon, type RunState } from '../components/common/StatusIcon';
 import { useWorkspaces } from '../app/WorkspaceProvider';
 import { useLanguage } from '../app/LanguageProvider';
 import { useContentWorkflow } from '../features/content/ContentWorkflowProvider';
-import { editorialInbox, type EditorialInboxItem } from '../features/content/editorialInbox';
-import { editorialInboxLabel } from '../components/content/EditorialInbox';
-import type {ChatInboxItem} from '../features/chat/chatInbox';
-import {useChatInboxState} from '../features/chat/chatInboxState';
-import {pipelineColumnIds,pipelineColumnLabel,projectHomePipeline,type PipelineItem} from '../features/content/homePipeline';
-import {useProduction} from '../features/production/ProductionProvider';
-import {ExecutionOverview} from '../components/production/ExecutionOverview';
-import type {ExecutionOverviewItem} from '../components/production/ExecutionOverviewProjection';
-import {usePersistentState} from '../data/localPersistence';
+import { pipelineColumnIds, pipelineColumnLabel, projectHomePipeline, type PipelineColumnId, type PipelineItem } from '../features/content/homePipeline';
+import { useProduction } from '../features/production/ProductionProvider';
+import { executionOverview } from '../components/production/ExecutionOverviewProjection';
+import { usePersistentState } from '../data/localPersistence';
+import { usageByDay, usageLedgerKey, type UsageEntry } from '../features/usage/usageLedger';
+import type { PublicationStatus } from '../features/content/model';
+import { productionStageLabel } from '../features/production/model';
+import { executionRunState, inboxToneLabel, inboxToneState, runLabel, shortAgo, type InboxItem } from '../features/inbox/inbox';
 
-type TaskView = 'active' | 'review' | 'done';
 interface HomeProps {
-  tasks: Task[];
-  onOpenTask: (task: Task) => void;
+  inbox: InboxItem[];
   onCreateAgent: () => void;
-  onCreateTask: () => void;
+  onNewProduction: () => void;
   onSelectAgent: (id: string) => void;
   onNavigate: (page: PageId) => void;
-  onOpenEditorial: (item: EditorialInboxItem) => void;
-  chatInbox:ChatInboxItem[];
-  onOpenChatInbox:(item:ChatInboxItem)=>void;
-  showEmptyPrompt: boolean;
-  onOpenExecution: (item: ExecutionOverviewItem) => void;
-  onOpenExecutionChat: (item: ExecutionOverviewItem) => void;
+  onOpenRun: (runId: string) => void;
 }
 
 const busyStates = ['thinking', 'searching', 'using-tool'];
-type NeedTone = 'blocked' | 'review' | 'reply' | 'approval' | 'next';
-/** One row of "Precisa de você": everything that waits on the user, whatever produced it. */
-interface Need { id: string; tone: NeedTone; title: string; context: string; at: string; agent?: Agent; icon: 'script' | 'note' | 'history' | 'message' | 'board'; action: string; open: () => void; data: Record<string, string> }
-const toneRank: Record<NeedTone, number> = { blocked: 0, approval: 1, review: 2, reply: 3, next: 4 };
+const DAY = 86_400_000;
+const publicationState: Record<PublicationStatus, RunState> = { draft: 'queued', 'in-review': 'waiting', approved: 'queued', sending: 'running', scheduled: 'done', published: 'done', failed: 'failed' };
 
-export function Home({
-  tasks,
-  onOpenTask,
-  onCreateAgent,
-  onCreateTask,
-  onSelectAgent,
-  onNavigate,
-  onOpenEditorial,
-  chatInbox,onOpenChatInbox,
-  onOpenExecution, onOpenExecutionChat,
-}: HomeProps) {
+/** Polyline points for a 7-day sparkline in a 100×26 box; flat when every value is equal. */
+function sparkPoints(values: number[]) {
+  const max = Math.max(...values), min = Math.min(...values), span = max - min || 1;
+  return values.map((value, index) => `${(index * 100 / Math.max(1, values.length - 1)).toFixed(1)},${(23 - (value - min) / span * 20).toFixed(1)}`).join(' ');
+}
+/** Seven local-day buckets, oldest first, counting the timestamps that fall in each. */
+function perDay(times: readonly (string | undefined)[], now = new Date()) {
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6).getTime();
+  const buckets = Array.from({ length: 7 }, () => 0);
+  for (const at of times) { const time = Date.parse(at ?? ''); if (Number.isFinite(time) && time >= start) buckets[Math.min(6, Math.floor((time - start) / DAY))]++; }
+  return buckets;
+}
+
+export function Home({ inbox, onCreateAgent, onNewProduction, onSelectAgent, onNavigate, onOpenRun }: HomeProps) {
   const { agents: allAgents, getAgentById } = useAgents();
   const { runs: productionRuns } = useProduction();
   const { currentWorkspaceId } = useWorkspaces();
   const { sessions, getRunState } = useChat();
   const { locale, t } = useLanguage();
-  const { state, jobs, ready, storageError, jobsError } = useContentWorkflow();
-  const [inboxPrefs, setInboxPrefs] = useChatInboxState();
-  const [expanded, setExpanded] = useState(false);
-  const pt = locale === 'pt-BR';
+  const { state, ready, storageError, jobsError } = useContentWorkflow();
+  const [range, setRange] = usePersistentState<'today' | 'week'>('mission-range', 'today');
+  const [ledger] = usePersistentState<UsageEntry[]>(usageLedgerKey, []);
+  const pt = locale === 'pt-BR', week = range === 'week', now = new Date();
   const agents = allAgents.filter((agent) => agent.workspaceId === currentWorkspaceId);
   const agentIds = new Set(agents.map((agent) => agent.id));
   const workspaceSessions = sessions.filter((session) => agentIds.has(session.agentId));
-  const groups: Record<TaskView, Task[]> = {
-    active: tasks.filter((task) => task.status === 'research' || task.status === 'running'),
-    review: tasks.filter((task) => task.status === 'review'),
-    done: tasks.filter((task) => task.status === 'done'),
-  };
-
-  const ago = (at: string) => {
-    const minutes = Math.max(0, Math.round((Date.now() - new Date(at).getTime()) / 60000));
-    if (!Number.isFinite(minutes)) return '';
-    if (minutes < 1) return pt ? 'agora' : 'now';
-    if (minutes < 60) return pt ? `há ${minutes} min` : `${minutes} min ago`;
-    if (minutes < 1440) return pt ? `há ${Math.round(minutes / 60)} h` : `${Math.round(minutes / 60)} h ago`;
-    return new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short' }).format(new Date(at));
-  };
-  // The agent that worked on a content most recently (editorial items carry no agent of their own).
-  const agentForContent = (contentId?: string) => {
-    if (!contentId) return undefined;
-    const session = workspaceSessions.filter((item) => item.contentId === contentId).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
-    return session ? getAgentById(session.agentId) : undefined;
-  };
   const busySession = (agentId: string) => workspaceSessions.find((session) => session.agentId === agentId && busyStates.includes(getRunState(session.id)));
+  const working = agents.filter((agent) => busySession(agent.id)).length;
+  const runsHere = productionRuns.filter((run) => run.workspaceId === currentWorkspaceId);
+  const executions = executionOverview(productionRuns, currentWorkspaceId, pt);
+  const executionById = new Map(executions.map((item) => [item.id, item]));
+  const time = (value?: string) => { const parsed = Date.parse(value ?? ''); return Number.isFinite(parsed) ? parsed : 0; };
+  const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const periodStart = week ? startToday - 6 * DAY : startToday, previousStart = week ? periodStart - 7 * DAY : periodStart - DAY;
 
-  const needs: Need[] = [
-    ...editorialInbox(state, jobs, currentWorkspaceId).map((item): Need => ({
-      id: 'editorial:' + item.id,
-      tone: item.urgency === 'blocked' ? 'blocked' : item.urgency === 'review' ? 'review' : 'next',
-      title: editorialInboxLabel(item.kind, pt) + (item.artifactVersion ? ` · v${item.artifactVersion}` : ''),
-      context: [item.title, item.detail].filter(Boolean).join(' · '),
-      at: item.updatedAt, agent: agentForContent(item.contentId),
-      icon: item.urgency === 'blocked' ? 'history' : item.kind.includes('script') ? 'script' : 'note',
-      action: item.urgency === 'blocked' ? (pt ? 'Retomar' : 'Resume') : item.urgency === 'review' ? (pt ? 'Revisar' : 'Review') : (pt ? 'Continuar' : 'Continue'),
-      open: () => onOpenEditorial(item), data: { 'data-inbox-id': item.id },
-    })),
-    ...chatInbox.map((item): Need => ({
-      id: 'chat:' + item.id,
-      tone: item.kind === 'approval' ? 'approval' : item.kind === 'blocked' ? 'blocked' : 'reply',
-      title: item.detail.split('\n')[0] || item.title,
-      context: item.title, at: item.at, agent: getAgentById(item.agentId), icon: 'message',
-      action: item.kind === 'approval' ? (pt ? 'Autorizar' : 'Approve') : item.kind === 'blocked' ? (pt ? 'Verificar' : 'Check') : (pt ? 'Abrir' : 'Open'),
-      open: () => onOpenChatInbox(item), data: { 'data-chat-inbox-id': item.id },
-    })),
-    ...groups.review.map((task): Need => ({
-      id: 'task:' + task.id, tone: 'review', title: task.title, context: pt ? 'Tarefa' : 'Task', at: task.createdAt,
-      agent: getAgentById(task.agentId), icon: 'board', action: pt ? 'Revisar' : 'Review',
-      open: () => onOpenTask(task), data: { 'data-od-id': 'overview-task-' + task.id },
-    })),
-  ].sort((a, b) => toneRank[a.tone] - toneRank[b.tone] || b.at.localeCompare(a.at));
-  const toneLabel: Record<NeedTone, string> = pt
-    ? { blocked: 'Bloqueado', approval: 'Autorização', review: 'Revisão', reply: 'Resposta', next: 'Próximo passo' }
-    : { blocked: 'Blocked', approval: 'Approval', review: 'Review', reply: 'Reply', next: 'Next step' };
-  const shownNeeds = expanded ? needs : needs.slice(0, 5);
+  // KPIs: every number below is counted from saved records (runs, inbox, publications, usage ledger), never estimated.
+  const completedAt = (runId: string) => runsHere.find((run) => run.id === runId)?.events?.filter((event) => event.action === 'complete').at(-1)?.at;
+  const completions = executions.filter((item) => item.state === 'complete').map((item) => completedAt(item.id) ?? item.updatedAt);
+  const countIn = (times: readonly (string | undefined)[], from: number, to = Infinity) => times.filter((at) => time(at) >= from && time(at) < to).length;
+  const running = executions.filter((item) => item.state === 'active').length, waitingRuns = executions.filter((item) => item.state === 'waiting').length;
+  const failedRuns = executions.filter((item) => item.state === 'blocked').length;
+  const oldestWait = [...inbox].sort((a, b) => a.at.localeCompare(b.at))[0];
+  const publications = (state.publications ?? []).filter((item) => item.workspaceId === currentWorkspaceId);
+  const delivered = publications.filter((item) => item.status === 'published' || item.status === 'scheduled').map((item) => item.receipt?.checkedAt ?? item.updatedAt);
+  const usage = usageByDay(ledger.filter((entry) => entry.workspaceId === currentWorkspaceId), 14, now);
+  const usageIn = usage.slice(week ? 7 : 13);
+  const cost = usageIn.reduce((sum, day) => sum + (day.cost ?? 0), 0), costKnown = usageIn.some((day) => day.cost !== undefined);
+  const tokens = usageIn.reduce((sum, day) => sum + day.total, 0), turns = usageIn.reduce((sum, day) => sum + day.turns, 0);
+  const tokenLabel = (value: number) => value >= 1_000_000 ? `${(value / 1_000_000).toLocaleString(locale, { maximumFractionDigits: 1 })}M` : value >= 1000 ? `${Math.round(value / 1000).toLocaleString(locale)}k` : value.toLocaleString(locale);
+  const money = (value: number) => new Intl.NumberFormat(locale, { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(value);
+  const delta = (current: number, previous: number, unit: string) => current === previous ? (pt ? `igual ${unit}` : `same ${unit}`) : `${current > previous ? '+' : '−'}${Math.abs(current - previous)} ${unit}`;
+  const vsLabel = week ? (pt ? 'vs semana anterior' : 'vs previous week') : (pt ? 'vs ontem' : 'vs yesterday');
+  const doneNow = countIn(completions, periodStart), donePrev = countIn(completions, previousStart, periodStart);
+  const deliveredNow = countIn(delivered, periodStart), deliveredPrev = countIn(delivered, previousStart, periodStart);
+  const kpis = [
+    week
+      ? { id: 'done', label: pt ? 'Execuções concluídas' : 'Runs completed', value: doneNow.toLocaleString(locale), note: delta(doneNow, donePrev, vsLabel), tone: doneNow >= donePrev ? 'good' : 'muted', color: 'var(--state-done)', series: perDay(completions) }
+      : { id: 'running', label: pt ? 'Em execução' : 'Running', value: running.toLocaleString(locale), note: waitingRuns ? (pt ? `${waitingRuns} ${waitingRuns === 1 ? 'travada' : 'travadas'} em você` : `${waitingRuns} stuck on you`) : (pt ? `${working} ${working === 1 ? 'agente trabalhando' : 'agentes trabalhando'}` : `${working} agents working`), tone: waitingRuns ? 'warn' : 'muted', color: 'var(--state-running)', series: perDay(runsHere.flatMap((run) => (run.events ?? []).map((event) => event.at))) },
+    { id: 'waiting', label: pt ? 'Esperando você' : 'Waiting on you', value: inbox.length.toLocaleString(locale), note: oldestWait ? (pt ? `mais antiga: ${shortAgo(oldestWait.at, locale)}` : `oldest: ${shortAgo(oldestWait.at, locale)}`) : (pt ? 'nada pendente' : 'nothing pending'), tone: 'muted', color: 'var(--state-waiting)', series: perDay(inbox.map((item) => item.at)) },
+    week
+      ? { id: 'delivered', label: pt ? 'Entregas publicadas ou agendadas' : 'Deliveries published or scheduled', value: deliveredNow.toLocaleString(locale), note: delta(deliveredNow, deliveredPrev, vsLabel), tone: deliveredNow >= deliveredPrev ? 'good' : 'muted', color: 'var(--accent)', series: perDay(delivered) }
+      : { id: 'done', label: pt ? 'Concluídas hoje' : 'Completed today', value: doneNow.toLocaleString(locale), note: delta(doneNow, donePrev, vsLabel), tone: doneNow > donePrev ? 'good' : 'muted', color: 'var(--state-done)', series: perDay(completions) },
+    { id: 'cost', label: week ? (pt ? 'Custo de modelos · 7 dias' : 'Model cost · 7 days') : (pt ? 'Custo hoje' : 'Cost today'), value: costKnown ? money(cost) : tokens ? tokenLabel(tokens) : '—', note: costKnown ? `${tokenLabel(tokens)} tokens` : tokens ? (pt ? `tokens · ${turns} respostas` : `tokens · ${turns} replies`) : (pt ? 'sem uso registrado' : 'no usage recorded'), tone: 'muted', color: 'var(--muted)', series: usage.slice(7).map((day) => costKnown ? day.cost ?? 0 : day.total) },
+  ];
 
-  // Production: one row per content or idea, placed on the 8 stages by the same projection the Studio uses; furthest along first.
+  // Runs table: every content in production, placed on the 8 stages by the same projection the Studio uses.
   const projection = projectHomePipeline({ contents: state.contents, topics: state.topics, runs: productionRuns, workspaceId: currentWorkspaceId });
-  const production = pipelineColumnIds.flatMap((column) => projection[column].map((item) => ({ column, item }))).reverse();
-  const facesFor = (item: PipelineItem) => {
-    const ids = [...new Set(workspaceSessions.filter((session) => item.contentId ? session.contentId === item.contentId : !!item.topicId && session.topicId === item.topicId).map((session) => session.agentId))];
-    return ids.map((id) => getAgentById(id)).filter((agent): agent is Agent => !!agent);
+  const touchedAt = (item: PipelineItem) => state.contents.find((content) => content.id === item.contentId)?.updatedAt ?? state.topics.find((topic) => topic.id === item.topicId)?.updatedAt ?? '';
+  const rank: Record<RunState, number> = { failed: 0, waiting: 1, running: 2, paused: 3, queued: 4, done: 5 };
+  const rows = pipelineColumnIds.flatMap((column) => projection[column].map((item) => {
+    const execution = item.runId ? executionById.get(item.runId) : undefined;
+    const runState: RunState = execution ? executionRunState[execution.state] : column === 'published' ? 'done' : 'queued';
+    return { column, item, execution, runState, at: execution?.updatedAt ?? touchedAt(item) };
+  })).sort((a, b) => rank[a.runState] - rank[b.runState] || b.at.localeCompare(a.at));
+  const shownRows = rows.filter((row) => row.runState !== 'done').concat(rows.filter((row) => row.runState === 'done').slice(0, 2)).slice(0, 8);
+  const teamFor = (row: typeof rows[number]) => {
+    const run = row.item.runId ? runsHere.find((candidate) => candidate.id === row.item.runId) : undefined;
+    const ids = run ? [run.sourceAgent?.id, run.editorAgent?.id, run.publisherAgent?.id] : workspaceSessions.filter((session) => row.item.contentId ? session.contentId === row.item.contentId : !!row.item.topicId && session.topicId === row.item.topicId).map((session) => session.agentId);
+    return [...new Set(ids.filter((id): id is string => !!id))].map((id) => getAgentById(id)).filter((agent): agent is Agent => !!agent);
   };
-  // Every Studio entry here names its view, so a calendar left open last time never hijacks "Open Studio".
   const [, setStudioView] = usePersistentState<'studio' | 'calendar'>('studio-view', 'studio');
   const openStudio = (view: 'studio' | 'calendar') => { setStudioView(view); onNavigate('content'); };
-  const openProduction = (item: PipelineItem) => { openStudio('studio'); window.dispatchEvent(new CustomEvent('mainsagents:open-content', { detail: { contentId: item.contentId, topicId: item.topicId } })); };
-  const hasRuns = productionRuns.some((run) => run.workspaceId === currentWorkspaceId);
-  // Continue: the work in progress touched most recently, offered when nothing waits on the user. Scheduled and published work is finished here.
-  const touchedAt = (item: PipelineItem) => state.contents.find((content) => content.id === item.contentId)?.updatedAt ?? state.topics.find((topic) => topic.id === item.topicId)?.updatedAt ?? '';
-  const resume = production.filter(({ column }) => column !== 'schedule' && column !== 'published').sort((a, b) => touchedAt(b.item).localeCompare(touchedAt(a.item)))[0];
+  const openContent = (item: PipelineItem) => { openStudio('studio'); window.dispatchEvent(new CustomEvent('mainsagents:open-content', { detail: { contentId: item.contentId, topicId: item.topicId } })); };
+  const openRow = (row: typeof rows[number]) => row.item.runId && row.execution ? onOpenRun(row.item.runId) : openContent(row.item);
+  const resume = rows.filter((row) => row.column !== 'schedule' && row.column !== 'published').sort((a, b) => touchedAt(b.item).localeCompare(touchedAt(a.item)))[0];
 
-  // Where to start: the three steps every new workspace goes through, each done by real data, never by a click here.
-  // Hiding is remembered per workspace, so a new empty workspace still shows its guide.
-  const [startHidden, setStartHidden] = usePersistentState<boolean>(`overview-start-hidden:${currentWorkspaceId}`, false);
-  const startSteps = [
-    { id: 'team', done: agents.length > 0, title: pt ? 'Monte a equipe' : 'Build the team', detail: pt ? 'Crie um agente com um papel claro, como pesquisa ou roteiro.' : 'Create an agent with a clear role, such as research or scripting.', action: t('Create agent'), run: onCreateAgent },
-    { id: 'idea', done: state.topics.some((topic) => topic.workspaceId === currentWorkspaceId) || state.contents.some((content) => content.workspaceId === currentWorkspaceId), title: pt ? 'Crie a primeira pauta' : 'Create the first idea', detail: pt ? 'No Estúdio, descreva o assunto. O agente pesquisa e traz fontes e ângulos.' : 'In the Studio, describe the subject. The agent researches it and brings sources and angles.', action: pt ? 'Abrir Estúdio' : 'Open Studio', run: () => openStudio('studio') },
-    { id: 'schedule', done: (state.publications ?? []).some((item) => item.workspaceId === currentWorkspaceId && !!item.plannedAt), title: pt ? 'Agende a publicação' : 'Schedule the post', detail: pt ? 'Com o conteúdo aprovado, escolha data e rede no Calendário.' : 'Once the content is approved, pick a date and channel in the Calendar.', action: pt ? 'Abrir Calendário' : 'Open Calendar', run: () => openStudio('calendar') },
-  ];
-  const startCurrent = startSteps.findIndex((step) => !step.done);
-  const showStart = ready && !startHidden && startCurrent >= 0;
-  // Real pending items come first: with any, the guide moves below them and gives up the primary action.
-  const startFirst = needs.length === 0;
-  const startGuide = <section className="ov-card ov-start" aria-labelledby="start-heading" data-od-id="overview-start">
-    <div className="ov-card-head">
-      <h2 id="start-heading">{pt ? 'Por onde começar' : 'Where to start'}<span className="ov-sub">{pt ? `${startSteps.filter((step) => step.done).length} de ${startSteps.length}` : `${startSteps.filter((step) => step.done).length} of ${startSteps.length}`}</span></h2>
-      <button className="text-link" onClick={() => setStartHidden(true)}>{pt ? 'Ocultar guia' : 'Hide guide'}</button>
-    </div>
-    <ol className="ov-start-steps">{startSteps.map((step, index) => (
-      <li key={step.id} className={step.done ? 'done' : index === startCurrent ? 'current' : ''} data-step={step.id}>
-        <span className="ov-start-mark" aria-hidden="true">{step.done ? <svg viewBox="0 0 24 24"><path d="M6 12.5l4 4 8-9" /></svg> : index + 1}</span>
-        <span className="ov-row-copy"><b>{step.title}</b><small>{step.done ? (pt ? 'Feito' : 'Done') : step.detail}</small></span>
-        {index === startCurrent && <button type="button" className={startFirst ? 'primary-button' : 'soft-button'} onClick={step.run} data-od-id={`overview-start-${step.id}`}>{step.action}</button>}
-      </li>
-    ))}</ol>
-  </section>;
-
-  const working = agents.filter((agent) => busySession(agent.id)).length;
-  const hour = new Date().getHours();
-  const greeting = pt ? (hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite') : (hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening');
-  const summary = [
-    working ? (pt ? `${working} agente${working === 1 ? '' : 's'} trabalhando agora` : `${working} agent${working === 1 ? '' : 's'} working now`) : (pt ? 'Ninguém trabalhando agora' : 'Nobody working right now'),
-    needs.length ? (pt ? `${needs.length} ${needs.length === 1 ? 'coisa esperando' : 'coisas esperando'} você` : `${needs.length} waiting on you`) : (pt ? 'nada esperando você' : 'nothing waiting on you'),
-  ].join(' · ') + '.';
+  // Right column.
   const idleLine = (agent: Agent) => {
     const last = workspaceSessions.filter((session) => session.agentId === agent.id).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
-    return last ? (pt ? `Livre · ativo ${ago(last.updatedAt)}` : `Free · active ${ago(last.updatedAt)}`) : (pt ? 'Livre' : 'Free');
+    return last ? (pt ? `Livre · ativo há ${shortAgo(last.updatedAt, locale)}` : `Free · active ${shortAgo(last.updatedAt, locale)} ago`) : (pt ? 'Livre' : 'Free');
   };
-  const providerName = (agent: Agent) => agent.providerId === 'claude' ? 'Claude' : agent.providerId === 'gemini' ? 'Gemini' : 'Codex';
+  const team = agents.map((agent) => {
+    const busy = busySession(agent.id), waiting = inbox.find((item) => item.agent?.id === agent.id);
+    const runState: RunState = busy ? 'running' : waiting ? 'waiting' : 'queued';
+    const doing = busy ? busy.title : waiting ? (pt ? `Parado: ${waiting.title}` : `Stopped: ${waiting.title}`) : idleLine(agent);
+    return { agent, runState, doing };
+  }).sort((a, b) => rank[a.runState] - rank[b.runState]);
+  const upcoming = publications.filter((item) => item.plannedAt && time(item.plannedAt) >= startToday && item.status !== 'draft' && item.status !== 'published').sort((a, b) => time(a.plannedAt) - time(b.plannedAt)).slice(0, 4);
+  const contentTitle = (contentId: string) => state.contents.find((content) => content.id === contentId)?.title ?? (pt ? 'Conteúdo' : 'Content');
+  const feed = [
+    ...runsHere.flatMap((run) => (run.events ?? []).filter((event) => event.at).map((event) => ({ at: event.at, who: run.name || run.topic?.title || runLabel(run.id), what: productionStageLabel(event.action, pt) === event.action ? event.action.replaceAll('-', ' ') : productionStageLabel(event.action, pt) }))),
+    ...publications.map((item) => ({ at: item.updatedAt, who: contentTitle(item.contentId), what: `${item.platform} · ${({ draft: pt ? 'rascunho' : 'draft', 'in-review': pt ? 'em revisão' : 'in review', approved: pt ? 'aprovado' : 'approved', sending: pt ? 'enviando' : 'sending', scheduled: pt ? 'agendado' : 'scheduled', published: pt ? 'publicado' : 'published', failed: pt ? 'falhou' : 'failed' } as Record<PublicationStatus, string>)[item.status]}` })),
+  ].filter((entry) => time(entry.at)).sort((a, b) => time(b.at) - time(a.at)).slice(0, 6);
+  const clock = (at: string) => time(at) >= startToday ? new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(new Date(at)) : new Intl.DateTimeFormat(locale, { day: '2-digit', month: '2-digit' }).format(new Date(at));
+  const openRuns = executions.filter((item) => item.state === 'active' || item.state === 'waiting').length;
+  const runsSummary = pt ? `${openRuns} ${openRuns === 1 ? 'ativa' : 'ativas'}${failedRuns ? ` · ${failedRuns} com falha` : ''}` : `${openRuns} active${failedRuns ? ` · ${failedRuns} failed` : ''}`;
+  const kindColor = (item: InboxItem) => item.tone === 'blocked' ? 'var(--danger-text)' : item.tone === 'reply' ? 'var(--muted)' : item.tone === 'next' ? 'var(--fg-2)' : 'var(--warn)';
 
   return (
-    <div className="page overview-page ov" data-od-id="workspace-overview">
-      <header className="ov-head" data-od-id="overview-header">
-        <div>
-          <p className="ov-date">{new Intl.DateTimeFormat(locale, { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date())}</p>
-          <h1 data-od-id="overview-heading">{greeting}</h1>
-          <p className="ov-lede">{summary}</p>
+    <div className="page overview-page v2-page v2-mission" data-od-id="workspace-overview">
+      <header className="v2-header" data-od-id="overview-header">
+        <h1 data-od-id="overview-heading">Mission Control</h1>
+        <span className="v2-sub">{new Intl.DateTimeFormat(locale, { weekday: 'long', day: 'numeric', month: 'long' }).format(now)}</span>
+        <span className="v2-spacer" />
+        <div className="v2-segmented" role="group" aria-label={pt ? 'Período' : 'Period'}>
+          <button type="button" aria-pressed={!week} onClick={() => setRange('today')}>{pt ? 'Hoje' : 'Today'}</button>
+          <button type="button" aria-pressed={week} onClick={() => setRange('week')}>{pt ? '7 dias' : '7 days'}</button>
         </div>
-        <div className="ov-head-side">
-          {agents.length > 0 && <button className="ov-team-pill" onClick={() => onNavigate('agents')} aria-label={pt ? 'Abrir equipe' : 'Open team'}>
-            <span className="ov-faces">{agents.slice(0, 5).map((agent) => <AgentAvatar key={agent.id} name={agent.name} image={agent.avatarImage} mascot={agent.avatarMascot} role={agent.role} thinking={!!busySession(agent.id)} />)}</span>
-            <span>{working ? (pt ? `${working} de ${agents.length} trabalhando` : `${working} of ${agents.length} working`) : (pt ? `${agents.length} agente${agents.length === 1 ? '' : 's'} livre${agents.length === 1 ? '' : 's'}` : `${agents.length} free`)}</span>
-          </button>}
-          {ready && startHidden && startCurrent >= 0 && <button className="text-link" onClick={() => setStartHidden(false)} data-od-id="overview-start-show">{pt ? 'Por onde começar' : 'Where to start'}</button>}
-          {/* While the guide is open its current step is the one primary action on the page. */}
-          <button className={showStart && startFirst ? 'soft-button' : 'primary-button'} data-od-id="overview-create" onClick={agents.length ? onCreateTask : onCreateAgent}>
-            <Icon name="plus" />
-            {agents.length ? t('New Task') : t('Create agent')}
-          </button>
-        </div>
+        <button className="primary-button" data-od-id="overview-create" onClick={agents.length ? onNewProduction : onCreateAgent}>
+          <Icon name="plus" />{agents.length ? (pt ? 'Nova execução' : 'New run') : t('Create agent')}
+        </button>
       </header>
 
-      <div className="ov-grid">
-        <div className="ov-main">
-          {showStart && startFirst && startGuide}
-          <section className="ov-card ov-needs" aria-labelledby="needs-heading" data-od-id="overview-needs">
-            <div className="ov-card-head">
-              <h2 id="needs-heading">{pt ? 'Precisa de você' : 'Needs you'}{ready && needs.length > 0 && <span className="ov-needs-count">{needs.length}</span>}</h2>
-              <button className="text-link" aria-pressed={!inboxPrefs.muted} onClick={() => setInboxPrefs((current) => ({ ...current, muted: !current.muted }))}>
-                {inboxPrefs.muted ? (pt ? 'Ativar avisos' : 'Enable notifications') : (pt ? 'Silenciar avisos' : 'Mute notifications')}
-              </button>
+      <div className="v2-mission-body">
+        <div className="v2-mission-main">
+          <section className="v2-kpis" aria-label={pt ? 'Resumo' : 'Summary'} data-od-id="overview-kpis">
+            {kpis.map((kpi) => <div key={kpi.id} data-kpi={kpi.id}>
+              <span className="v2-kpi-label"><i aria-hidden="true" style={{ background: kpi.color }} />{kpi.label}</span>
+              <span className="v2-kpi-line"><b className="v2-kpi-value">{kpi.value}</b><span className={`v2-kpi-note ${kpi.tone}`}>{kpi.note}</span></span>
+              <svg className="v2-spark" viewBox="0 0 100 26" preserveAspectRatio="none" aria-hidden="true"><polyline points={sparkPoints(kpi.series)} style={{ stroke: kpi.color }} /></svg>
+            </div>)}
+          </section>
+
+          <section className="ov-needs v2-block" aria-labelledby="needs-heading" data-od-id="overview-needs">
+            <div className="v2-block-head">
+              <h2 id="needs-heading" className="v2-section-title">{pt ? 'Precisa de você' : 'Needs you'}{ready && inbox.length > 0 && <span className="v2-count waiting ov-needs-count">{inbox.length}</span>}<span className="v2-sub">{pt ? 'ordenado pelo que trava mais trabalho' : 'sorted by what blocks the most work'}</span></h2>
+              <a href="#inbox" className="v2-link" onClick={(event) => { event.preventDefault(); onNavigate('inbox'); }}>{pt ? 'Abrir caixa de entrada' : 'Open inbox'}</a>
             </div>
             {(storageError || jobsError) && <div className="ov-alert" role="alert"><b>{pt ? 'Não foi possível atualizar todas as pendências' : 'Could not refresh all next steps'}</b><span>{storageError || jobsError}</span></div>}
-            {!ready ? <p className="ov-empty" role="status">{pt ? 'Carregando suas pendências…' : 'Loading your next steps…'}</p> : needs.length ? <div className="ov-list">
-              {shownNeeds.map((need) => (
-                <button key={need.id} className={`ov-row inbox-row ov-need ${need.tone}`} onClick={need.open} {...need.data}>
-                  {need.agent ? <AgentAvatar name={need.agent.name} image={need.agent.avatarImage} mascot={need.agent.avatarMascot} role={need.agent.role} /> : <span className="ov-need-icon" aria-hidden="true"><Icon name={need.icon} /></span>}
-                  <span className="ov-row-copy">
-                    <b>{need.title}</b>
-                    <small>{[need.agent?.name, need.context, ago(need.at)].filter(Boolean).join(' · ')}</small>
-                  </span>
-                  <span className={`ov-tone ${need.tone}`}>{toneLabel[need.tone]}</span>
-                  <span className="ov-action">{need.action}</span>
+            {!ready ? <p className="v2-empty" role="status">{pt ? 'Carregando suas pendências…' : 'Loading your next steps…'}</p> : inbox.length ? <div className="v2-list">
+              {inbox.slice(0, 6).map((item) => (
+                <button key={item.id} className={`v2-row ov-need inbox-row ${item.tone}`} onClick={item.open} {...item.data}>
+                  <StatusIcon state={inboxToneState[item.tone]} label={inboxToneLabel(item.tone, pt)} />
+                  <span className="v2-need-kind v2-ellipsis" style={{ color: kindColor(item) }}>{item.title}</span>
+                  <span className="v2-need-title v2-ellipsis">{item.context}</span>
+                  {item.agent ? <span className="v2-face" title={item.agent.name}><AgentAvatar name={item.agent.name} image={item.agent.avatarImage} mascot={item.agent.avatarMascot} role={item.agent.role} /></span> : <span className="v2-face v2-face-icon" aria-hidden="true"><Icon name={item.icon} /></span>}
+                  <span className="v2-need-wait v2-mono">{shortAgo(item.at, locale)}</span>
+                  <span className="v2-row-action">{item.action}</span>
                 </button>
               ))}
-            </div> : <div className="ov-empty"><b>{pt ? 'Tudo em dia' : 'All caught up'}</b><span>{pt ? 'Revisões, respostas dos agentes e escolhas aparecem aqui.' : 'Reviews, agent replies and choices appear here.'}</span>
-              {resume && <button className="ov-row ov-resume" onClick={() => openProduction(resume.item)} data-od-id="overview-resume">
-                <span className="ov-need-icon" aria-hidden="true"><Icon name="script" /></span>
-                <span className="ov-row-copy"><small>{pt ? 'Continuar de onde parou' : 'Pick up where you left off'}</small><b>{resume.item.title}</b></span>
-                <span className="ov-action">{pt ? 'Continuar' : 'Continue'}</span>
+              {inbox.length > 6 && <button className="v2-row v2-more ov-more" onClick={() => onNavigate('inbox')}>{pt ? `Ver todas (${inbox.length})` : `View all (${inbox.length})`}</button>}
+            </div> : <div className="v2-list v2-empty-box"><div className="v2-empty"><b>{pt ? 'Tudo em dia' : 'All caught up'}</b><span>{pt ? 'Aprovações, escolhas, perguntas dos agentes e falhas aparecem aqui.' : 'Approvals, choices, agent questions and failures appear here.'}</span></div>
+              {resume && <button className="v2-row ov-resume" onClick={() => openContent(resume.item)} data-od-id="overview-resume">
+                <StatusIcon state="queued" />
+                <span className="v2-need-kind v2-ellipsis">{pt ? 'Continuar de onde parou' : 'Pick up where you left off'}</span>
+                <span className="v2-need-title v2-ellipsis">{resume.item.title}</span>
+                <span className="v2-row-action">{pt ? 'Continuar' : 'Continue'}</span>
               </button>}
             </div>}
-            {needs.length > 5 && <button className="ov-more" onClick={() => setExpanded(!expanded)} aria-expanded={expanded}>{expanded ? (pt ? 'Mostrar menos' : 'Show less') : (pt ? `Ver todas (${needs.length})` : `View all (${needs.length})`)}</button>}
           </section>
-          {showStart && !startFirst && startGuide}
 
-          <section className="ov-card ov-production" aria-labelledby="production-heading" data-od-id="overview-production">
-            <div className="ov-card-head">
-              <h2 id="production-heading">{pt ? 'Em produção' : 'In production'}<span className="ov-sub">{production.length} {pt ? (production.length === 1 ? 'item' : 'itens') : (production.length === 1 ? 'item' : 'items')}</span></h2>
-              <button className="text-link" onClick={() => openStudio('studio')}>{pt ? 'Abrir Estúdio' : 'Open Studio'}<Icon name="chevron" /></button>
+          <section className="ov-production execution-overview v2-block" aria-labelledby="runs-heading" data-od-id="execution-overview">
+            <div className="v2-block-head">
+              <h2 id="runs-heading" className="v2-section-title">{pt ? 'Execuções' : 'Runs'}<span className="v2-sub">{runsSummary}</span></h2>
+              <a href="#runs" className="v2-link" onClick={(event) => { event.preventDefault(); onNavigate('runs'); }}>{pt ? 'Ver todas' : 'View all'}</a>
             </div>
-            {production.length ? <>
-              <div className="ov-prod-labels" aria-hidden="true"><span>{pt ? 'Conteúdo' : 'Content'}</span><span>{pipelineColumnLabel('ideas', pt)} → {pipelineColumnLabel('published', pt)}</span><span /></div>
-              <div className="ov-list">{production.map(({ column, item }) => {
-                const step = pipelineColumnIds.indexOf(column) + 1, faces = facesFor(item);
-                return <button key={item.id} className="ov-row ov-prod-row" data-column={column} onClick={() => openProduction(item)} title={item.title}>
-                  <span className="ov-row-copy"><b className="ov-prod-title">{item.title}</b><small className="ov-prod-stage">{pipelineColumnLabel(column, pt)} · {pt ? `etapa ${step} de 8` : `stage ${step} of 8`}</small></span>
-                  <span className="ov-bars" role="img" aria-label={pt ? `Etapa ${step} de 8` : `Stage ${step} of 8`}>{pipelineColumnIds.map((id, index) => <i key={id} className={index + 1 < step ? 'done' : index + 1 === step ? 'current' : ''} />)}</span>
-                  <span className="ov-faces">{faces.slice(0, 3).map((agent) => <AgentAvatar key={agent.id} name={agent.name} image={agent.avatarImage} mascot={agent.avatarMascot} role={agent.role} thinking={!!busySession(agent.id)} />)}</span>
+            {shownRows.length ? <div className="v2-list v2-table-scroll"><div className="v2-runs-table">
+              <div className="v2-table-head" aria-hidden="true"><span /><span>ID</span><span>{pt ? 'Conteúdo' : 'Content'}</span><span>{pt ? 'Etapa atual' : 'Current stage'}</span><span>{pt ? 'Progresso' : 'Progress'}</span><span>{pt ? 'Equipe' : 'Team'}</span><span>{pt ? 'Tempo' : 'Time'}</span></div>
+              {shownRows.map((row) => {
+                const step = pipelineColumnIds.indexOf(row.column) + 1, faces = teamFor(row);
+                const stage = `${pipelineColumnLabel(row.column, pt)}${row.execution ? ` · ${row.execution.stageLabel}` : ''}`;
+                return <button key={row.item.id} className="v2-row ov-prod-row" data-column={row.column} data-state={row.runState} onClick={() => openRow(row)} title={row.item.title}>
+                  <StatusIcon state={row.runState} />
+                  <span className="v2-mono v2-run-id">{row.item.runId ? runLabel(row.item.runId) : '—'}</span>
+                  <span className="v2-ellipsis ov-prod-title">{row.item.title}</span>
+                  <span className={`v2-ellipsis v2-run-stage ov-prod-stage ${row.runState}`}>{stage}</span>
+                  <span className="v2-steps ov-bars" role="img" aria-label={pt ? `Etapa ${step} de 8` : `Stage ${step} of 8`}>{pipelineColumnIds.map((id: PipelineColumnId, index) => <i key={id} className={index + 1 < step || row.runState === 'done' ? 'done' : index + 1 === step ? row.runState === 'failed' ? 'failed' : row.runState === 'waiting' ? 'waiting' : 'running' : ''} />)}</span>
+                  <span className="v2-faces">{faces.slice(0, 3).map((agent) => <AgentAvatar key={agent.id} name={agent.name} image={agent.avatarImage} mascot={agent.avatarMascot} role={agent.role} thinking={!!busySession(agent.id)} />)}</span>
+                  <span className="v2-mono v2-run-time">{shortAgo(row.at, locale)}</span>
                 </button>;
-              })}</div>
-            </> : <div className="ov-empty"><b>{pt ? 'Nada em produção' : 'Nothing in production'}</b><span>{pt ? 'Crie uma pauta no Estúdio para começar.' : 'Create an idea in the Studio to get started.'}</span><button className="soft-button" onClick={() => openStudio('studio')}><Icon name="plus" />{pt ? 'Abrir Estúdio' : 'Open Studio'}</button></div>}
+              })}
+            </div></div> : <div className="v2-list v2-empty-box"><div className="v2-empty"><b>{pt ? 'Nada em execução' : 'Nothing running'}</b><span>{pt ? 'Comece uma execução ou crie uma pauta no Estúdio.' : 'Start a run or create an idea in the Studio.'}</span><span className="v2-empty-actions"><button className="soft-button" onClick={agents.length ? onNewProduction : onCreateAgent}><Icon name="plus" />{pt ? 'Nova execução' : 'New run'}</button><button className="soft-button" onClick={() => openStudio('studio')}>{pt ? 'Abrir Estúdio' : 'Open Studio'}</button></span></div></div>}
           </section>
-
-          {hasRuns && <ExecutionOverview onOpen={onOpenExecution} onOpenChat={onOpenExecutionChat} />}
         </div>
 
-        <aside className="ov-side" data-od-id="workspace-team">
-          <section className="ov-card ov-now" aria-labelledby="now-heading" data-od-id="team-panel">
-            <div className="ov-card-head">
-              <h2 id="now-heading">{pt ? 'Agora' : 'Now'}{working > 0 && <i className="ov-live" aria-hidden="true" />}</h2>
-              <button className="text-link" onClick={agents.length ? () => onNavigate('agents') : onCreateAgent}>{agents.length ? (pt ? 'Equipe' : 'Team') : t('Create agent')}<Icon name="chevron" /></button>
-            </div>
-            {agents.length ? <div className="ov-list">{agents.map((agent) => {
-              const busy = busySession(agent.id);
-              return <button className={`ov-row ov-agent ${busy ? 'busy' : ''}`} key={agent.id} onClick={() => onSelectAgent(agent.id)} data-od-id={'team-agent-' + agent.id}>
-                <AgentAvatar name={agent.name} image={agent.avatarImage} mascot={agent.avatarMascot} role={agent.role} thinking={!!busy} />
-                <span className="ov-row-copy"><b>{agent.name}</b><small className={busy ? 'ov-shimmer' : ''}>{busy ? `${pt ? 'Pensando…' : 'Thinking…'} ${busy.title}` : idleLine(agent)}</small></span>
-                <span className="ov-provider">{providerName(agent)}</span>
-              </button>;
-            })}</div> : <div className="ov-empty"><span>{pt ? 'Um especialista para cada parte do trabalho.' : 'A specialist for every part of your work.'}</span></div>}
+        <aside className="v2-mission-side" aria-label={pt ? 'Equipe e agenda' : 'Team and schedule'} data-od-id="workspace-team">
+          <section className="v2-block" aria-labelledby="now-heading" data-od-id="team-panel">
+            <div className="v2-block-head"><h2 id="now-heading" className="v2-section-title">{pt ? 'Equipe agora' : 'Team now'}</h2>{agents.length > 0 && <a href="#agents" className="v2-link" onClick={(event) => { event.preventDefault(); onNavigate('agents'); }}>{pt ? 'Equipe' : 'Team'}</a>}</div>
+            {agents.length ? <div className="v2-card v2-team-card">{team.map(({ agent, runState, doing }) => (
+              <button className="v2-team-row" key={agent.id} onClick={() => onSelectAgent(agent.id)} data-od-id={'team-agent-' + agent.id}>
+                <AgentAvatar name={agent.name} image={agent.avatarImage} mascot={agent.avatarMascot} role={agent.role} thinking={runState === 'running'} />
+                <span className="v2-team-copy"><b>{agent.name}</b><span className="v2-ellipsis">{doing}</span></span>
+                <StatusIcon state={runState} label={runState === 'queued' ? (pt ? 'Livre' : 'Free') : undefined} />
+              </button>
+            ))}</div> : <div className="v2-card v2-empty"><span>{pt ? 'Um especialista para cada parte do trabalho.' : 'A specialist for every part of your work.'}</span><button className="soft-button" onClick={onCreateAgent}><Icon name="plus" />{t('Create agent')}</button></div>}
           </section>
 
-          <section className="ov-card ov-tasks" aria-labelledby="tasks-heading" data-od-id="workspace-tasks">
-            <div className="ov-card-head">
-              <h2 id="tasks-heading">{pt ? 'Tarefas' : 'Tasks'}</h2>
-              <button className="text-link" onClick={() => onNavigate('board')} data-od-id="open-task-board">{pt ? 'Quadro' : 'Board'}<Icon name="chevron" /></button>
-            </div>
-            <div className="ov-task-stats">
-              {(['active', 'review', 'done'] as const).map((view) => <button key={view} className={view} onClick={() => onNavigate('board')} data-od-id={'summary-' + view}>
-                <b>{groups[view].length.toLocaleString(locale)}</b>
-                <span>{view === 'active' ? (pt ? 'Em andamento' : 'In progress') : view === 'review' ? (pt ? 'Para revisar' : 'To review') : (pt ? 'Concluídas' : 'Completed')}</span>
-              </button>)}
-            </div>
+          <section className="v2-block" aria-labelledby="next-heading" data-od-id="overview-upcoming">
+            <div className="v2-block-head"><h2 id="next-heading" className="v2-section-title">{pt ? 'Próximas publicações' : 'Upcoming posts'}</h2><a href="#content" className="v2-link" onClick={(event) => { event.preventDefault(); openStudio('calendar'); }}>{pt ? 'Calendário' : 'Calendar'}</a></div>
+            {upcoming.length ? <div className="v2-card v2-upcoming">{upcoming.map((item) => {
+              const date = new Date(item.plannedAt!);
+              return <div className="v2-upcoming-row" key={item.id}>
+                <span className="v2-date-box"><span>{new Intl.DateTimeFormat(locale, { weekday: 'short' }).format(date).replace('.', '')}</span><b>{String(date.getDate()).padStart(2, '0')}</b></span>
+                <span className="v2-team-copy"><span className="v2-ellipsis">{contentTitle(item.contentId)}</span><span>{item.platform} · {new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(date)}</span></span>
+                <StatusIcon state={publicationState[item.status]} />
+              </div>;
+            })}</div> : <p className="v2-card v2-empty">{pt ? 'Nenhuma publicação com data marcada.' : 'No posts with a date yet.'}</p>}
+          </section>
+
+          <section className="v2-block" aria-labelledby="feed-heading" data-od-id="overview-activity">
+            <h2 id="feed-heading" className="v2-section-title">{pt ? 'Atividade' : 'Activity'}</h2>
+            {feed.length ? <ol className="v2-feed">{feed.map((entry, index) => <li key={`${entry.at}-${index}`}><span className="v2-mono">{clock(entry.at)}</span><span><b>{entry.who}</b> {entry.what}</span></li>)}</ol> : <p className="v2-empty">{pt ? 'A atividade das execuções e publicações aparece aqui.' : 'Run and publication activity shows here.'}</p>}
           </section>
         </aside>
       </div>

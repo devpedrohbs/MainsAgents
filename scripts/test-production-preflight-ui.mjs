@@ -39,13 +39,15 @@ const labelOf=`el=>(el.querySelector('.select-menu-option-copy b')?.textContent?
 async function button(text){await until(()=>js(`Array.from(document.querySelectorAll('button')).some(el=>(${labelOf})(el)===${JSON.stringify(text)}&&!el.disabled)`),`button ${text}`);await js(`Array.from(document.querySelectorAll('button')).find(el=>(${labelOf})(el)===${JSON.stringify(text)}&&!el.disabled).click()`)}
 const shot=async name=>{writeFileSync(join(out,`${name}.png`),await captureReadyPng(win.webContents))};
 const text=()=>js('document.querySelector(".flow-dialog")?.innerText??document.body.innerText');
-async function open(){if(win&&!win.isDestroyed())win.destroy();win=new BrowserWindow({show:false,width:1440,height:1000,webPreferences:{preload:resolve(root,'tests/fixtures/assets-ui-preload.cjs'),contextIsolation:true,sandbox:true,offscreen:true,backgroundThrottling:false}});win.webContents.on('console-message',event=>{if(/Uncaught|Maximum update depth|Cannot update a component/.test(event.message))errors.push(event.message)});await win.loadURL(`http://127.0.0.1:${server.address().port}/app.html#flow`);await until(()=>js('Boolean(document.querySelector(".production-flow-page"))'),'flow page')}
+async function open(){if(win&&!win.isDestroyed())win.destroy();win=new BrowserWindow({show:false,width:1440,height:1000,webPreferences:{preload:resolve(root,'tests/fixtures/assets-ui-preload.cjs'),contextIsolation:true,sandbox:true,offscreen:true,backgroundThrottling:false}});win.webContents.on('console-message',event=>{if(/Uncaught|Maximum update depth|Cannot update a component/.test(event.message))errors.push(event.message)});await win.loadURL(`http://127.0.0.1:${server.address().port}/app.html#board`);await until(()=>js('Boolean(document.querySelector(".global-create"))'),'app shell')}
 const countRuns=()=>bridge.production.list(profile).length;
 const startButton=()=>js('(()=>{const el=Array.from(document.querySelectorAll(".flow-dialog button")).find(el=>el.textContent.includes("Aprovar ideia e iniciar produção"));return el?{disabled:el.disabled}:null})()');
+// The production dialog opens from Create → New production (the Flow area was retired).
+async function openNewProduction(){await click('.global-create');await until(()=>js('Array.from(document.querySelectorAll(".flow-option")).some(b=>b.textContent.includes("Nova produção"))'));await js('Array.from(document.querySelectorAll(".flow-option")).find(b=>b.textContent.includes("Nova produção")).click()');await until(()=>js('Boolean(document.querySelector(\'[aria-label="Produção atual"]\'))'))}
 app.whenReady().then(async()=>{try{
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));await open();
  // 1) Opening the start dialog shows the pre-start check; no recording video exists and the script stage is still not blocked.
- await button('Iniciar produção');await until(()=>js('Boolean(document.querySelector(".production-preflight .production-preflight-stage"))'),'preflight report');
+ await openNewProduction();await until(()=>js('Boolean(document.querySelector(".production-preflight .production-preflight-stage"))'),'preflight report');
  // Consent cannot be given while the report is pending: hold the next preflight response and observe the checkbox.
  let release;hold={promise:new Promise(resolve=>{release=resolve})};
  await click('[aria-label="Ideia da produção"]');await button(topic.title);

@@ -1,4 +1,4 @@
-// D04: the Flow page explains what production really executes. Real renderer + state store; no AI, no provider.
+// D04: the production dialog shows the roles production really executes. Real renderer + state store; no AI, no provider.
 // Usage: electron scripts/test-flow-execution-ui.mjs   (MAINSAGENTS_DIST=<built app dir>, default ./dist)
 import {app,BrowserWindow,ipcMain} from 'electron';
 import {createServer} from 'node:http';
@@ -32,28 +32,30 @@ const server=createServer(async(request,response)=>{const url=new URL(request.ur
 const errors=[];let win;const js=code=>win.webContents.executeJavaScript(code);
 async function until(check,label='condition'){const end=Date.now()+15000;while(Date.now()<end){if(await check())return;await new Promise(resolve=>setTimeout(resolve,50))}throw Error(`Flow execution UI timed out: ${label}`)}
 async function screenshot(name){writeFileSync(resolve(out,`${name}.png`),await captureReadyPng(win.webContents))}
-const panelText=()=>js('document.querySelector(".flow-execution")?.innerText??""');
+const roleValue=label=>js(`document.querySelector('[aria-label=${JSON.stringify(label)}]')?.textContent.trim()??''`);
+async function openNewProduction(){await js('document.querySelector(".global-create").click()');await until(()=>js('Array.from(document.querySelectorAll(".flow-option")).some(b=>b.textContent.includes("Nova produção"))'),'new production option');await js('Array.from(document.querySelectorAll(".flow-option")).find(b=>b.textContent.includes("Nova produção")).click()');await until(()=>js('Boolean(document.querySelector(\'[aria-label="Produção atual"]\'))'),'production dialog')}
 app.whenReady().then(async()=>{try{
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
  win=new BrowserWindow({show:false,width:1440,height:1000,webPreferences:{preload:resolve(root,'tests/fixtures/assets-ui-preload.cjs'),contextIsolation:true,sandbox:true,offscreen:true,backgroundThrottling:false}});
  win.webContents.on('console-message',event=>{if(/Uncaught|Maximum update depth|Cannot update a component/.test(event.message))errors.push(event.message)});
- await win.loadURL(`http://127.0.0.1:${server.address().port}/app.html#flow`);await until(()=>js('document.querySelectorAll(".production-box").length===5'),'five boxes');
+ await win.loadURL(`http://127.0.0.1:${server.address().port}/app.html#board`);await until(()=>js('Boolean(document.querySelector(".global-create"))'),'app shell');
  const before=JSON.stringify(store.read(profile,'production-flows'));
- await until(()=>js('document.querySelector(".flow-execution")?.open===true'),'panel opens for an ambiguous role');
- const text=await panelText();
- for(const expected of ['Papel duplicado','Como a produção executa este fluxo','Roteiro (e card no Notion, se ativado)','Agendamento autorizado','usa somente “Editor de vídeo” (a primeira na lista salva deste fluxo)','Conexões de contexto não enviam dados','Edição: Editor de Vídeo'])assert(text.includes(expected),`missing: ${expected}\n${text}`);
- assert(!text.includes('somente agentes Codex'),'the unused Claude box never blocks a valid configuration');
- await until(async()=>(await panelText()).includes('Edições neste fluxo ficam salvas para a próxima produção'),'active run snapshot notice');
- await screenshot('flow-execution-light');
- await js('Array.from(document.querySelectorAll(".flow-execution .text-link")).find(b=>b.textContent.trim()==="Ver caixa").click()');
- await until(()=>js('Boolean(document.querySelector(".production-flow-detail"))'),'box detail');
- await js('document.documentElement.dataset.appearance="dark"');await screenshot('flow-execution-dark');
+ await openNewProduction();
+ // The role shown is the one production executes: the first box of each role in the saved flow, not the extra Claude box.
+ await until(async()=>(await roleValue('Editor de vídeo')).includes('Editor de Vídeo'),'first video box shown');
+ assert(!(await roleValue('Editor de vídeo')).includes('Revisor Claude'));assert.match(await roleValue('Agente de conteúdo'),/Editor de Conteúdo/);
+ const text=await js('document.querySelector(".production-roles")?.innerText??""');
+ for(const expected of ['Quem faz cada etapa','Esta configuração tem 2 caixas deste papel; a produção usa só a primeira, mostrada aqui.','Uma produção em andamento continua com os agentes aprovados no início.'])assert(text.includes(expected),`missing: ${expected}
+${text}`);
+ assert(!(await js('document.body.innerText')).includes('somente agentes Codex'),'the unused Claude box never blocks a valid configuration');
+ await screenshot('flow-roles-light');
+ await js('document.documentElement.dataset.appearance="dark"');await screenshot('flow-roles-dark');
  win.setSize(360,800);await new Promise(resolve=>setTimeout(resolve,150));
- assert(await js('document.documentElement.scrollWidth<=360'),'no horizontal page scroll at 360px');await screenshot('flow-execution-360');
+ assert(await js('document.documentElement.scrollWidth<=360'),'no horizontal page scroll at 360px');await screenshot('flow-roles-360');
  await js('window.mainsAgentsSaveNow?.()');
- assert.equal(JSON.stringify(store.read(profile,'production-flows')),before,'viewing and inspecting never rewrites the saved diagram');
- assert.equal(JSON.stringify(runRow()),runBefore,'the active run is never rewritten from the Flow page');
+ assert.equal(JSON.stringify(store.read(profile,'production-flows')),before,'viewing the roles never rewrites the saved flow');
+ assert.equal(JSON.stringify(runRow()),runBefore,'the active run is never rewritten from the production dialog');
  assert.equal(sends,0,'no AI or production runtime was touched');assert.deepEqual(errors,[]);
- console.log(`FLOW_EXECUTION_UI_OK: active-run snapshot notice, ambiguous role explained, fixed order shown, diagram preserved, no AI, light/dark/360px. Screenshots: ${out}`);
+ console.log(`FLOW_EXECUTION_UI_OK: roles shown as executed (first box per role), repeated role explained, running-production snapshot notice, flow and active run preserved, no AI, light/dark/360px. Screenshots: ${out}`);
  win.destroy();runDb.close();await bridge.close();store.close();server.close();app.exit(0);
 }catch(error){console.error(error);console.error(errors);if(win&&!win.isDestroyed()){await screenshot('failure').catch(()=>{});win.destroy()}await bridge.close();store.close();server.close();app.exit(1)}});

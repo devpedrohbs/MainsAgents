@@ -37,6 +37,7 @@ interface ContentContextValue {
   changeFile:(assetId:string,role:AssetRole,sourceAssetId?:string)=>Promise<void>;
   removeFile:(assetId:string)=>Promise<void>;
   createTopic:(input:TopicInput)=>Promise<EditorialTopic>;
+  deleteTopic:(topicId:string,workspaceId:string)=>Promise<void>;
   createRecordingContent:(workspaceId:string,title:string)=>Promise<EditorialContent>;
   /** Content owned by one chat session of an agent ("Novo conteúdo"). */
   createSessionContent:(workspaceId:string,title:string,brief?:string)=>Promise<EditorialContent>;
@@ -183,6 +184,11 @@ export function ContentWorkflowProvider({children}:PropsWithChildren){
     await storage.command('/api/content/work?profile='+encodeURIComponent(profile()),{kind,targetId,agentId,requestKey,language:locale,agents:source?[source,agent]:[agent],...extra,expectedArtifactId});
     requestKeys.current.delete(key);
   },[storage,getAgentById,getProviderStatus,locale]);
+  const deleteTopic=useCallback(async(topicId:string,workspaceId:string)=>{
+    await storage.command(`/api/content/topics/delete?profile=${encodeURIComponent(profile())}`,{topicId,workspaceId,language:locale});
+    // Detach the topic only. Existing conversations are independent and stay in history.
+    updatePersistentValue<AgentSession[]>('sessions',[],sessions=>sessions.map(session=>{if(session.topicId!==topicId)return session;const {topicId:_topic,...rest}=session;return rest;}));
+  },[storage,locale]);
   const runResearch=useCallback((topicId:string,agentId:string)=>enqueueWork('research',topicId,agentId),[enqueueWork]);
   const reviseTopic=useCallback(async(topicId:string,changes:Pick<ResearchProposal,'title'|'summary'|'whyItMatters'|'angles'>)=>{
     const topic=stateRef.current.topics.find((item)=>item.id===topicId);
@@ -265,6 +271,6 @@ export function ContentWorkflowProvider({children}:PropsWithChildren){
   const changeFile=useCallback((assetId:string,role:AssetRole,sourceAssetId?:string)=>commit(current=>changeAssetMetadata(current,assetId,role,sourceAssetId)),[commit]);
   const removeFile=useCallback((assetId:string)=>commit(current=>removeAsset(current,assetId)),[commit]);
   const transferWork=useCallback((contentId:string,sourceAgentId:string,targetAgentId:string,instructions:string,assetIds:string[],newSession:boolean,expectedArtifactId?:string)=>enqueueWork('handoff',contentId,targetAgentId,{sourceAgentId,instructions,assetIds,newSession,expectedArtifactId}),[enqueueWork]);
-  return <Context.Provider value={{saveInspiration,state,ready,storageError,jobs,jobsError,workJobs,workError,mediaJobs,mediaCapabilities,inspectVideo,exportVideo,mediaAction,mediaReview,planVideoEdit,planMotion,previewEdit,cancelPreview,measureAudio,snapCut,previewFileUrl,createSubtitles,mediaFileUrl,transferWork,retryWork,cancelWork,workDetail,getNotionConnection,configureNotion,retryJob,setProductionStage,createTopic,createRecordingContent,createSessionContent,runResearch,reviseTopic,decideTopic,runScript,approveScript,reviewScript,reviewFiles,publicationCommand,publicationAccounts,publicationOptions,preparePublicationChange,publicationTransport,configureCalendarRefresh,publicationCalendar,calendarAccounts,syncCalendar,captureChatDelivery,attachFiles,reviseFile,verifyFiles,changeFile,removeFile}}>{children}</Context.Provider>;
+  return <Context.Provider value={{saveInspiration,state,ready,storageError,jobs,jobsError,workJobs,workError,mediaJobs,mediaCapabilities,inspectVideo,exportVideo,mediaAction,mediaReview,planVideoEdit,planMotion,previewEdit,cancelPreview,measureAudio,snapCut,previewFileUrl,createSubtitles,mediaFileUrl,transferWork,retryWork,cancelWork,workDetail,getNotionConnection,configureNotion,retryJob,setProductionStage,createTopic,deleteTopic,createRecordingContent,createSessionContent,runResearch,reviseTopic,decideTopic,runScript,approveScript,reviewScript,reviewFiles,publicationCommand,publicationAccounts,publicationOptions,preparePublicationChange,publicationTransport,configureCalendarRefresh,publicationCalendar,calendarAccounts,syncCalendar,captureChatDelivery,attachFiles,reviseFile,verifyFiles,changeFile,removeFile}}>{children}</Context.Provider>;
 }
 export function useContentWorkflow(){const context=useContext(Context);if(!context)throw new Error('useContentWorkflow requires ContentWorkflowProvider');return context}

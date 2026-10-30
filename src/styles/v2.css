@@ -1,0 +1,108 @@
+/* V2 system: dense type, hairline borders, one inset panel, color only as signal.
+   Loaded after every other layer, so these tokens and rules win for both appearances.
+   Page rules live in v2-pages.css (Home, Studio, Radar) and v2-team.css (the other pages). */
+:root,:root[data-appearance=dark]{
+ color-scheme:dark;
+ --frame:#0b0b0d;--bg:#111113;--surface:#16161a;--surface-2:#1c1c21;--surface-warm:var(--surface);
+ --fg:#ececef;--fg-2:#c9c9d1;--muted:#a4a4ad;--meta:#85858f;--faint:#6b6b75;
+ --border:#1f1f24;--border-soft:#1a1a1f;--line:#2a2a31;--line-strong:#33333b;
+ --accent:#5b8cff;--accent-hover:#8aa8ff;--accent-active:#b3c6ff;--accent-on:#0b1020;--accent-soft:#16203a;--link:#8aa8ff;
+ --primary-bg:#ececef;--primary-fg:#0b0b0d;--primary-hover:#ffffff;
+ --success:#3ecf8e;--success-soft:#0f1a15;--warn:#f0b03f;--warn-soft:#17140e;--danger:#f2555a;--danger-text:#ff8a8e;--danger-soft:#160f10;
+ --state-queued:#85858f;--state-running:#5b8cff;--state-waiting:#f0b03f;--state-paused:#a78bfa;--state-done:#3ecf8e;--state-failed:#f2555a;
+ --sidebar-bg:var(--frame);--sidebar-active:var(--surface-2);--topbar-bg:var(--frame);--bubble:var(--surface-2);
+ --radius-xs:4px;--radius-sm:6px;--radius-md:8px;--radius-lg:10px;
+ --font-mono:"JetBrains Mono",ui-monospace,"Cascadia Mono",Consolas,monospace;
+ --text-xs:12px;--text-sm:13px;--text-base:14px;
+ --row-h:32px;--control-h:32px;--control-h-sm:28px;--header-h:44px;
+ --elev-pop:0 8px 24px rgba(0,0,0,.45);
+ --focus-ring:0 0 0 3px color-mix(in oklab,var(--accent),transparent 65%);
+}
+:root[data-appearance=light]{
+ color-scheme:light;
+ --frame:#f4f4f5;--bg:#ffffff;--surface:#fafafa;--surface-2:#f1f1f3;--surface-warm:var(--surface);
+ --fg:#111113;--fg-2:#3f3f46;--muted:#55555e;--meta:#6b6b75;--faint:#8a8a93;
+ --border:#ececef;--border-soft:#f1f1f3;--line:#dedee3;--line-strong:#d0d0d6;
+ --accent:#2f6feb;--accent-hover:#2559c7;--accent-active:#1f4aa6;--accent-on:#ffffff;--accent-soft:#edf2fe;--link:#2559c7;
+ --primary-bg:#111113;--primary-fg:#ffffff;--primary-hover:#2a2a2e;
+ --success:#17a34a;--success-soft:#e8f6ee;--warn:#a86a12;--warn-soft:#fbf1df;--danger:#dc2626;--danger-text:#b91c1c;--danger-soft:#fcebeb;
+ --state-queued:#6b6b75;--state-running:#2f6feb;--state-waiting:#c27c0e;--state-paused:#7c5cd6;--state-done:#17a34a;--state-failed:#dc2626;
+ --elev-pop:0 8px 24px rgba(17,17,19,.12);
+ --focus-ring:0 0 0 3px color-mix(in oklab,var(--accent),transparent 72%);
+}
+
+/* Canvas keeps its previous look: the V1 surfaces, scoped to its view only. */
+:root:not([data-appearance=light]) .studio-shell[data-page=canvas]>.main>.view{
+ --bg:#18181a;--surface:#1f1f22;--surface-2:#26262a;--border:#2a2a2e;--border-soft:#222225;--line:#2a2a2e;--line-strong:#3a3a40;
+ --fg:#ededed;--fg-2:#d4d4d8;--muted:#a1a1a6;--meta:#8a8a90;--canvas-dot:#2a2a2e;--edge:#4a4a52;
+}
+
+html,body{background:var(--frame)}
+body{font-size:var(--text-sm);line-height:20px;font-feature-settings:"cv11" 1,"ss01" 1}
+
+/* Frame: the page lives in one inset panel with a hairline border. */
+.studio-shell>.main{padding:0 8px 8px 0}
+.studio-shell>.main>.view{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-lg)}
+.studio-shell .chat-layer:not(.floating){background:var(--bg);border-color:var(--border);border-radius:var(--radius-lg)}
+
+/* Sidebar: icons in --meta, active row filled, no accent bar. */
+:root .studio-shell>.sidebar{background:var(--frame)}
+.studio-shell .sidebar-search{height:30px;border-color:var(--border);background:var(--bg);color:var(--meta);border-radius:var(--radius-sm)}
+.studio-shell .sidebar-search kbd{border:0;background:transparent;font-family:var(--font-mono);font-size:11px;color:var(--meta)}
+.studio-shell .nav-label{font-size:11px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--meta)}
+.studio-shell .nav-item{min-height:30px;border-radius:var(--radius-sm);color:var(--muted);font-size:var(--text-sm)}
+.studio-shell .nav-item svg{color:var(--meta)}
+.studio-shell .nav-item.active{background:var(--sidebar-active);color:var(--fg);font-weight:500}
+.studio-shell .nav-item.active::before{display:none}
+.studio-shell .nav-item .badge{font-family:var(--font-mono);font-size:11px;color:var(--meta);background:transparent}
+
+/* Controls */
+:root .primary-button,:root .soft-button,:root .studio-shell .global-create{border-radius:var(--radius-sm);font-weight:500}
+.studio-shell .soft-button{background:var(--surface);border-color:var(--line)}
+.studio-shell .soft-button:hover{background:var(--surface-2);border-color:var(--line-strong)}
+.studio-shell input:not([type=checkbox]):not([type=radio]):not([type=range]),.studio-shell select,.studio-shell textarea{border-radius:var(--radius-sm);border-color:var(--line)}
+.studio-shell :focus-visible{outline:none;box-shadow:var(--focus-ring)}
+kbd,.v2-kbd{font-family:var(--font-mono);font-size:11px;color:var(--meta)}
+.v2-mono{font-family:var(--font-mono);font-size:12px;font-variant-numeric:tabular-nums}
+
+/* Shared V2 building blocks, used by both page files. */
+.v2-page{display:flex;flex-direction:column;min-height:100%}
+.v2-header{display:flex;flex-wrap:wrap;align-items:center;gap:10px;min-height:var(--header-h);padding:6px 12px 6px 20px;border-bottom:1px solid var(--border);box-sizing:border-box}
+.v2-header h1{margin:0;font-size:var(--text-sm);font-weight:600;letter-spacing:0}
+.v2-header .v2-sub{font-size:var(--text-xs);color:var(--meta)}
+.v2-header .v2-spacer{flex:1}
+.v2-section-title{display:flex;align-items:center;gap:8px;margin:0;font-size:var(--text-sm);font-weight:600}
+.v2-section-title .v2-sub{font-weight:400;font-size:var(--text-xs);color:var(--meta)}
+.v2-label{font-size:11px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--meta)}
+.v2-card{border:1px solid var(--border);border-radius:var(--radius-md);background:var(--bg)}
+.v2-list{border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden}
+.v2-row{display:flex;align-items:center;gap:12px;min-height:44px;padding:0 14px;border:0;border-top:1px solid var(--border);background:transparent;color:var(--fg);text-align:left;text-decoration:none;width:100%;box-sizing:border-box;font:inherit}
+.v2-row:first-child{border-top:0}
+.v2-row:hover{background:var(--surface)}
+.v2-row[aria-pressed=true],.v2-row[aria-current=true],.v2-row.selected{background:var(--surface-2)}
+.v2-ellipsis{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.v2-segmented{display:inline-flex;padding:2px;border:1px solid var(--line);border-radius:7px;background:var(--frame)}
+.v2-segmented button{height:24px;padding:0 10px;border:0;border-radius:5px;background:transparent;color:var(--muted);font-size:var(--text-xs)}
+.v2-segmented button[aria-pressed=true],.v2-segmented button[aria-selected=true]{background:var(--surface-2);color:var(--fg)}
+.v2-tabs{display:flex;gap:18px;border-bottom:1px solid var(--border)}
+.v2-tabs button{height:34px;padding:0;border:0;border-bottom:2px solid transparent;margin-bottom:-1px;background:transparent;color:var(--muted);font-size:var(--text-xs)}
+.v2-tabs button[aria-selected=true]{border-bottom-color:var(--fg);color:var(--fg)}
+.v2-chip{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 8px;border:1px solid var(--line);border-radius:var(--radius-xs);font-size:var(--text-xs);color:var(--muted)}
+.v2-count{font-family:var(--font-mono);font-size:11px;height:18px;line-height:18px;padding:0 6px;border-radius:var(--radius-xs);background:var(--surface-2);color:var(--muted)}
+.v2-count.waiting{background:var(--warn-soft);color:var(--warn)}
+.v2-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1px;background:var(--border);border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden}
+.v2-kpis>*{background:var(--bg);padding:14px 16px 12px;display:flex;flex-direction:column;gap:6px}
+.v2-kpis .v2-kpi-label{font-size:var(--text-xs);color:var(--muted)}
+.v2-kpis .v2-kpi-value{font-size:24px;line-height:30px;font-weight:600;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+.v2-steps{display:flex;gap:2px}
+.v2-steps i{flex:1;height:4px;border-radius:2px;background:var(--line)}
+.v2-steps i.done{background:var(--state-done)}
+.v2-steps i.running{background:var(--state-running)}
+.v2-steps i.waiting{background:var(--state-waiting)}
+.v2-steps i.failed{background:var(--state-failed)}
+.v2-gate{border:1px solid color-mix(in srgb,var(--warn) 28%,transparent);border-radius:var(--radius-md);background:var(--warn-soft);padding:12px;display:flex;flex-direction:column;gap:10px}
+.v2-inspector{border-left:1px solid var(--border);display:flex;flex-direction:column;gap:16px;padding:16px;box-sizing:border-box;overflow:auto}
+
+/* Status icon: one shape per state so it reads without telling hues apart. */
+.v2-status{display:inline-flex;flex:0 0 auto;width:14px;height:14px}
+.v2-status svg{width:100%;height:100%}
